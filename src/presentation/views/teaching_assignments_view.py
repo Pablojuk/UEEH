@@ -1,0 +1,135 @@
+"""Vista funcional de asignaciones académicas."""
+
+from __future__ import annotations
+
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from src.application.services.catalog_service import CatalogService
+from src.application.services.teacher_service import TeacherService
+from src.application.services.teaching_assignment_service import TeachingAssignmentService
+
+
+class TeachingAssignmentsView(QWidget):
+    def __init__(
+        self,
+        teaching_assignment_service: TeachingAssignmentService,
+        teacher_service: TeacherService,
+        catalog_service: CatalogService,
+    ) -> None:
+        super().__init__()
+        self.teaching_assignment_service = teaching_assignment_service
+        self.teacher_service = teacher_service
+        self.catalog_service = catalog_service
+
+        root = QVBoxLayout(self)
+        title = QLabel("Asignaciones Académicas")
+        title.setObjectName("Title")
+        subtitle = QLabel("Asignar docente + asignatura + curso + paralelo + período")
+        subtitle.setObjectName("Subtitle")
+
+        search_row = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Buscar por docente, asignatura, curso, paralelo o período")
+        self.search_input.textChanged.connect(self.load_assignments)
+        search_row.addWidget(self.search_input)
+
+        card = QFrame()
+        card.setObjectName("Card")
+        form = QFormLayout(card)
+
+        self.teacher_combo = QComboBox()
+        self.subject_combo = QComboBox()
+        self.course_combo = QComboBox()
+        self.parallel_combo = QComboBox()
+        self.period_combo = QComboBox()
+
+        form.addRow("Docente", self.teacher_combo)
+        form.addRow("Asignatura", self.subject_combo)
+        form.addRow("Curso", self.course_combo)
+        form.addRow("Paralelo", self.parallel_combo)
+        form.addRow("Período", self.period_combo)
+
+        actions = QHBoxLayout()
+        self.save_button = QPushButton("Guardar asignación")
+        self.save_button.clicked.connect(self.save_assignment)
+        actions.addWidget(self.save_button)
+        actions.addStretch(1)
+
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["ID", "Docente", "Asignatura", "Curso", "Paralelo", "Período"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+
+        root.addWidget(title)
+        root.addWidget(subtitle)
+        root.addLayout(search_row)
+        root.addWidget(card)
+        root.addLayout(actions)
+        root.addWidget(self.table, 1)
+
+        self.load_combos()
+        self.load_assignments()
+
+    def load_combos(self) -> None:
+        self.teacher_combo.clear()
+        for row in self.teacher_service.listar_docentes():
+            label = f"{row.get('apellidos', '')} {row.get('nombres', '')}".strip()
+            self.teacher_combo.addItem(label, row.get("id_docente"))
+
+        self.subject_combo.clear()
+        for row in self.catalog_service.listar_asignaturas():
+            self.subject_combo.addItem(row.get("nombre", row.get("id_asignatura", "")), row.get("id_asignatura"))
+
+        self.course_combo.clear()
+        for row in self.catalog_service.listar_cursos():
+            self.course_combo.addItem(row.get("nombre", row.get("id_curso", "")), row.get("id_curso"))
+
+        self.parallel_combo.clear()
+        for row in self.catalog_service.listar_paralelos():
+            self.parallel_combo.addItem(row.get("nombre", row.get("id_paralelo", "")), row.get("id_paralelo"))
+
+        self.period_combo.clear()
+        for row in self.catalog_service.listar_periodos_lectivos():
+            self.period_combo.addItem(row.get("id_periodo", ""), row.get("id_periodo"))
+
+    def save_assignment(self) -> None:
+        payload = {
+            "docente_id": self.teacher_combo.currentData(),
+            "asignatura_id": self.subject_combo.currentData(),
+            "curso_id": self.course_combo.currentData(),
+            "paralelo_id": self.parallel_combo.currentData(),
+            "periodo_id": self.period_combo.currentData(),
+        }
+        ok, message = self.teaching_assignment_service.crear_asignacion(payload)
+        if ok:
+            QMessageBox.information(self, "Éxito", message)
+            self.load_assignments()
+        else:
+            QMessageBox.warning(self, "Validación", message)
+
+    def load_assignments(self) -> None:
+        query = self.search_input.text().strip()
+        rows = self.teaching_assignment_service.buscar_asignaciones(query) if query else self.teaching_assignment_service.listar_asignaciones()
+
+        self.table.setRowCount(0)
+        for row_data in rows:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(row_data.get("id_asignacion", "")))
+            self.table.setItem(row, 1, QTableWidgetItem(row_data.get("docente_id", "")))
+            self.table.setItem(row, 2, QTableWidgetItem(row_data.get("asignatura_id", "")))
+            self.table.setItem(row, 3, QTableWidgetItem(row_data.get("curso_id", "")))
+            self.table.setItem(row, 4, QTableWidgetItem(row_data.get("paralelo_id", "")))
+            self.table.setItem(row, 5, QTableWidgetItem(row_data.get("periodo_id", "")))
