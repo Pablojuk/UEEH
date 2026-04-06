@@ -62,15 +62,36 @@ class StudentService:
         self.repo.actualizar(student_id, normalized)
         return True, "Estudiante actualizado"
 
+    def eliminar_estudiantes(self, student_ids: list[str]) -> tuple[int, list[str]]:
+        eliminados = 0
+        bloqueos: list[str] = []
+        for student_id in student_ids:
+            deps = self.connection.execute(
+                """
+                SELECT
+                    (SELECT COUNT(1) FROM matriculas WHERE estudiante_id = ?) AS matr,
+                    (SELECT COUNT(1) FROM grade_records WHERE estudiante_id = ?) AS notes,
+                    (SELECT COUNT(1) FROM final_supplementary WHERE estudiante_id = ?) AS supp
+                """,
+                (student_id, student_id, student_id),
+            ).fetchone()
+            if deps and (deps["matr"] > 0 or deps["notes"] > 0 or deps["supp"] > 0):
+                bloqueos.append(f"{student_id}: tiene matrículas o notas relacionadas")
+                continue
+            self.repo.eliminar(student_id)
+            eliminados += 1
+        return eliminados, bloqueos
+
     def validar_duplicado(self, data: dict, exclude_id: str | None = None) -> str | None:
         rows = self.listar_estudiantes()
+        identificacion_data = self._normalizar_identificacion(data.get("identificacion"))
 
         for row in rows:
             if exclude_id and row.get("id_estudiante") == exclude_id:
                 continue
 
-            if data.get("identificacion") and row.get("identificacion"):
-                if data["identificacion"].strip().lower() == row["identificacion"].strip().lower():
+            identificacion_row = self._normalizar_identificacion(row.get("identificacion"))
+            if identificacion_data and identificacion_row and identificacion_data == identificacion_row:
                     return "Duplicado por identificación"
 
             same_name = data.get("nombres", "").strip().lower() == row.get("nombres", "").strip().lower()
@@ -98,5 +119,19 @@ class StudentService:
             "codigo": code,
             "apellidos": lastnames,
             "nombres": names,
-            "identificacion": identification,
+            "identificacion": StudentService._normalizar_identificacion(identification),
         }
+
+    @staticmethod
+    def _normalizar_identificacion(value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text or text.lower() in {"nan", "none", "null"}:
+            return None
+        if text.endswith(".0"):
+            base = text[:-2]
+            if base.isdigit():
+                text = base
+        normalized = "".join(char for char in text if char.isalnum())
+        return normalized or None

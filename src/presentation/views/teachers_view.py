@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QFileDialog,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -18,12 +19,14 @@ from PySide6.QtWidgets import (
 )
 
 from src.application.services.teacher_service import TeacherService
+from src.presentation.app_signals import AppSignals
 
 
 class TeachersView(QWidget):
-    def __init__(self, teacher_service: TeacherService) -> None:
+    def __init__(self, teacher_service: TeacherService, app_signals: AppSignals | None = None) -> None:
         super().__init__()
         self.teacher_service = teacher_service
+        self.app_signals = app_signals
         self.editing_teacher_id: str | None = None
 
         root = QVBoxLayout(self)
@@ -59,10 +62,16 @@ class TeachersView(QWidget):
         self.save_button.clicked.connect(self.save_teacher)
         self.toggle_button = QPushButton("Activar/Inactivar")
         self.toggle_button.clicked.connect(self.toggle_teacher_status)
+        self.delete_button = QPushButton("Borrar Docente")
+        self.delete_button.clicked.connect(self.delete_teacher)
+        self.import_button = QPushButton("Importar Excel/CSV")
+        self.import_button.clicked.connect(self.import_teachers)
 
         actions.addWidget(self.new_button)
         actions.addWidget(self.save_button)
         actions.addWidget(self.toggle_button)
+        actions.addWidget(self.delete_button)
+        actions.addWidget(self.import_button)
         actions.addStretch(1)
 
         self.table = QTableWidget(0, 5)
@@ -121,6 +130,8 @@ class TeachersView(QWidget):
         QMessageBox.information(self, "Éxito", "Docente guardado correctamente.")
         self.reset_form()
         self.load_teachers()
+        if self.app_signals:
+            self.app_signals.data_changed.emit("teachers")
 
     def load_teachers(self) -> None:
         query = self.search_input.text().strip().lower()
@@ -176,4 +187,56 @@ class TeachersView(QWidget):
         else:
             self.teacher_service.activar_docente(self.editing_teacher_id)
 
+        self.load_teachers()
+        if self.app_signals:
+            self.app_signals.data_changed.emit("teachers")
+
+    def delete_teacher(self) -> None:
+        if not self.editing_teacher_id:
+            QMessageBox.warning(self, "Validación", "Seleccione un docente de la tabla.")
+            return
+        confirm = QMessageBox.question(self, "Confirmación", "¿Seguro que desea borrar el docente seleccionado?")
+        if confirm != QMessageBox.Yes:
+            return
+        ok, message = self.teacher_service.eliminar_docente(self.editing_teacher_id)
+        if ok:
+            QMessageBox.information(self, "Éxito", message)
+            self.reset_form()
+            self.load_teachers()
+            if self.app_signals:
+                self.app_signals.data_changed.emit("teachers")
+        else:
+            QMessageBox.warning(self, "Validación", message)
+
+    def import_teachers(self) -> None:
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seleccionar archivo de docentes",
+            "",
+            "Archivos soportados (*.xlsx *.xlsm *.csv)",
+        )
+        if not file_path:
+            return
+        try:
+            summary = self.teacher_service.importar_desde_excel(file_path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Error", f"No se pudo importar: {exc}")
+            return
+
+        message = (
+            f"Total leídos: {summary['total_leidos']}\n"
+            f"Válidos: {summary['validos']}\n"
+            f"Importados: {summary['importados']}\n"
+            f"Omitidos: {summary['omitidos']}\n"
+            f"Duplicados: {summary['duplicados']}\n"
+            f"Errores: {len(summary['errores'])}"
+        )
+        if summary["errores"]:
+            message += "\n\nDetalle:\n- " + "\n- ".join(summary["errores"][:15])
+        QMessageBox.information(self, "Resultado importación", message)
+        self.load_teachers()
+        if self.app_signals:
+            self.app_signals.data_changed.emit("teachers")
+
+    def refresh_data(self) -> None:
         self.load_teachers()
