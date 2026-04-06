@@ -2,27 +2,24 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import uuid
 from typing import Any
 
-from src.domain.calculations import (
-    calcular_nota_trimestral,
-    calcular_promedio_formativo,
-    calcular_promedio_sumativo,
-)
-from src.infrastructure.persistence.repositories import GradeRecordsRepository
+from src.domain.calculations import calcular_nota_trimestral, calcular_promedio_formativo, calcular_promedio_sumativo
+from src.infrastructure.persistence.repositories import GradeActivityConfigRepository, GradeRecordsRepository
 
 
 class GradeRegistrationService:
     """Casos de uso para carga, cálculo y guardado de notas trimestrales."""
 
-    FORMATIVE_FIELDS = ("actividad_1", "mejora_1", "actividad_2", "mejora_2", "actividad_3", "mejora_3")
     SUMMATIVE_FIELDS = ("proyecto", "evaluacion", "refuerzo", "mejora_sumativa")
 
     def __init__(self, connection: sqlite3.Connection, min_grade: float = 0.0, max_grade: float = 10.0) -> None:
         self.connection = connection
         self.repo = GradeRecordsRepository(connection)
+        self.activity_config_repo = GradeActivityConfigRepository(connection)
         self.min_grade = min_grade
         self.max_grade = max_grade
 
@@ -60,6 +57,33 @@ class GradeRegistrationService:
             contextos.append(row_data)
         return contextos
 
+    def obtener_numero_actividades(self, asignacion_id: str, trimestre_num: int) -> int:
+        row = self.connection.execute(
+            "SELECT numero_actividades FROM grade_activity_config WHERE asignacion_id = ? AND trimestre_num = ?",
+            (asignacion_id, trimestre_num),
+        ).fetchone()
+        if row:
+            return int(row["numero_actividades"])
+        return 3
+
+    def configurar_numero_actividades(self, asignacion_id: str, trimestre_num: int, numero_actividades: int) -> tuple[bool, str]:
+        if numero_actividades < 1 or numero_actividades > 20:
+            return False, "El número de actividades debe estar entre 1 y 20"
+        row = self.connection.execute(
+            "SELECT * FROM grade_activity_config WHERE asignacion_id = ? AND trimestre_num = ?",
+            (asignacion_id, trimestre_num),
+        ).fetchone()
+        payload = {
+            "asignacion_id": asignacion_id,
+            "trimestre_num": trimestre_num,
+            "numero_actividades": numero_actividades,
+        }
+        if row:
+            self.activity_config_repo.actualizar(row["id_config"], payload)
+        else:
+            self.activity_config_repo.crear({"id_config": str(uuid.uuid4()), **payload})
+        return True, "Configuración de actividades actualizada"
+
     def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict[str, Any]]:
         if trimestre_num not in (1, 2, 3):
             raise ValueError("El trimestre debe ser 1, 2 o 3")
@@ -70,6 +94,7 @@ class GradeRegistrationService:
         if not asignacion:
             return []
 
+        numero_actividades = self.obtener_numero_actividades(asignacion_id, trimestre_num)
         estudiantes = self.connection.execute(
             """
             SELECT
@@ -100,10 +125,10 @@ class GradeRegistrationService:
         for estudiante in estudiantes:
             estudiante_row = dict(estudiante)
             registro = por_estudiante.get(estudiante_row["id_estudiante"])
-            fila = self._fila_base_estudiante(estudiante_row)
+            fila = self._fila_base_estudiante(estudiante_row, numero_actividades)
             if registro:
-                fila.update(registro)
-            fila = self.recalcular_fila(fila)
+                fila.update(self._expand_dynamic_fields(registro, numero_actividades))
+            fila = self.recalcular_fila(fila, numero_actividades)
             resultado.append(fila)
         return resultado
 
@@ -111,6 +136,7 @@ class GradeRegistrationService:
         if trimestre_num not in (1, 2, 3):
             return False, "Trimestre inválido"
 
+        numero_actividades = self.obtener_numero_actividades(asignacion_id, trimestre_num)
         existentes = self.connection.execute(
             "SELECT * FROM grade_records WHERE asignacion_id = ? AND trimestre_num = ?",
             (asignacion_id, trimestre_num),
@@ -123,16 +149,25 @@ class GradeRegistrationService:
             if not estudiante_id:
                 continue
 
-            validada = self.validar_y_normalizar_fila(fila)
-            calculada = self.recalcular_fila(validada)
+            validada = self.validar_y_normalizar_fila(fila, numero_actividades)
+            calculada = self.recalcular_fila(validada, numero_actividades)
+            actividades, mejoras = self._extract_activities(calculada, numero_actividades)
             payload = {
                 "estudiante_id": estudiante_id,
                 "asignacion_id": asignacion_id,
                 "trimestre_num": trimestre_num,
-                **{campo: calculada.get(campo) for campo in self.FORMATIVE_FIELDS + self.SUMMATIVE_FIELDS},
+                "actividad_1": actividades[0] if len(actividades) > 0 else None,
+                "mejora_1": mejoras[0] if len(mejoras) > 0 else None,
+                "actividad_2": actividades[1] if len(actividades) > 1 else None,
+                "mejora_2": mejoras[1] if len(mejoras) > 1 else None,
+                "actividad_3": actividades[2] if len(actividades) > 2 else None,
+                "mejora_3": mejoras[2] if len(mejoras) > 2 else None,
+                **{campo: calculada.get(campo) for campo in self.SUMMATIVE_FIELDS},
                 "promedio_formativo": calculada.get("promedio_formativo"),
                 "promedio_sumativo": calculada.get("promedio_sumativo"),
                 "nota_trimestral": calculada.get("nota_trimestral"),
+                "actividades_json": json.dumps(actividades, ensure_ascii=False),
+                "mejoras_json": json.dumps(mejoras, ensure_ascii=False),
             }
 
             existente = por_estudiante.get(estudiante_id)
@@ -144,22 +179,26 @@ class GradeRegistrationService:
 
         return True, f"Registros guardados: {procesados}"
 
-    def validar_y_normalizar_fila(self, fila: dict[str, Any]) -> dict[str, Any]:
+    def validar_y_normalizar_fila(self, fila: dict[str, Any], numero_actividades: int = 3) -> dict[str, Any]:
         salida = dict(fila)
-        for campo in self.FORMATIVE_FIELDS + self.SUMMATIVE_FIELDS:
+        for idx in range(1, numero_actividades + 1):
+            salida[f"actividad_{idx}"] = self._normalizar_nota(fila.get(f"actividad_{idx}"), f"actividad_{idx}")
+            salida[f"mejora_{idx}"] = self._normalizar_nota(fila.get(f"mejora_{idx}"), f"mejora_{idx}")
+        for campo in self.SUMMATIVE_FIELDS:
             salida[campo] = self._normalizar_nota(fila.get(campo), campo)
         return salida
 
-    def recalcular_fila(self, fila: dict[str, Any]) -> dict[str, Any]:
-        data = self.validar_y_normalizar_fila(fila)
+    def recalcular_fila(self, fila: dict[str, Any], numero_actividades: int = 3) -> dict[str, Any]:
+        data = self.validar_y_normalizar_fila(fila, numero_actividades)
 
-        promedio_formativo = calcular_promedio_formativo(
-            [
-                (data["actividad_1"] or 0.0, data["mejora_1"]),
-                (data["actividad_2"] or 0.0, data["mejora_2"]),
-                (data["actividad_3"] or 0.0, data["mejora_3"]),
-            ]
-        )
+        actividades_formativas = []
+        for idx in range(1, numero_actividades + 1):
+            actividad = data.get(f"actividad_{idx}")
+            if actividad is None:
+                continue
+            actividades_formativas.append((actividad, data.get(f"mejora_{idx}")))
+
+        promedio_formativo = calcular_promedio_formativo(actividades_formativas)
         promedio_sumativo = calcular_promedio_sumativo(
             [
                 (data["proyecto"] or 0.0, data["mejora_sumativa"]),
@@ -181,6 +220,8 @@ class GradeRegistrationService:
         texto = str(valor).strip()
         if texto == "":
             return None
+        if texto.upper() in {"J", "JP", "JUST", "JUSTIFICADO", "NP", "N/P", "NO PRESENTADO"}:
+            return None
 
         try:
             nota = float(texto)
@@ -192,8 +233,8 @@ class GradeRegistrationService:
 
         return nota
 
-    def _fila_base_estudiante(self, estudiante: dict[str, Any]) -> dict[str, Any]:
-        return {
+    def _fila_base_estudiante(self, estudiante: dict[str, Any], numero_actividades: int) -> dict[str, Any]:
+        base = {
             "id_registro": None,
             "estudiante_id": estudiante["id_estudiante"],
             "estudiante": f"{estudiante.get('apellidos', '')} {estudiante.get('nombres', '')}".strip(),
@@ -201,12 +242,6 @@ class GradeRegistrationService:
             "numero_lista": estudiante.get("numero_lista"),
             "asignacion_id": None,
             "trimestre_num": None,
-            "actividad_1": None,
-            "mejora_1": None,
-            "actividad_2": None,
-            "mejora_2": None,
-            "actividad_3": None,
-            "mejora_3": None,
             "proyecto": None,
             "evaluacion": None,
             "refuerzo": None,
@@ -215,3 +250,46 @@ class GradeRegistrationService:
             "promedio_sumativo": 0.0,
             "nota_trimestral": 0.0,
         }
+        for idx in range(1, numero_actividades + 1):
+            base[f"actividad_{idx}"] = None
+            base[f"mejora_{idx}"] = None
+        return base
+
+    def _expand_dynamic_fields(self, registro: dict[str, Any], numero_actividades: int) -> dict[str, Any]:
+        out = dict(registro)
+        actividades = self._json_to_list(registro.get("actividades_json"))
+        mejoras = self._json_to_list(registro.get("mejoras_json"))
+
+        legacy_actividades = [registro.get("actividad_1"), registro.get("actividad_2"), registro.get("actividad_3")]
+        legacy_mejoras = [registro.get("mejora_1"), registro.get("mejora_2"), registro.get("mejora_3")]
+        for idx in range(3):
+            if idx >= len(actividades):
+                actividades.append(legacy_actividades[idx])
+            if idx >= len(mejoras):
+                mejoras.append(legacy_mejoras[idx])
+
+        while len(actividades) < numero_actividades:
+            actividades.append(None)
+        while len(mejoras) < numero_actividades:
+            mejoras.append(None)
+
+        for idx in range(1, numero_actividades + 1):
+            out[f"actividad_{idx}"] = actividades[idx - 1]
+            out[f"mejora_{idx}"] = mejoras[idx - 1]
+        return out
+
+    @staticmethod
+    def _json_to_list(value: Any) -> list[Any]:
+        if not value:
+            return []
+        try:
+            data = json.loads(value)
+            return data if isinstance(data, list) else []
+        except Exception:  # noqa: BLE001
+            return []
+
+    @staticmethod
+    def _extract_activities(data: dict[str, Any], numero_actividades: int) -> tuple[list[Any], list[Any]]:
+        actividades = [data.get(f"actividad_{idx}") for idx in range(1, numero_actividades + 1)]
+        mejoras = [data.get(f"mejora_{idx}") for idx in range(1, numero_actividades + 1)]
+        return actividades, mejoras

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -17,30 +18,11 @@ from PySide6.QtWidgets import (
 )
 
 from src.application.services.grade_registration_service import GradeRegistrationService
+from src.presentation.app_signals import AppSignals
 
 
 class GradesView(QWidget):
-    EDITABLE_COLUMNS = {
-        "actividad_1",
-        "mejora_1",
-        "actividad_2",
-        "mejora_2",
-        "actividad_3",
-        "mejora_3",
-        "proyecto",
-        "evaluacion",
-        "refuerzo",
-        "mejora_sumativa",
-    }
-
-    TABLE_COLUMNS = [
-        ("estudiante", "Estudiante"),
-        ("actividad_1", "Actividad 1"),
-        ("mejora_1", "Mejora 1"),
-        ("actividad_2", "Actividad 2"),
-        ("mejora_2", "Mejora 2"),
-        ("actividad_3", "Actividad 3"),
-        ("mejora_3", "Mejora 3"),
+    SUMMATIVE_COLUMNS = [
         ("proyecto", "Proyecto"),
         ("evaluacion", "Evaluación"),
         ("refuerzo", "Refuerzo"),
@@ -50,11 +32,14 @@ class GradesView(QWidget):
         ("nota_trimestral", "Nota Trimestral"),
     ]
 
-    def __init__(self, grade_registration_service: GradeRegistrationService) -> None:
+    def __init__(self, grade_registration_service: GradeRegistrationService, app_signals: AppSignals | None = None) -> None:
         super().__init__()
         self.grade_registration_service = grade_registration_service
+        self.app_signals = app_signals
         self._contextos: list[dict] = []
         self._fila_meta: list[dict] = []
+        self._numero_actividades = 3
+        self._table_columns: list[tuple[str, str]] = []
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -75,6 +60,13 @@ class GradesView(QWidget):
         self.trimester_combo.addItem("Trimestre 2", 2)
         self.trimester_combo.addItem("Trimestre 3", 3)
 
+        self.activities_count_input = QSpinBox()
+        self.activities_count_input.setRange(1, 20)
+        self.activities_count_input.setValue(3)
+
+        self.generate_activities_button = QPushButton("Generar actividades")
+        self.generate_activities_button.clicked.connect(self.generate_activities)
+
         self.load_button = QPushButton("Cargar estudiantes")
         self.load_button.clicked.connect(self.load_rows)
         self.recalc_button = QPushButton("Recalcular")
@@ -86,12 +78,14 @@ class GradesView(QWidget):
         filter_row.addWidget(self.assignment_combo, 1)
         filter_row.addWidget(QLabel("Trimestre"))
         filter_row.addWidget(self.trimester_combo)
+        filter_row.addWidget(QLabel("N° actividades"))
+        filter_row.addWidget(self.activities_count_input)
+        filter_row.addWidget(self.generate_activities_button)
         filter_row.addWidget(self.load_button)
         filter_row.addWidget(self.recalc_button)
         filter_row.addWidget(self.save_button)
 
-        self.table = QTableWidget(0, len(self.TABLE_COLUMNS))
-        self.table.setHorizontalHeaderLabels([title for _, title in self.TABLE_COLUMNS])
+        self.table = QTableWidget(0, 1)
         self.table.horizontalHeader().setStretchLastSection(True)
 
         root.addWidget(title)
@@ -112,6 +106,21 @@ class GradesView(QWidget):
         for row in self._contextos:
             self.assignment_combo.addItem(row.get("display", row.get("id_asignacion", "")), row.get("id_asignacion"))
 
+    def generate_activities(self) -> None:
+        asignacion_id = self.assignment_combo.currentData()
+        trimestre = self.trimester_combo.currentData()
+        if not asignacion_id:
+            QMessageBox.warning(self, "Validación", "Seleccione una asignación")
+            return
+        numero = int(self.activities_count_input.value())
+        ok, message = self.grade_registration_service.configurar_numero_actividades(asignacion_id, int(trimestre), numero)
+        if ok:
+            QMessageBox.information(self, "Éxito", message)
+            self._numero_actividades = numero
+            self._setup_columns()
+        else:
+            QMessageBox.warning(self, "Validación", message)
+
     def load_rows(self) -> None:
         asignacion_id = self.assignment_combo.currentData()
         trimestre = self.trimester_combo.currentData()
@@ -119,6 +128,8 @@ class GradesView(QWidget):
             self._clear_table()
             return
 
+        self._numero_actividades = self.grade_registration_service.obtener_numero_actividades(asignacion_id, int(trimestre))
+        self.activities_count_input.setValue(self._numero_actividades)
         try:
             filas = self.grade_registration_service.cargar_registro(asignacion_id, int(trimestre))
         except ValueError as exc:
@@ -133,7 +144,7 @@ class GradesView(QWidget):
         recalculadas = []
         try:
             for fila in filas:
-                recalculadas.append(self.grade_registration_service.recalcular_fila(fila))
+                recalculadas.append(self.grade_registration_service.recalcular_fila(fila, self._numero_actividades))
         except ValueError as exc:
             QMessageBox.warning(self, "Validación", str(exc))
             return
@@ -157,20 +168,32 @@ class GradesView(QWidget):
         if ok:
             QMessageBox.information(self, "Éxito", message)
             self.load_rows()
+            if self.app_signals:
+                self.app_signals.data_changed.emit("grades")
         else:
             QMessageBox.warning(self, "Error", message)
 
+    def _setup_columns(self) -> None:
+        self._table_columns = [("estudiante", "Estudiante")]
+        for idx in range(1, self._numero_actividades + 1):
+            self._table_columns.append((f"actividad_{idx}", f"Actividad {idx}"))
+            self._table_columns.append((f"mejora_{idx}", f"Mejora {idx}"))
+        self._table_columns.extend(self.SUMMATIVE_COLUMNS)
+        self.table.setColumnCount(len(self._table_columns))
+        self.table.setHorizontalHeaderLabels([title for _, title in self._table_columns])
+
     def _fill_table(self, rows: list[dict]) -> None:
         self._clear_table()
+        self._setup_columns()
         self._fila_meta = rows
         for row_data in rows:
             row = self.table.rowCount()
             self.table.insertRow(row)
-            for col, (field, _) in enumerate(self.TABLE_COLUMNS):
+            for col, (field, _) in enumerate(self._table_columns):
                 value = row_data.get(field)
                 text = "" if value is None else str(value)
                 item = QTableWidgetItem(text)
-                if field not in self.EDITABLE_COLUMNS:
+                if field in {"estudiante", "promedio_formativo", "promedio_sumativo", "nota_trimestral"}:
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 self.table.setItem(row, col, item)
 
@@ -179,7 +202,7 @@ class GradesView(QWidget):
         for row_idx in range(self.table.rowCount()):
             meta = self._fila_meta[row_idx] if row_idx < len(self._fila_meta) else {}
             row_data = dict(meta)
-            for col, (field, _) in enumerate(self.TABLE_COLUMNS):
+            for col, (field, _) in enumerate(self._table_columns):
                 item = self.table.item(row_idx, col)
                 text = item.text().strip() if item else ""
                 row_data[field] = text if text != "" else None
@@ -189,3 +212,6 @@ class GradesView(QWidget):
     def _clear_table(self) -> None:
         self.table.setRowCount(0)
         self._fila_meta = []
+
+    def refresh_data(self) -> None:
+        self.load_contexts()

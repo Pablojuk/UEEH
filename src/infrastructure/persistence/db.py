@@ -52,6 +52,16 @@ def _run_compatibility_migrations(connection: sqlite3.Connection) -> None:
                     "ALTER TABLE docentes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1))"
                 )
 
+        if _column_exists(connection, "institucion", "id_institucion"):
+            if not _column_exists(connection, "institucion", "logo_path"):
+                connection.execute("ALTER TABLE institucion ADD COLUMN logo_path TEXT")
+
+        if _column_exists(connection, "grade_records", "id_registro"):
+            if not _column_exists(connection, "grade_records", "actividades_json"):
+                connection.execute("ALTER TABLE grade_records ADD COLUMN actividades_json TEXT")
+            if not _column_exists(connection, "grade_records", "mejoras_json"):
+                connection.execute("ALTER TABLE grade_records ADD COLUMN mejoras_json TEXT")
+
 
 def initialize_database(db_path: str | None = None) -> sqlite3.Connection:
     """Inicializa el esquema completo y retorna la conexión activa."""

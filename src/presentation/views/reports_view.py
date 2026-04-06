@@ -17,9 +17,11 @@ class ReportsView(QWidget):
     ) -> None:
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.addWidget(
-            AcademicSummaryView(
-                academic_summary_service=academic_summary_service,
-                report_export_service=report_export_service,
-            )
+        self.academic_summary_view = AcademicSummaryView(
+            academic_summary_service=academic_summary_service,
+            report_export_service=report_export_service,
         )
+        layout.addWidget(self.academic_summary_view)
+
+    def refresh_data(self) -> None:
+        self.academic_summary_view.load_contexts()

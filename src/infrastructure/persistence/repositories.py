@@ -48,6 +48,11 @@ class SQLiteRepository:
         with self.connection:
             self.connection.execute(query, valores)
 
+    def eliminar(self, id_value: Any) -> None:
+        query = f"DELETE FROM {self.table_name} WHERE {self.id_field} = ?"
+        with self.connection:
+            self.connection.execute(query, (id_value,))
+
 
 class ConfiguracionSistemaRepository(SQLiteRepository):
     table_name = "configuracion_sistema"
@@ -65,7 +70,7 @@ class ConfiguracionSistemaRepository(SQLiteRepository):
 class InstitucionRepository(SQLiteRepository):
     table_name = "institucion"
     id_field = "id_institucion"
-    fields = ("id_institucion", "nombre", "jornada")
+    fields = ("id_institucion", "nombre", "jornada", "logo_path")
 
 
 class DocentesRepository(SQLiteRepository):
@@ -157,7 +162,15 @@ class GradeRecordsRepository(SQLiteRepository):
         "promedio_formativo",
         "promedio_sumativo",
         "nota_trimestral",
+        "actividades_json",
+        "mejoras_json",
     )
+
+
+class GradeActivityConfigRepository(SQLiteRepository):
+    table_name = "grade_activity_config"
+    id_field = "id_config"
+    fields = ("id_config", "asignacion_id", "trimestre_num", "numero_actividades")
 
 
 class FinalSupplementaryRepository(SQLiteRepository):

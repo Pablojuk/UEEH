@@ -62,16 +62,42 @@ class StudentService:
         self.repo.actualizar(student_id, normalized)
         return True, "Estudiante actualizado"
 
+    def eliminar_estudiantes(self, student_ids: list[str]) -> tuple[int, list[str]]:
+        eliminados = 0
+        bloqueos: list[str] = []
+        for student_id in student_ids:
+            deps = self.connection.execute(
+                """
+                SELECT
+                    (SELECT COUNT(1) FROM matriculas WHERE estudiante_id = ?) AS matr,
+                    (SELECT COUNT(1) FROM grade_records WHERE estudiante_id = ?) AS notes,
+                    (SELECT COUNT(1) FROM final_supplementary WHERE estudiante_id = ?) AS supp
+                """,
+                (student_id, student_id, student_id),
+            ).fetchone()
+            if deps and (deps["matr"] > 0 or deps["notes"] > 0 or deps["supp"] > 0):
+                bloqueos.append(f"{student_id}: tiene matrículas o notas relacionadas")
+                continue
+            self.repo.eliminar(student_id)
+            eliminados += 1
+        return eliminados, bloqueos
+
     def validar_duplicado(self, data: dict, exclude_id: str | None = None) -> str | None:
         rows = self.listar_estudiantes()
+        identificacion_data = self._normalizar_identificacion(data.get("identificacion"))
+        codigo_data = self._normalizar_codigo(data.get("codigo"))
 
         for row in rows:
             if exclude_id and row.get("id_estudiante") == exclude_id:
                 continue
 
-            if data.get("identificacion") and row.get("identificacion"):
-                if data["identificacion"].strip().lower() == row["identificacion"].strip().lower():
-                    return "Duplicado por identificación"
+            identificacion_row = self._normalizar_identificacion(row.get("identificacion"))
+            if identificacion_data and identificacion_row and identificacion_data == identificacion_row:
+                return "Duplicado por identificación"
+
+            codigo_row = self._normalizar_codigo(row.get("codigo"))
+            if codigo_data and codigo_row and codigo_data == codigo_row:
+                return "Duplicado por código"
 
             same_name = data.get("nombres", "").strip().lower() == row.get("nombres", "").strip().lower()
             same_lastname = data.get("apellidos", "").strip().lower() == row.get("apellidos", "").strip().lower()
@@ -91,12 +117,38 @@ class StudentService:
             raise ValueError("Nombres y apellidos son obligatorios")
 
         # El código es opcional. Si no viene, se genera uno técnico interno.
-        code = str(data.get("codigo", "")).strip() or f"AUTO-{student_id[:8]}"
+        raw_code = data.get("codigo")
+        code = str(raw_code).strip() if raw_code is not None else ""
+        if not code or code.lower() in {"none", "nan", "null"}:
+            code = f"AUTO-{student_id[:8]}"
 
         return {
             "id_estudiante": student_id,
-            "codigo": code,
+            "codigo": StudentService._normalizar_codigo(code) or f"AUTO-{student_id[:8]}",
             "apellidos": lastnames,
             "nombres": names,
-            "identificacion": identification,
+            "identificacion": StudentService._normalizar_identificacion(identification),
         }
+
+    @staticmethod
+    def _normalizar_identificacion(value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text or text.lower() in {"nan", "none", "null"}:
+            return None
+        if text.endswith(".0"):
+            base = text[:-2]
+            if base.isdigit():
+                text = base
+        normalized = "".join(char for char in text if char.isalnum())
+        return normalized or None
+
+    @staticmethod
+    def _normalizar_codigo(value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text or text.lower() in {"none", "nan", "null"}:
+            return None
+        return text
