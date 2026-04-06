@@ -116,8 +116,11 @@ class TestGradeRegistrationService(unittest.TestCase):
             }
         )
         self.assertEqual(fila["promedio_formativo"], 8.33)
-        self.assertEqual(fila["promedio_sumativo"], 8.16)
-        self.assertEqual(fila["nota_trimestral"], 8.27)
+        self.assertEqual(fila["promedio_evaluacion_sumativa"], 8.5)
+        self.assertEqual(fila["promedio_sumativo"], 8.5)
+        self.assertEqual(fila["promedio_formativo_70"], 5.83)
+        self.assertEqual(fila["promedio_sumativo_30"], 2.55)
+        self.assertEqual(fila["nota_trimestral"], 8.38)
 
     def test_contexto_sin_estudiantes_retorna_vacio(self) -> None:
         with self.conn:

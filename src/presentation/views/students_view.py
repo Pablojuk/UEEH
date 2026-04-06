@@ -86,6 +86,7 @@ class StudentsView(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.MultiSelection)
         self.table.cellClicked.connect(self.select_student)
+        self.table.cellPressed.connect(self._toggle_checkbox_if_needed)
 
         root.addWidget(title)
         root.addWidget(subtitle)
@@ -239,3 +240,12 @@ class StudentsView(QWidget):
 
     def refresh_data(self) -> None:
         self.load_students()
+
+    def _toggle_checkbox_if_needed(self, row: int, column: int) -> None:
+        if column != 0:
+            return
+        item = self.table.item(row, 0)
+        if item is None:
+            return
+        new_state = Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked
+        item.setCheckState(new_state)

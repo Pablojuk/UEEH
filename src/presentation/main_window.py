@@ -77,14 +77,8 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(16, 16, 16, 16)
 
-        header_title = QLabel("Sistema de Gestión Académica")
-        header_title.setObjectName("Title")
-        header_subtitle = QLabel("Panel principal")
-        header_subtitle.setObjectName("Subtitle")
-
         self.stack = QStackedWidget()
-        dashboard = DashboardView(counters_provider=self._build_dashboard_counters)
-        dashboard.navigate_requested.connect(self._change_view)
+        dashboard = DashboardView(institution_service=self.institution_service)
 
         self.views = {
             "dashboard": dashboard,
@@ -122,8 +116,6 @@ class MainWindow(QMainWindow):
         self.author_label = QLabel("Autor: Econ Pablo Hernan Juca Farfan.")
         self.author_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
 
-        right_layout.addWidget(header_title)
-        right_layout.addWidget(header_subtitle)
         right_layout.addWidget(self.stack, 1)
         right_layout.addWidget(self.author_label)
 
@@ -139,15 +131,6 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentWidget(widget)
             if hasattr(widget, "refresh_data"):
                 widget.refresh_data()
-
-    def _build_dashboard_counters(self) -> dict[str, int]:
-        return {
-            "students": len(self.student_service.listar_estudiantes()),
-            "teachers": len(self.teacher_service.listar_docentes()),
-            "courses": len(self.catalog_service.listar_cursos()),
-            "assignments": len(self.teaching_assignment_service.listar_asignaciones()),
-            "enrollments": len(self.enrollment_service.listar_matriculas()),
-        }
 
     def _on_data_changed(self, _scope: str) -> None:
         for view in self.views.values():

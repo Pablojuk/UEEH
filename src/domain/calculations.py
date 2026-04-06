@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from typing import Iterable, Optional
 
 
 def truncar_2_decimales(valor: float) -> float:
     """Trunca un valor numérico a 2 decimales (estilo TRUNC de Excel)."""
     return float(Decimal(str(valor)).quantize(Decimal("0.00"), rounding=ROUND_DOWN))
+
+
+def redondear_2_decimales(valor: float) -> float:
+    """Redondea a 2 decimales con criterio estándar."""
+    return float(Decimal(str(valor)).quantize(Decimal("0.00"), rounding=ROUND_HALF_UP))
 
 
 def resolver_mejora(nota_base: float, nota_mejora: Optional[float]) -> float:
@@ -73,6 +78,51 @@ def calcular_cualitativo(promedio_final: float) -> str:
         if promedio_final >= limite:
             return etiqueta
     return "SIN_ESCALA"
+
+
+def calcular_promedio_actividad(actividad: Optional[float], refuerzo: Optional[float]) -> Optional[float]:
+    if actividad is None:
+        return None
+    if refuerzo is None:
+        return redondear_2_decimales(actividad)
+    return redondear_2_decimales((actividad + refuerzo) / 2)
+
+
+def calcular_promedio_evaluacion_sumativa(
+    proyecto_interdisciplinar: Optional[float],
+    evaluacion_trimestral: Optional[float],
+) -> Optional[float]:
+    if proyecto_interdisciplinar is None or evaluacion_trimestral is None:
+        return None
+    return redondear_2_decimales((proyecto_interdisciplinar + evaluacion_trimestral) / 2)
+
+
+def calcular_promedio_con_mejora(
+    promedio_evaluacion_sumativa: Optional[float],
+    calificacion_refuerzo_pedagogico: Optional[float],
+    evaluacion_mejora: Optional[float],
+) -> Optional[float]:
+    if promedio_evaluacion_sumativa is None:
+        return None
+    valores = [promedio_evaluacion_sumativa]
+    if calificacion_refuerzo_pedagogico is not None:
+        valores.append(calificacion_refuerzo_pedagogico)
+    if evaluacion_mejora is not None:
+        valores.append(evaluacion_mejora)
+    return redondear_2_decimales(sum(valores) / len(valores))
+
+
+def calcular_promedio_evaluacion_formativa(lista_promedios_actividades: Iterable[Optional[float]]) -> Optional[float]:
+    valores = [valor for valor in lista_promedios_actividades if valor is not None]
+    if not valores:
+        return None
+    return redondear_2_decimales(sum(valores) / len(valores))
+
+
+def calcular_cualitativo_trimestral(promedio_trimestral: Optional[float]) -> str:
+    if promedio_trimestral is None or promedio_trimestral < 0.5:
+        return ""
+    return calcular_cualitativo(promedio_trimestral)
 
 
 def calcular_observacion_final(promedio_final: float) -> str:

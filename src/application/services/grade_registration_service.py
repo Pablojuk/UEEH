@@ -7,7 +7,14 @@ import sqlite3
 import uuid
 from typing import Any
 
-from src.domain.calculations import calcular_nota_trimestral, calcular_promedio_formativo, calcular_promedio_sumativo
+from src.domain.calculations import (
+    calcular_cualitativo_trimestral,
+    calcular_promedio_actividad,
+    calcular_promedio_con_mejora,
+    calcular_promedio_evaluacion_formativa,
+    calcular_promedio_evaluacion_sumativa,
+    redondear_2_decimales,
+)
 from src.infrastructure.persistence.repositories import GradeActivityConfigRepository, GradeRecordsRepository
 
 
@@ -198,19 +205,31 @@ class GradeRegistrationService:
                 continue
             actividades_formativas.append((actividad, data.get(f"mejora_{idx}")))
 
-        promedio_formativo = calcular_promedio_formativo(actividades_formativas)
-        promedio_sumativo = calcular_promedio_sumativo(
-            [
-                (data["proyecto"] or 0.0, data["mejora_sumativa"]),
-                (data["evaluacion"] or 0.0, None),
-                (data["refuerzo"] or 0.0, None),
-            ]
-        )
-        nota_trimestral = calcular_nota_trimestral(promedio_formativo, promedio_sumativo)
+        promedios_actividades: list[float | None] = []
+        for idx in range(1, numero_actividades + 1):
+            promedio = calcular_promedio_actividad(data.get(f"actividad_{idx}"), data.get(f"mejora_{idx}"))
+            data[f"promedio_{idx}"] = promedio
+            promedios_actividades.append(promedio)
 
-        data["promedio_formativo"] = promedio_formativo
-        data["promedio_sumativo"] = promedio_sumativo
-        data["nota_trimestral"] = nota_trimestral
+        promedio_eval_sumativa = calcular_promedio_evaluacion_sumativa(data.get("proyecto"), data.get("evaluacion"))
+        promedio_con_mejora = calcular_promedio_con_mejora(promedio_eval_sumativa, data.get("refuerzo"), data.get("mejora_sumativa"))
+        promedio_formativa = calcular_promedio_evaluacion_formativa(promedios_actividades)
+        promedio_formativa_70 = redondear_2_decimales(promedio_formativa * 0.70) if promedio_formativa is not None else None
+        promedio_sumativa_30 = redondear_2_decimales(promedio_con_mejora * 0.30) if promedio_con_mejora is not None else None
+        promedio_trimestral = (
+            redondear_2_decimales(promedio_formativa_70 + promedio_sumativa_30)
+            if promedio_formativa_70 is not None and promedio_sumativa_30 is not None
+            else None
+        )
+
+        data["promedio_evaluacion_sumativa"] = promedio_eval_sumativa
+        data["promedio_con_mejora_sumativa"] = promedio_con_mejora
+        data["promedio_formativo"] = promedio_formativa
+        data["promedio_formativo_70"] = promedio_formativa_70
+        data["promedio_sumativo_30"] = promedio_sumativa_30
+        data["promedio_sumativo"] = promedio_con_mejora
+        data["nota_trimestral"] = promedio_trimestral
+        data["cualitativo"] = calcular_cualitativo_trimestral(promedio_trimestral)
         return data
 
     def _normalizar_nota(self, valor: Any, campo: str) -> float | None:
@@ -246,13 +265,19 @@ class GradeRegistrationService:
             "evaluacion": None,
             "refuerzo": None,
             "mejora_sumativa": None,
-            "promedio_formativo": 0.0,
-            "promedio_sumativo": 0.0,
-            "nota_trimestral": 0.0,
+            "promedio_evaluacion_sumativa": None,
+            "promedio_con_mejora_sumativa": None,
+            "promedio_formativo": None,
+            "promedio_formativo_70": None,
+            "promedio_sumativo_30": None,
+            "promedio_sumativo": None,
+            "nota_trimestral": None,
+            "cualitativo": "",
         }
         for idx in range(1, numero_actividades + 1):
             base[f"actividad_{idx}"] = None
             base[f"mejora_{idx}"] = None
+            base[f"promedio_{idx}"] = None
         return base
 
     def _expand_dynamic_fields(self, registro: dict[str, Any], numero_actividades: int) -> dict[str, Any]:

@@ -49,9 +49,17 @@ class Sidebar(QFrame):
 
         layout.addStretch(1)
 
+        layout.addWidget(QLabel("Logo de: Ministerio de Educación, Deporte y Cultura"))
+        self.logo_ministerio_label = QLabel("Logo ministerial")
+        self.logo_ministerio_label.setAlignment(Qt.AlignCenter)
+        self.logo_ministerio_label.setFixedHeight(90)
+        self.logo_ministerio_label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")
+        layout.addWidget(self.logo_ministerio_label)
+
+        layout.addWidget(QLabel("Logo Institucional"))
         self.logo_label = QLabel("Logo institucional")
         self.logo_label.setAlignment(Qt.AlignCenter)
-        self.logo_label.setFixedHeight(120)
+        self.logo_label.setFixedHeight(90)
         self.logo_label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")
         layout.addWidget(self.logo_label)
 
@@ -65,19 +73,20 @@ class Sidebar(QFrame):
 
     def refresh_logo(self) -> None:
         institution = self.institution_service.obtener_actual() or {}
-        logo_path = institution.get("logo_path")
+        self._apply_logo(self.logo_ministerio_label, institution.get("logo_ministerio_path"), "Logo ministerial")
+        self._apply_logo(self.logo_label, institution.get("logo_path"), "Logo institucional")
+
+    @staticmethod
+    def _apply_logo(label: QLabel, logo_path: str | None, placeholder: str) -> None:
         if logo_path and Path(logo_path).exists():
             pixmap = QPixmap(logo_path)
             if not pixmap.isNull():
-                self.logo_label.setPixmap(
-                    pixmap.scaled(180, 110, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                )
-                self.logo_label.setStyleSheet("border: none;")
+                label.setPixmap(pixmap.scaled(180, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                label.setStyleSheet("border: none;")
                 return
-
-        self.logo_label.setPixmap(QPixmap())
-        self.logo_label.setText("Logo institucional")
-        self.logo_label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")
+        label.setPixmap(QPixmap())
+        label.setText(placeholder)
+        label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")
 
     def select_default(self) -> None:
         self.section_selected.emit("dashboard")

@@ -22,6 +22,7 @@ class TeacherService:
             "nombres": data["nombres"],
             "apellidos": data["apellidos"],
             "identificacion": data["identificacion"],
+            "titulo": data.get("titulo") or "No registrado",
             "activo": data.get("activo", 1),
         }
         self.repo.crear(payload)
@@ -148,7 +149,9 @@ class TeacherService:
 
         if not docente_id:
             docente_id = f"DOC-{uuid.uuid4().hex[:8].upper()}"
-        if not (nombres and apellidos and identificacion):
+        titulo = get("titulo", "título")
+
+        if not (docente_id and nombres and apellidos and identificacion):
             return None
 
         return {
@@ -156,5 +159,6 @@ class TeacherService:
             "nombres": nombres,
             "apellidos": apellidos,
             "identificacion": identificacion,
+            "titulo": titulo or "No registrado",
             "activo": 1,
         }

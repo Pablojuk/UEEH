@@ -23,13 +23,17 @@ from src.presentation.app_signals import AppSignals
 
 class GradesView(QWidget):
     SUMMATIVE_COLUMNS = [
-        ("proyecto", "Proyecto"),
-        ("evaluacion", "Evaluación"),
-        ("refuerzo", "Refuerzo"),
-        ("mejora_sumativa", "Mejora Sumativa"),
-        ("promedio_formativo", "Promedio Formativo"),
-        ("promedio_sumativo", "Promedio Sumativo"),
-        ("nota_trimestral", "Nota Trimestral"),
+        ("proyecto", "Proyecto Interdisciplinar"),
+        ("evaluacion", "Evaluación Trimestral"),
+        ("promedio_evaluacion_sumativa", "Promedio Evaluación Sumativa"),
+        ("refuerzo", "Calificación Refuerzo Pedagógico"),
+        ("mejora_sumativa", "Evaluación de Mejora"),
+        ("promedio_con_mejora_sumativa", "Promedio con Mejora Evaluación Sumativa"),
+        ("promedio_formativo", "Promedio Evaluación Formativa"),
+        ("promedio_formativo_70", "Promedio Evaluación Formativa 70%"),
+        ("promedio_sumativo_30", "Promedio Evaluación Sumativa 30%"),
+        ("nota_trimestral", "Promedio Trimestral"),
+        ("cualitativo", "Cualitativo"),
     ]
 
     def __init__(self, grade_registration_service: GradeRegistrationService, app_signals: AppSignals | None = None) -> None:
@@ -177,7 +181,8 @@ class GradesView(QWidget):
         self._table_columns = [("estudiante", "Estudiante")]
         for idx in range(1, self._numero_actividades + 1):
             self._table_columns.append((f"actividad_{idx}", f"Actividad {idx}"))
-            self._table_columns.append((f"mejora_{idx}", f"Mejora {idx}"))
+            self._table_columns.append((f"mejora_{idx}", f"Refuerzo {idx}"))
+            self._table_columns.append((f"promedio_{idx}", f"Promedio {idx}"))
         self._table_columns.extend(self.SUMMATIVE_COLUMNS)
         self.table.setColumnCount(len(self._table_columns))
         self.table.setHorizontalHeaderLabels([title for _, title in self._table_columns])
@@ -193,7 +198,7 @@ class GradesView(QWidget):
                 value = row_data.get(field)
                 text = "" if value is None else str(value)
                 item = QTableWidgetItem(text)
-                if field in {"estudiante", "promedio_formativo", "promedio_sumativo", "nota_trimestral"}:
+                if field.startswith("promedio_") or field in {"estudiante", "nota_trimestral", "cualitativo"}:
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 self.table.setItem(row, col, item)
 

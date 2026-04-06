@@ -1,86 +1,74 @@
-"""Vista de inicio con métricas y accesos rápidos."""
+"""Vista de inicio con ficha institucional formal."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
+
+from src.application.services.institution_service import InstitutionService
 
 
 class DashboardView(QWidget):
-    navigate_requested = Signal(str)
-
-    def __init__(self, counters_provider) -> None:
+    def __init__(self, institution_service: InstitutionService) -> None:
         super().__init__()
-        self.counters_provider = counters_provider
-        self.metric_labels: dict[str, QLabel] = {}
+        self.institution_service = institution_service
+        self.value_labels: dict[str, QLabel] = {}
 
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignTop)
+        root = QVBoxLayout(self)
+        root.setAlignment(Qt.AlignTop)
 
-        title = QLabel("Inicio")
-        title.setObjectName("Title")
-        subtitle = QLabel("Resumen general del sistema académico")
-        subtitle.setObjectName("Subtitle")
+        card = QFrame()
+        card.setObjectName("Card")
+        grid = QGridLayout(card)
+        grid.setSpacing(2)
 
-        metrics_card = QFrame()
-        metrics_card.setObjectName("Card")
-        metrics_grid = QGridLayout(metrics_card)
-        metrics_grid.setContentsMargins(12, 12, 12, 12)
-
-        definitions = [
-            ("students", "Estudiantes"),
-            ("teachers", "Docentes"),
-            ("courses", "Cursos"),
-            ("assignments", "Asignaciones"),
-            ("enrollments", "Matrículas"),
-        ]
-        for idx, (key, label) in enumerate(definitions):
-            box = QFrame()
-            box.setObjectName("Card")
-            box_layout = QVBoxLayout(box)
-            box_layout.addWidget(QLabel(label))
-            value_label = QLabel("0")
-            value_label.setStyleSheet("font-size: 22px; font-weight: 600;")
-            box_layout.addWidget(value_label)
-            self.metric_labels[key] = value_label
-            metrics_grid.addWidget(box, idx // 3, idx % 3)
-
-        shortcuts_card = QFrame()
-        shortcuts_card.setObjectName("Card")
-        shortcuts_layout = QHBoxLayout(shortcuts_card)
-        for key, text in [
-            ("students", "Ir a Estudiantes"),
-            ("teachers", "Ir a Docentes"),
-            ("enrollments", "Ir a Matrículas"),
-            ("grades", "Ir a Notas"),
-        ]:
-            button = QPushButton(text)
-            button.clicked.connect(lambda _=False, section=key: self.navigate_requested.emit(section))
-            shortcuts_layout.addWidget(button)
-
-        institutional_text = QFrame()
-        institutional_text.setObjectName("Card")
-        text_layout = QVBoxLayout(institutional_text)
-        paragraph = QLabel(
-            "Bienvenido al panel académico. Aquí puede monitorear el estado general del sistema y acceder "
-            "rápidamente a los módulos más utilizados para mantener registros actualizados."
+        header = QLabel("DATOS DE LA INSTITUCIÓN")
+        header.setAlignment(Qt.AlignCenter)
+        header.setStyleSheet(
+            "background-color: #facc15; border: 1px solid #111827; font-weight: 700; padding: 8px;"
         )
-        paragraph.setWordWrap(True)
-        text_layout.addWidget(paragraph)
+        grid.addWidget(header, 0, 0, 1, 6)
 
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-        layout.addWidget(metrics_card)
-        layout.addWidget(shortcuts_card)
-        layout.addWidget(institutional_text)
-        layout.addStretch(1)
+        row = 1
+        row = self._add_field_row(grid, row, "Nombre de la institución", "nombre", span=5)
+
+        self._add_label_cell(grid, row, 0, "Provincia")
+        self._add_value_cell(grid, row, 1, "provincia")
+        self._add_label_cell(grid, row, 2, "Ciudad")
+        self._add_value_cell(grid, row, 3, "ciudad")
+        self._add_label_cell(grid, row, 4, "Parroquia")
+        self._add_value_cell(grid, row, 5, "parroquia")
+        row += 1
+
+        row = self._add_field_row(grid, row, "Dirección", "direccion", span=5)
+        row = self._add_field_row(grid, row, "Código AMIE", "codigo_amie", span=5)
+        row = self._add_field_row(grid, row, "Rector(a)", "rector", span=5)
+        row = self._add_field_row(grid, row, "Vicerrector(a)", "vicerrector", span=5)
+        self._add_field_row(grid, row, "Inspector(a)", "inspector", span=5)
+
+        root.addWidget(card)
+        root.addStretch(1)
 
         self.refresh_data()
 
+    def _add_field_row(self, grid: QGridLayout, row: int, label: str, key: str, span: int = 1) -> int:
+        self._add_label_cell(grid, row, 0, label)
+        self._add_value_cell(grid, row, 1, key, span=span)
+        return row + 1
+
+    def _add_label_cell(self, grid: QGridLayout, row: int, col: int, text: str) -> None:
+        label = QLabel(text)
+        label.setStyleSheet("background-color: #fde68a; border: 1px solid #111827; padding: 6px; font-weight: 600;")
+        grid.addWidget(label, row, col)
+
+    def _add_value_cell(self, grid: QGridLayout, row: int, col: int, key: str, span: int = 1) -> None:
+        value = QLabel("No registrado")
+        value.setStyleSheet("background-color: #f8fafc; border: 1px solid #111827; padding: 6px;")
+        self.value_labels[key] = value
+        grid.addWidget(value, row, col, 1, span)
+
     def refresh_data(self) -> None:
-        counters = self.counters_provider()
-        self.metric_labels["students"].setText(str(counters.get("students", 0)))
-        self.metric_labels["teachers"].setText(str(counters.get("teachers", 0)))
-        self.metric_labels["courses"].setText(str(counters.get("courses", 0)))
-        self.metric_labels["assignments"].setText(str(counters.get("assignments", 0)))
-        self.metric_labels["enrollments"].setText(str(counters.get("enrollments", 0)))
+        institution = self.institution_service.obtener_actual() or {}
+        for key, label in self.value_labels.items():
+            value = institution.get(key)
+            label.setText(str(value).strip() if value else "No registrado")

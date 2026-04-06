@@ -20,6 +20,15 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         id_institucion TEXT PRIMARY KEY,
         nombre TEXT NOT NULL,
         jornada TEXT NOT NULL,
+        provincia TEXT,
+        ciudad TEXT,
+        parroquia TEXT,
+        direccion TEXT,
+        codigo_amie TEXT,
+        rector TEXT,
+        vicerrector TEXT,
+        inspector TEXT,
+        logo_ministerio_path TEXT,
         logo_path TEXT
     );
     """,
@@ -29,6 +38,7 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         nombres TEXT NOT NULL,
         apellidos TEXT NOT NULL,
         identificacion TEXT NOT NULL UNIQUE,
+        titulo TEXT,
         activo INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1))
     );
     """,

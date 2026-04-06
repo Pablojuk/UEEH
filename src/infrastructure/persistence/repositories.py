@@ -70,13 +70,27 @@ class ConfiguracionSistemaRepository(SQLiteRepository):
 class InstitucionRepository(SQLiteRepository):
     table_name = "institucion"
     id_field = "id_institucion"
-    fields = ("id_institucion", "nombre", "jornada", "logo_path")
+    fields = (
+        "id_institucion",
+        "nombre",
+        "jornada",
+        "provincia",
+        "ciudad",
+        "parroquia",
+        "direccion",
+        "codigo_amie",
+        "rector",
+        "vicerrector",
+        "inspector",
+        "logo_ministerio_path",
+        "logo_path",
+    )
 
 
 class DocentesRepository(SQLiteRepository):
     table_name = "docentes"
     id_field = "id_docente"
-    fields = ("id_docente", "nombres", "apellidos", "identificacion", "activo")
+    fields = ("id_docente", "nombres", "apellidos", "identificacion", "titulo", "activo")
 
 
 class CursosRepository(SQLiteRepository):

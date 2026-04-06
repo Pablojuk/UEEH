@@ -49,11 +49,13 @@ class TeachersView(QWidget):
         self.names_input = QLineEdit()
         self.lastnames_input = QLineEdit()
         self.identification_input = QLineEdit()
+        self.title_input = QLineEdit()
 
         form.addRow("ID docente", self.id_input)
         form.addRow("Nombres", self.names_input)
         form.addRow("Apellidos", self.lastnames_input)
         form.addRow("Identificación", self.identification_input)
+        form.addRow("Título", self.title_input)
 
         actions = QHBoxLayout()
         self.new_button = QPushButton("Nuevo")
@@ -74,8 +76,8 @@ class TeachersView(QWidget):
         actions.addWidget(self.import_button)
         actions.addStretch(1)
 
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["ID", "Nombres", "Apellidos", "Identificación", "Estado"])
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["ID", "Nombres", "Apellidos", "Identificación", "Título", "Estado"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
@@ -97,6 +99,7 @@ class TeachersView(QWidget):
         self.names_input.clear()
         self.lastnames_input.clear()
         self.identification_input.clear()
+        self.title_input.clear()
         self.table.clearSelection()
 
     def save_teacher(self) -> None:
@@ -105,6 +108,7 @@ class TeachersView(QWidget):
             "nombres": self.names_input.text().strip(),
             "apellidos": self.lastnames_input.text().strip(),
             "identificacion": self.identification_input.text().strip(),
+            "titulo": self.title_input.text().strip() or "No registrado",
         }
 
         if not all(payload.values()):
@@ -119,6 +123,7 @@ class TeachersView(QWidget):
                         "nombres": payload["nombres"],
                         "apellidos": payload["apellidos"],
                         "identificacion": payload["identificacion"],
+                        "titulo": payload["titulo"],
                     },
                 )
             else:
@@ -154,10 +159,11 @@ class TeachersView(QWidget):
             self.table.setItem(row, 1, QTableWidgetItem(row_data.get("nombres", "")))
             self.table.setItem(row, 2, QTableWidgetItem(row_data.get("apellidos", "")))
             self.table.setItem(row, 3, QTableWidgetItem(row_data.get("identificacion", "")))
+            self.table.setItem(row, 4, QTableWidgetItem(row_data.get("titulo") or "No registrado"))
             estado = "Activo" if int(row_data.get("activo", 1)) == 1 else "Inactivo"
             status_item = QTableWidgetItem(estado)
             status_item.setTextAlignment(Qt.AlignCenter)
-            self.table.setItem(row, 4, status_item)
+            self.table.setItem(row, 5, status_item)
 
     def select_teacher_from_table(self, row: int, _column: int) -> None:
         teacher_id = self.table.item(row, 0).text()
@@ -171,6 +177,7 @@ class TeachersView(QWidget):
         self.names_input.setText(data.get("nombres", ""))
         self.lastnames_input.setText(data.get("apellidos", ""))
         self.identification_input.setText(data.get("identificacion", ""))
+        self.title_input.setText(data.get("titulo") or "No registrado")
 
     def toggle_teacher_status(self) -> None:
         if not self.editing_teacher_id:
