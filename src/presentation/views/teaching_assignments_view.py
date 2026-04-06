@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from src.application.services.catalog_service import CatalogService
 from src.application.services.teacher_service import TeacherService
 from src.application.services.teaching_assignment_service import TeachingAssignmentService
+from src.presentation.app_signals import AppSignals
 
 
 class TeachingAssignmentsView(QWidget):
@@ -28,11 +29,13 @@ class TeachingAssignmentsView(QWidget):
         teaching_assignment_service: TeachingAssignmentService,
         teacher_service: TeacherService,
         catalog_service: CatalogService,
+        app_signals: AppSignals | None = None,
     ) -> None:
         super().__init__()
         self.teaching_assignment_service = teaching_assignment_service
         self.teacher_service = teacher_service
         self.catalog_service = catalog_service
+        self.app_signals = app_signals
 
         root = QVBoxLayout(self)
         title = QLabel("Asignaciones Académicas")
@@ -116,6 +119,8 @@ class TeachingAssignmentsView(QWidget):
         if ok:
             QMessageBox.information(self, "Éxito", message)
             self.load_assignments()
+            if self.app_signals:
+                self.app_signals.data_changed.emit("teaching_assignments")
         else:
             QMessageBox.warning(self, "Validación", message)
 
@@ -133,3 +138,7 @@ class TeachingAssignmentsView(QWidget):
             self.table.setItem(row, 3, QTableWidgetItem(row_data.get("curso_id", "")))
             self.table.setItem(row, 4, QTableWidgetItem(row_data.get("paralelo_id", "")))
             self.table.setItem(row, 5, QTableWidgetItem(row_data.get("periodo_id", "")))
+
+    def refresh_data(self) -> None:
+        self.load_combos()
+        self.load_assignments()

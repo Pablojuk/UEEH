@@ -19,7 +19,8 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
     CREATE TABLE IF NOT EXISTS institucion (
         id_institucion TEXT PRIMARY KEY,
         nombre TEXT NOT NULL,
-        jornada TEXT NOT NULL
+        jornada TEXT NOT NULL,
+        logo_path TEXT
     );
     """,
     """
@@ -118,6 +119,8 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         promedio_formativo REAL,
         promedio_sumativo REAL,
         nota_trimestral REAL,
+        actividades_json TEXT,
+        mejoras_json TEXT,
         FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id_estudiante),
         FOREIGN KEY (asignacion_id) REFERENCES asignaciones_docente(id_asignacion),
         UNIQUE (estudiante_id, asignacion_id, trimestre_num)
@@ -147,6 +150,16 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         FOREIGN KEY (periodo_id) REFERENCES periodos_lectivos(id_periodo)
     );
     """,
+    """
+    CREATE TABLE IF NOT EXISTS grade_activity_config (
+        id_config TEXT PRIMARY KEY,
+        asignacion_id TEXT NOT NULL,
+        trimestre_num INTEGER NOT NULL CHECK (trimestre_num IN (1,2,3)),
+        numero_actividades INTEGER NOT NULL CHECK (numero_actividades >= 1 AND numero_actividades <= 20),
+        UNIQUE (asignacion_id, trimestre_num),
+        FOREIGN KEY (asignacion_id) REFERENCES asignaciones_docente(id_asignacion)
+    );
+    """,
 )
 
 INDEX_STATEMENTS: tuple[str, ...] = (
@@ -159,6 +172,7 @@ INDEX_STATEMENTS: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_trimestres_periodo ON trimestres(periodo_id);",
     "CREATE INDEX IF NOT EXISTS idx_grade_records_assignment_trimestre ON grade_records(asignacion_id, trimestre_num);",
     "CREATE INDEX IF NOT EXISTS idx_final_supp_assignment ON final_supplementary(asignacion_id);",
+    "CREATE INDEX IF NOT EXISTS idx_grade_activity_config_assignment ON grade_activity_config(asignacion_id, trimestre_num);",
 )
 
 

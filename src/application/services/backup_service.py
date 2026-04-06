@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,21 @@ class BackupService:
             if source_conn is not None:
                 source_conn.close()
             gc.collect()
+
+    def validar_directorio_respaldo(self, directory_path: str) -> tuple[bool, str]:
+        directory = Path(directory_path).expanduser().resolve()
+        if not directory.exists() or not directory.is_dir():
+            return False, "La carpeta seleccionada no existe"
+        if not os.access(str(directory), os.W_OK):
+            return False, "La carpeta seleccionada no tiene permisos de escritura"
+        return True, "Carpeta válida"
+
+    def crear_respaldo_en_directorio(self, directory_path: str) -> tuple[bool, str]:
+        ok, message = self.validar_directorio_respaldo(directory_path)
+        if not ok:
+            return False, message
+        destination = Path(directory_path).expanduser().resolve() / self.nombre_respaldo_sugerido()
+        return self.crear_respaldo(str(destination))
 
     def restaurar_desde_respaldo(self, backup_path: str) -> tuple[bool, str]:
         source_conn: sqlite3.Connection | None = None
