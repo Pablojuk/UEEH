@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config.estilos import (
+from gestion_academica.config.estilos import (
     A4_ALTO_PX,
     A4_ANCHO_PX,
     A4_MARGEN_EXTERNO,
