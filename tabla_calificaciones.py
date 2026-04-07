@@ -97,9 +97,9 @@ class PieChartWidget(QWidget):
     def __init__(self, resumen: Sequence, parent=None):
         super().__init__(parent)
         self.resumen = list(resumen)
-        self.setMinimumSize(esc(360), esc(170))
+        self.setFixedWidth(esc(300))
         self.setFixedHeight(esc(170))
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -311,7 +311,9 @@ class TablaCalificaciones(QWidget):
 
         titulo = QLabel(self.meta.institucion)
         titulo.setAlignment(Qt.AlignCenter)
-        titulo.setFont(FUENTE_TITULO)
+        fuente_titulo = QFont(FUENTE_TITULO)
+        fuente_titulo.setPointSize(max(FUENTE_TITULO.pointSize() + 2, FUENTE_TITULO.pointSize()))
+        titulo.setFont(fuente_titulo)
         titulo.setStyleSheet("color: white; border: none;")
 
         fila_1_layout.addWidget(logo_izq, 0, Qt.AlignVCenter)
@@ -396,8 +398,8 @@ class TablaCalificaciones(QWidget):
         headers = [
             (0, "N°", 1, 2),
             (1, "Nómina", 1, 2),
-            (2, "Aportes / Insumos", 2, 1),
-            (4, "Proyecto Integrador", 2, 1),
+            (2, "Aportes /\nInsumos", 2, 1),
+            (4, "Proyecto\nIntegrador", 2, 1),
             (6, "Examen", 2, 1),
             (8, "Promedio", 1, 2),
             (9, "Cualitativa", 1, 2),
@@ -423,11 +425,11 @@ class TablaCalificaciones(QWidget):
 
         sub_headers = [
             (2, "Calificación"),
-            (3, "× 0.70"),
+            (3, "70%"),
             (4, "Calificación"),
-            (5, "× 0.15"),
+            (5, "15%"),
             (6, "Calificación"),
-            (7, "× 0.15"),
+            (7, "15%"),
         ]
         for col, texto in sub_headers:
             t.setItem(
