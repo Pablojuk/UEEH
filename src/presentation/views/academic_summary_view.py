@@ -60,6 +60,11 @@ class AcademicSummaryView(QWidget):
 
         self.assignment_combo = QComboBox()
         self.assignment_combo.setMinimumWidth(380)
+        self.report_type_combo = QComboBox()
+        self.report_type_combo.addItem("Anual", ("anual", None))
+        self.report_type_combo.addItem("Primer Trimestre", ("trimestral", 1))
+        self.report_type_combo.addItem("Segundo Trimestre", ("trimestral", 2))
+        self.report_type_combo.addItem("Tercer Trimestre", ("trimestral", 3))
         self.load_button = QPushButton("Cargar resumen")
         self.load_button.clicked.connect(self.load_summary)
         self.recalc_button = QPushButton("Recalcular")
@@ -73,6 +78,8 @@ class AcademicSummaryView(QWidget):
 
         filter_row.addWidget(QLabel("Asignación"))
         filter_row.addWidget(self.assignment_combo, 1)
+        filter_row.addWidget(QLabel("Tipo de informe"))
+        filter_row.addWidget(self.report_type_combo)
         filter_row.addWidget(self.load_button)
         filter_row.addWidget(self.recalc_button)
         filter_row.addWidget(self.save_button)
@@ -165,9 +172,21 @@ class AcademicSummaryView(QWidget):
             return
 
         if kind == "pdf":
-            ok, message = self.report_export_service.exportar_resumen_pdf(asignacion_id, selected_path)
+            report_type, trimestre_num = self.report_type_combo.currentData()
+            ok, message = self.report_export_service.exportar_resumen_pdf(
+                asignacion_id,
+                selected_path,
+                report_type=report_type,
+                trimestre_num=trimestre_num,
+            )
         else:
-            ok, message = self.report_export_service.exportar_resumen_excel(asignacion_id, selected_path)
+            report_type, trimestre_num = self.report_type_combo.currentData()
+            ok, message = self.report_export_service.exportar_resumen_excel(
+                asignacion_id,
+                selected_path,
+                report_type=report_type,
+                trimestre_num=trimestre_num,
+            )
 
         if ok:
             QMessageBox.information(self, "Éxito", message)

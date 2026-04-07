@@ -80,13 +80,12 @@ class StudentsView(QWidget):
         actions.addWidget(self.delete_button)
         actions.addStretch(1)
 
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Sel.", "Código", "Apellidos", "Nombres", "Identificación"])
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Código", "Apellidos", "Nombres", "Identificación"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.MultiSelection)
         self.table.cellClicked.connect(self.select_student)
-        self.table.cellPressed.connect(self._toggle_checkbox_if_needed)
 
         root.addWidget(title)
         root.addWidget(subtitle)
@@ -139,22 +138,15 @@ class StudentsView(QWidget):
         for row_data in rows:
             row = self.table.rowCount()
             self.table.insertRow(row)
-            check_item = QTableWidgetItem()
-            check_item.setCheckState(Qt.Unchecked)
-            check_item.setTextAlignment(Qt.AlignCenter)
-            check_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable)
-            self.table.setItem(row, 0, check_item)
             code_item = QTableWidgetItem(row_data.get("codigo", ""))
             code_item.setData(Qt.UserRole, row_data.get("id_estudiante"))
-            self.table.setItem(row, 1, code_item)
-            self.table.setItem(row, 2, QTableWidgetItem(row_data.get("apellidos", "")))
-            self.table.setItem(row, 3, QTableWidgetItem(row_data.get("nombres", "")))
-            self.table.setItem(row, 4, QTableWidgetItem(row_data.get("identificacion") or ""))
+            self.table.setItem(row, 0, code_item)
+            self.table.setItem(row, 1, QTableWidgetItem(row_data.get("apellidos", "")))
+            self.table.setItem(row, 2, QTableWidgetItem(row_data.get("nombres", "")))
+            self.table.setItem(row, 3, QTableWidgetItem(row_data.get("identificacion") or ""))
 
     def select_student(self, row: int, column: int) -> None:
-        if column == 0:
-            return
-        code_item = self.table.item(row, 1)
+        code_item = self.table.item(row, 0)
         student_id = code_item.data(Qt.UserRole) if code_item else None
         if not student_id:
             return
@@ -210,12 +202,10 @@ class StudentsView(QWidget):
 
     def delete_students(self) -> None:
         selected_ids: list[str] = []
-        for row in range(self.table.rowCount()):
-            item = self.table.item(row, 0)
-            if item and item.checkState() == Qt.Checked:
-                code_item = self.table.item(row, 1)
-                if code_item and code_item.data(Qt.UserRole):
-                    selected_ids.append(code_item.data(Qt.UserRole))
+        for item in self.table.selectedItems():
+            if item.column() == 0 and item.data(Qt.UserRole):
+                selected_ids.append(item.data(Qt.UserRole))
+        selected_ids = list(dict.fromkeys(selected_ids))
         if not selected_ids and self.editing_student_id:
             selected_ids = [self.editing_student_id]
         if not selected_ids:
@@ -240,12 +230,3 @@ class StudentsView(QWidget):
 
     def refresh_data(self) -> None:
         self.load_students()
-
-    def _toggle_checkbox_if_needed(self, row: int, column: int) -> None:
-        if column != 0:
-            return
-        item = self.table.item(row, 0)
-        if item is None:
-            return
-        new_state = Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked
-        item.setCheckState(new_state)
