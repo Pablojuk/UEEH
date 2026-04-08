@@ -313,6 +313,7 @@ class TablaCalificaciones(QWidget):
         titulo.setAlignment(Qt.AlignCenter)
         fuente_titulo = QFont(FUENTE_TITULO)
         fuente_titulo.setPointSize(max(FUENTE_TITULO.pointSize() + 6, FUENTE_TITULO.pointSize()))
+        fuente_titulo.setPointSize(max(FUENTE_TITULO.pointSize() + 4, FUENTE_TITULO.pointSize()))
         titulo.setFont(fuente_titulo)
         titulo.setStyleSheet("color: white; border: none;")
 
@@ -384,6 +385,7 @@ class TablaCalificaciones(QWidget):
         for i in range(total_rows):
             t.setRowHeight(i, esc(23))
         t.setRowHeight(0, esc(34))
+        t.setRowHeight(0, esc(26))
         t.setRowHeight(1, esc(23))
         for col, ancho in ANCHOS_COLUMNAS.items():
             t.setColumnWidth(col, ancho)
@@ -400,6 +402,7 @@ class TablaCalificaciones(QWidget):
             (1, "Nómina", 1, 2),
             (2, "Aportes/\nInsumos", 2, 1),
             (4, "Proyecto\nInterdisciplinario", 2, 1),
+            (4, "Proyecto\nInterdisciplinar", 2, 1),
             (6, "Examen", 2, 1),
             (8, "Promedio\nfinal", 1, 2),
             (9, "Cualitativa", 1, 2),
