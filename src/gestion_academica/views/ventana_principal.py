@@ -9,9 +9,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config.estilos import ORIENTACION_A4
-from data.datos_demo import cargar_datos_demo
-from views.tabla_calificaciones import TablaCalificaciones
+from gestion_academica.config.estilos import ORIENTACION_A4
+from gestion_academica.data.datos_demo import cargar_datos_demo
+from gestion_academica.views.tabla_calificaciones import TablaCalificaciones
 
 
 class VentanaPrincipal(QMainWindow):

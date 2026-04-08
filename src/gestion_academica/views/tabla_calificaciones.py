@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config.estilos import (
+from gestion_academica.config.estilos import (
     A4_ALTO_PX,
     A4_ANCHO_PX,
     A4_MARGEN_EXTERNO,
@@ -97,9 +97,9 @@ class PieChartWidget(QWidget):
     def __init__(self, resumen: Sequence, parent=None):
         super().__init__(parent)
         self.resumen = list(resumen)
-        self.setMinimumSize(esc(360), esc(170))
+        self.setFixedWidth(esc(300))
         self.setFixedHeight(esc(170))
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -263,7 +263,7 @@ class FirmasWidget(QWidget):
 
 
 class TablaCalificaciones(QWidget):
-    NUM_COLS = 12
+    NUM_COLS = 11
 
     def __init__(self, meta, estudiantes, resumen, parent=None):
         super().__init__(parent)
@@ -311,7 +311,9 @@ class TablaCalificaciones(QWidget):
 
         titulo = QLabel(self.meta.institucion)
         titulo.setAlignment(Qt.AlignCenter)
-        titulo.setFont(FUENTE_TITULO)
+        fuente_titulo = QFont(FUENTE_TITULO)
+        fuente_titulo.setPointSize(max(FUENTE_TITULO.pointSize() + 4, FUENTE_TITULO.pointSize()))
+        titulo.setFont(fuente_titulo)
         titulo.setStyleSheet("color: white; border: none;")
 
         fila_1_layout.addWidget(logo_izq, 0, Qt.AlignVCenter)
@@ -396,13 +398,12 @@ class TablaCalificaciones(QWidget):
         headers = [
             (0, "N°", 1, 2),
             (1, "Nómina", 1, 2),
-            (2, "Aportes / Insumos", 2, 1),
-            (4, "Proyecto Integrador", 2, 1),
+            (2, "Aportes/\nInsumos", 2, 1),
+            (4, "Proyecto\nInterdisciplinar", 2, 1),
             (6, "Examen", 2, 1),
-            (8, "Promedio", 1, 2),
+            (8, "Promedio\nfinal", 1, 2),
             (9, "Cualitativa", 1, 2),
-            (10, "Promedio\nfinal", 1, 2),
-            (11, "Observación", 1, 2),
+            (10, "Observación", 1, 2),
         ]
         for col, texto, colspan, rowspan in headers:
             if rowspan == 2:
@@ -423,11 +424,11 @@ class TablaCalificaciones(QWidget):
 
         sub_headers = [
             (2, "Calificación"),
-            (3, "× 0.70"),
+            (3, "70%"),
             (4, "Calificación"),
-            (5, "× 0.15"),
+            (5, "15%"),
             (6, "Calificación"),
-            (7, "× 0.15"),
+            (7, "15%"),
         ]
         for col, texto in sub_headers:
             t.setItem(
@@ -450,11 +451,10 @@ class TablaCalificaciones(QWidget):
             t.setItem(row, 5, crear_celda(f"{est.pond_proyecto:.2f}", fuente=FUENTE_DATOS, bg=bg))
             t.setItem(row, 6, crear_celda(f"{est.cal_examen:.2f}", fuente=FUENTE_DATOS, bg=bg))
             t.setItem(row, 7, crear_celda(f"{est.pond_examen:.2f}", fuente=FUENTE_DATOS, bg=bg))
-            t.setItem(row, 8, crear_celda(f"{est.promedio:.2f}", fuente=FUENTE_DATOS, bg=bg, negrita=True))
+            t.setItem(row, 8, crear_celda(f"{est.promedio_final:.2f}", fuente=FUENTE_DATOS, bg=bg, negrita=True))
             t.setItem(row, 9, crear_celda(est.cualitativa, fuente=FUENTE_DATOS, bg=bg))
-            t.setItem(row, 10, crear_celda(f"{est.promedio_final:.2f}", fuente=FUENTE_DATOS, bg=bg, negrita=True))
             obs_bg = COLOR_APROBADO if est.observacion == "Aprobado" else COLOR_REPROBADO
-            t.setItem(row, 11, crear_celda(est.observacion, fuente=FUENTE_DATOS, bg=obs_bg))
+            t.setItem(row, 10, crear_celda(est.observacion, fuente=FUENTE_DATOS, bg=obs_bg))
 
     def _crear_bloque_inferior(self):
         bloque = QWidget()
@@ -481,7 +481,7 @@ class TablaCalificaciones(QWidget):
 
         promedio_wrapper = QWidget()
         promedio_layout = QHBoxLayout(promedio_wrapper)
-        promedio_layout.setContentsMargins(esc(28), esc(18), esc(28), 0)
+        promedio_layout.setContentsMargins(esc(40), esc(18), esc(28), 0)
         promedio_layout.setSpacing(0)
         promedio_layout.addWidget(PromedioWidget(self._promedio_general()))
         promedio_layout.addStretch(1)
