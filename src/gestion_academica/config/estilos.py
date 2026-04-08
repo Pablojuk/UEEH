@@ -64,10 +64,9 @@ ANCHOS_COLUMNAS = {
     5: esc(52),
     6: esc(78),
     7: esc(52),
-    8: esc(72),
+    8: esc(82),
     9: esc(70),
-    10: esc(82),
-    11: esc(110),
+    10: esc(110),
 }
 
 ESPACIO_FIRMAS = esc(82)
