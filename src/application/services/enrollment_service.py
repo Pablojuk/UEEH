@@ -72,6 +72,13 @@ class EnrollmentService:
         self.repo.actualizar(enrollment_id, merged)
         return True, "Matrícula actualizada"
 
+    def eliminar_matricula(self, enrollment_id: str) -> tuple[bool, str]:
+        existing = self.repo.obtener_por_id(enrollment_id)
+        if not existing:
+            return False, "Matrícula no encontrada"
+        self.repo.eliminar(enrollment_id)
+        return True, "Matrícula eliminada"
+
     def _es_duplicada(self, data: dict, exclude_id: str | None = None) -> bool:
         for row in self.listar_matriculas():
             if exclude_id and row.get("id_matricula") == exclude_id:
