@@ -178,11 +178,16 @@ class SummaryTableWidget(QFrame):
         )
         layout.addWidget(header, 0, 0, 1, 4)
 
+        # Calcular total desde cantidades reales para que los % sean siempre correctos
+        total = sum(max(0, int(log.cantidad)) for log in resumen)
+
         for i, log in enumerate(resumen, start=1):
+            cantidad = max(0, int(log.cantidad))
+            pct = cantidad / total if total > 0 else 0
             layout.addWidget(self._make_cell(str(i), FUENTE_DATOS), i, 0)
             layout.addWidget(self._make_cell(log.descripcion, FUENTE_DATOS, Qt.AlignLeft | Qt.AlignVCenter), i, 1)
-            layout.addWidget(self._make_cell(str(log.cantidad), FUENTE_DATOS), i, 2)
-            layout.addWidget(self._make_cell(self._formato_pct(log.porcentaje), FUENTE_DATOS), i, 3)
+            layout.addWidget(self._make_cell(str(cantidad), FUENTE_DATOS), i, 2)
+            layout.addWidget(self._make_cell(self._formato_pct(pct), FUENTE_DATOS), i, 3)
 
     def _make_cell(self, text, font, alignment=Qt.AlignCenter, bold=False):
         label = QLabel(text)
@@ -274,14 +279,16 @@ class TablaCalificaciones(QWidget):
 
     def _setup_ui(self):
         self.setStyleSheet("background: white;")
-        self.setFixedSize(A4_ANCHO_PX, A4_ALTO_PX)
+        self.setFixedWidth(A4_ANCHO_PX)
+        self.setMinimumHeight(A4_ALTO_PX)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(A4_MARGEN_EXTERNO, A4_MARGEN_EXTERNO, A4_MARGEN_EXTERNO, A4_MARGEN_EXTERNO)
         layout.setSpacing(0)
 
         marco = QFrame()
-        marco.setFixedSize(A4_ANCHO_PX - (A4_MARGEN_EXTERNO * 2), A4_ALTO_PX - (A4_MARGEN_EXTERNO * 2))
+        marco.setFixedWidth(A4_ANCHO_PX - (A4_MARGEN_EXTERNO * 2))
+        marco.setMinimumHeight(A4_ALTO_PX - (A4_MARGEN_EXTERNO * 2))
         marco.setStyleSheet("QFrame { background: white; border: 2px solid #1E4DFF; }")
 
         marco_layout = QVBoxLayout(marco)
@@ -311,9 +318,8 @@ class TablaCalificaciones(QWidget):
 
         titulo = QLabel(self.meta.institucion)
         titulo.setAlignment(Qt.AlignCenter)
-        fuente_titulo = QFont(FUENTE_TITULO)
-        fuente_titulo.setPointSize(max(FUENTE_TITULO.pointSize() + 6, FUENTE_TITULO.pointSize()))
-        fuente_titulo.setPointSize(max(FUENTE_TITULO.pointSize() + 4, FUENTE_TITULO.pointSize()))
+        titulo.setWordWrap(True)
+        fuente_titulo = QFont("Calibri", 22, QFont.Bold)
         titulo.setFont(fuente_titulo)
         titulo.setStyleSheet("color: white; border: none;")
 
@@ -384,13 +390,18 @@ class TablaCalificaciones(QWidget):
         )
         for i in range(total_rows):
             t.setRowHeight(i, esc(23))
-        t.setRowHeight(0, esc(34))
         t.setRowHeight(0, esc(26))
         t.setRowHeight(1, esc(23))
         for col, ancho in ANCHOS_COLUMNAS.items():
             t.setColumnWidth(col, ancho)
         self._llenar_encabezado_tabla()
         self._llenar_datos_estudiantes()
+
+        # Ajustar alto de la tabla al contenido real para evitar scrollbar interno
+        total_height = t.rowHeight(0) + t.rowHeight(1) + n_est * esc(23) + 2
+        t.setFixedHeight(total_height)
+        t.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        t.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         return t
 
     def _llenar_encabezado_tabla(self):
@@ -400,9 +411,8 @@ class TablaCalificaciones(QWidget):
         headers = [
             (0, "N°", 1, 2),
             (1, "Nómina", 1, 2),
-            (2, "Aportes/\nInsumos", 2, 1),
-            (4, "Proyecto\nInterdisciplinario", 2, 1),
-            (4, "Proyecto\nInterdisciplinar", 2, 1),
+            (2, "Aportes", 2, 1),
+            (4, "Proy. Inter.", 2, 1),
             (6, "Examen", 2, 1),
             (8, "Promedio\nfinal", 1, 2),
             (9, "Cualitativa", 1, 2),
@@ -484,8 +494,9 @@ class TablaCalificaciones(QWidget):
 
         promedio_wrapper = QWidget()
         promedio_layout = QHBoxLayout(promedio_wrapper)
-        promedio_layout.setContentsMargins(esc(40), esc(18), esc(28), 0)
+        promedio_layout.setContentsMargins(0, esc(18), 0, 0)
         promedio_layout.setSpacing(0)
+        promedio_layout.addStretch(1)
         promedio_layout.addWidget(PromedioWidget(self._promedio_general()))
         promedio_layout.addStretch(1)
         layout.addWidget(promedio_wrapper)

@@ -1,4 +1,6 @@
-from PySide6.QtCore import QPoint, QRectF, Qt
+import math
+
+from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QPageLayout, QPageSize, QPainter
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -62,14 +64,41 @@ class VentanaPrincipal(QMainWindow):
 
         dialog = QPrintDialog(printer, self)
         if dialog.exec():
-            painter = QPainter(printer)
             widget = self.scroll.widget()
-            if widget:
-                page = printer.pageRect(QPrinter.DevicePixel)
-                scale_x = page.width() / widget.width()
-                scale_y = page.height() / widget.height()
-                scale = min(scale_x, scale_y)
-                painter.translate(page.x(), page.y())
+            if not widget:
+                return
+
+            painter = QPainter(printer)
+            page_rect = printer.pageRect(QPrinter.DevicePixel)
+
+            # Escala basada solo en el ancho para mantener el tamaño de texto correcto
+            scale = page_rect.width() / widget.width()
+
+            # Cuántos píxeles de pantalla caben en una página impresa
+            pixels_por_pagina = page_rect.height() / scale
+
+            widget_total_height = widget.height()
+            y_offset = 0.0
+            primera_pagina = True
+
+            while y_offset < widget_total_height:
+                if not primera_pagina:
+                    printer.newPage()
+                primera_pagina = False
+
+                painter.save()
+                painter.translate(page_rect.x(), page_rect.y())
                 painter.scale(scale, scale)
-                widget.render(painter, QPoint(), QRectF(widget.rect()))
+                painter.translate(0, -y_offset)
+
+                # Clip para que solo se vea la sección de esta página
+                clip = QRectF(0, y_offset, widget.width(), pixels_por_pagina)
+                painter.setClipRect(clip)
+                widget.render(painter)
+
+                painter.restore()
+                y_offset += pixels_por_pagina
+
             painter.end()
+            pages = math.ceil(widget_total_height / pixels_por_pagina)
+            self.statusBar().showMessage(f"Impreso — {pages} página(s)")
