@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import unicodedata
 from dataclasses import dataclass
 
 from src.application.services.student_service import StudentService
@@ -97,22 +98,38 @@ class StudentImportService:
 
     @staticmethod
     def _detect_mapping(columns: list[str] | tuple[str, ...] | object) -> tuple[dict[str, str], list[str]]:
+        def normalize_header(value: object) -> str:
+            text = unicodedata.normalize("NFKD", str(value).strip().lower())
+            text = "".join(ch for ch in text if not unicodedata.combining(ch))
+            clean = "".join(ch if ch.isalnum() else " " for ch in text)
+            return " ".join(clean.split())
+
         aliases = {
             "nombres": {"nombres", "nombre", "estudiante", "nombre_estudiante"},
             "apellidos": {"apellidos", "apellido", "apellidos_estudiante"},
             "identificacion": {"cedula", "cédula", "identificacion", "identificación", "dni"},
-            "codigo": {"codigo", "codigo_estudiante", "codigo estudiante"},
+            "codigo": {
+                "codigo",
+                "código",
+                "codigo_estudiante",
+                "código_estudiante",
+                "codigo estudiante",
+                "código estudiante",
+                "codigo estudiante opcional",
+                "código estudiante opcional",
+            },
             "curso": {"curso"},
             "paralelo": {"paralelo"},
         }
 
-        normalized = {str(col).strip().lower(): str(col) for col in columns}
+        normalized = {normalize_header(col): str(col) for col in columns}
         mapping: dict[str, str] = {}
 
         for target, options in aliases.items():
             for option in options:
-                if option in normalized:
-                    mapping[target] = normalized[option]
+                option_key = normalize_header(option.replace("_", " "))
+                if option_key in normalized:
+                    mapping[target] = normalized[option_key]
                     break
 
         errors: list[str] = []
