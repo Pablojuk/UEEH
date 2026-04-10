@@ -6,9 +6,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
     QFrame,
-    QHBoxLayout,
     QLabel,
-    QLineEdit,
+    QHBoxLayout,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -43,12 +42,6 @@ class TeachingAssignmentsView(QWidget):
         subtitle = QLabel("Asignar docente + asignatura + curso + paralelo + período")
         subtitle.setObjectName("Subtitle")
 
-        search_row = QHBoxLayout()
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Buscar por docente, asignatura, curso, paralelo o período")
-        self.search_input.textChanged.connect(self.load_assignments)
-        search_row.addWidget(self.search_input)
-
         card = QFrame()
         card.setObjectName("Card")
         form = QFormLayout(card)
@@ -77,7 +70,6 @@ class TeachingAssignmentsView(QWidget):
 
         root.addWidget(title)
         root.addWidget(subtitle)
-        root.addLayout(search_row)
         root.addWidget(card)
         root.addLayout(actions)
         root.addWidget(self.table, 1)
@@ -125,8 +117,7 @@ class TeachingAssignmentsView(QWidget):
             QMessageBox.warning(self, "Validación", message)
 
     def load_assignments(self) -> None:
-        query = self.search_input.text().strip()
-        rows = self.teaching_assignment_service.buscar_asignaciones(query) if query else self.teaching_assignment_service.listar_asignaciones()
+        rows = self.teaching_assignment_service.listar_asignaciones()
 
         self.table.setRowCount(0)
         for row_data in rows:
