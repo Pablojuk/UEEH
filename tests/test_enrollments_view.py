@@ -30,5 +30,7 @@ class TestEnrollmentsView(unittest.TestCase):
         view = EnrollmentsView(EnrollmentService(conn), StudentService(conn), CatalogService(conn))
         self.assertIsNotNone(view.student_combo)
         self.assertIsNotNone(view.table)
+        self.assertIsNotNone(view.delete_button)
+        self.assertFalse(hasattr(view, "search_input"))
         self.assertEqual(view.table.rowCount(), 0)
         conn.close()
