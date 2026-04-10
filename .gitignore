@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+*.pyo
+reports/*.pdf
+reports/*.xlsx
+!reports/.gitkeep
