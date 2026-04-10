@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gestion-academica"
+version = "0.1.0"
+description = "Aplicación de gestión académica con reporte de calificaciones"
+requires-python = ">=3.10"
+dependencies = [
+  "PySide6>=6.6",
+  "openpyxl>=3.1",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+gestion-academica = "gestion_academica.app:main"
