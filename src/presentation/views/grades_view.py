@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QApplication,
+    QAbstractItemView,
     QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
+    QShortcut,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -91,6 +94,12 @@ class GradesView(QWidget):
 
         self.table = QTableWidget(0, 1)
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setSelectionMode(QAbstractItemView.ContiguousSelection)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.copy_shortcut = QShortcut("Ctrl+C", self.table)
+        self.copy_shortcut.activated.connect(self._copy_selected_cells)
+        self.paste_shortcut = QShortcut("Ctrl+V", self.table)
+        self.paste_shortcut.activated.connect(self._paste_from_clipboard)
 
         root.addWidget(title)
         root.addWidget(subtitle)
@@ -185,7 +194,7 @@ class GradesView(QWidget):
             self._table_columns.append((f"promedio_{idx}", f"Promedio {idx}"))
         self._table_columns.extend(self.SUMMATIVE_COLUMNS)
         self.table.setColumnCount(len(self._table_columns))
-        self.table.setHorizontalHeaderLabels([title for _, title in self._table_columns])
+        self.table.setHorizontalHeaderLabels([self._format_header_label(title) for _, title in self._table_columns])
 
     def _fill_table(self, rows: list[dict]) -> None:
         self._clear_table()
@@ -220,3 +229,50 @@ class GradesView(QWidget):
 
     def refresh_data(self) -> None:
         self.load_contexts()
+
+    @staticmethod
+    def _format_header_label(title: str) -> str:
+        words = title.split()
+        if len(words) <= 2:
+            return title
+        split_index = len(words) // 2
+        return f"{' '.join(words[:split_index])}\n{' '.join(words[split_index:])}"
+
+    def _copy_selected_cells(self) -> None:
+        ranges = self.table.selectedRanges()
+        if not ranges:
+            return
+        selected_range = ranges[0]
+        lines: list[str] = []
+        for row in range(selected_range.topRow(), selected_range.bottomRow() + 1):
+            cells: list[str] = []
+            for col in range(selected_range.leftColumn(), selected_range.rightColumn() + 1):
+                item = self.table.item(row, col)
+                cells.append(item.text() if item else "")
+            lines.append("\t".join(cells))
+        QApplication.clipboard().setText("\n".join(lines))
+
+    def _paste_from_clipboard(self) -> None:
+        text = QApplication.clipboard().text()
+        if not text.strip():
+            return
+        current_row = self.table.currentRow()
+        current_col = self.table.currentColumn()
+        if current_row < 0 or current_col < 0:
+            return
+
+        rows = [line.split("\t") for line in text.splitlines()]
+        for row_offset, values in enumerate(rows):
+            target_row = current_row + row_offset
+            if target_row >= self.table.rowCount():
+                break
+            for col_offset, value in enumerate(values):
+                target_col = current_col + col_offset
+                if target_col >= self.table.columnCount():
+                    break
+                item = self.table.item(target_row, target_col)
+                if item is None:
+                    item = QTableWidgetItem("")
+                    self.table.setItem(target_row, target_col, item)
+                if item.flags() & Qt.ItemIsEditable:
+                    item.setText(value)
