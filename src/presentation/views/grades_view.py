@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
-    QShortcut,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
