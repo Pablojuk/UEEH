@@ -37,18 +37,13 @@ class EnrollmentsView(QWidget):
         self.catalog_service = catalog_service
         self.app_signals = app_signals
         self._students_cache: list[dict] = []
+        self.selected_enrollment_id: str | None = None
 
         root = QVBoxLayout(self)
         title = QLabel("Matrículas")
         title.setObjectName("Title")
         subtitle = QLabel("Asociar estudiantes a curso/paralelo/período")
         subtitle.setObjectName("Subtitle")
-
-        search_row = QHBoxLayout()
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Buscar por estudiante, curso, paralelo o período")
-        self.search_input.textChanged.connect(self.load_enrollments)
-        search_row.addWidget(self.search_input)
 
         card = QFrame()
         card.setObjectName("Card")
@@ -73,16 +68,19 @@ class EnrollmentsView(QWidget):
         actions = QHBoxLayout()
         self.save_button = QPushButton("Guardar matrícula")
         self.save_button.clicked.connect(self.save_enrollment)
+        self.delete_button = QPushButton("Borrar")
+        self.delete_button.clicked.connect(self.delete_enrollment)
         actions.addWidget(self.save_button)
+        actions.addWidget(self.delete_button)
         actions.addStretch(1)
 
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["ID", "Estudiante", "Curso", "Paralelo", "Período"])
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.cellClicked.connect(self.select_enrollment)
 
         root.addWidget(title)
         root.addWidget(subtitle)
-        root.addLayout(search_row)
         root.addWidget(card)
         root.addLayout(actions)
         root.addWidget(self.table, 1)
@@ -91,8 +89,16 @@ class EnrollmentsView(QWidget):
         self.load_enrollments()
 
     def load_combos(self) -> None:
-        self._students_cache = self.student_service.listar_estudiantes()
-        self._filter_students()
+        selected_student = self.student_combo.currentData()
+        selected_course = self.course_combo.currentData()
+        selected_parallel = self.parallel_combo.currentData()
+        selected_period = self.period_combo.currentData()
+
+        self._students_cache = sorted(
+            self.student_service.listar_estudiantes(),
+            key=lambda row: f"{row.get('apellidos', '').strip().lower()} {row.get('nombres', '').strip().lower()}",
+        )
+        self._filter_students(selected_student)
 
         self.course_combo.clear()
         for row in self.catalog_service.listar_cursos():
@@ -105,6 +111,10 @@ class EnrollmentsView(QWidget):
         self.period_combo.clear()
         for row in self.catalog_service.listar_periodos_lectivos():
             self.period_combo.addItem(row.get("id_periodo", ""), row.get("id_periodo"))
+
+        self._restore_combo_selection(self.course_combo, selected_course)
+        self._restore_combo_selection(self.parallel_combo, selected_parallel)
+        self._restore_combo_selection(self.period_combo, selected_period)
 
     def save_enrollment(self) -> None:
         payload = {
@@ -123,18 +133,15 @@ class EnrollmentsView(QWidget):
             QMessageBox.warning(self, "Validación", message)
 
     def load_enrollments(self) -> None:
-        query = self.search_input.text().strip().lower()
         rows = self.enrollment_service.listar_matriculas()
         students = {s.get("id_estudiante"): s for s in self.student_service.listar_estudiantes()}
-        if query:
-            filtered: list[dict] = []
-            for row in rows:
-                student = students.get(row.get("estudiante_id"), {})
-                student_text = f"{student.get('apellidos', '')} {student.get('nombres', '')} {student.get('identificacion', '')}".lower()
-                search_text = f"{student_text} {row.get('curso_id', '')} {row.get('paralelo_id', '')} {row.get('periodo_id', '')}".lower()
-                if query in search_text:
-                    filtered.append(row)
-            rows = filtered
+        rows = sorted(
+            rows,
+            key=lambda row: (
+                students.get(row.get("estudiante_id"), {}).get("apellidos", "").strip().lower(),
+                students.get(row.get("estudiante_id"), {}).get("nombres", "").strip().lower(),
+            ),
+        )
 
         self.table.setRowCount(0)
         for row_data in rows:
@@ -148,7 +155,7 @@ class EnrollmentsView(QWidget):
             self.table.setItem(row, 3, QTableWidgetItem(row_data.get("paralelo_id", "")))
             self.table.setItem(row, 4, QTableWidgetItem(row_data.get("periodo_id", "")))
 
-    def _filter_students(self) -> None:
+    def _filter_students(self, selected_student: str | None = None) -> None:
         query = self.student_filter_input.text().strip().lower()
         self.student_combo.clear()
         for student in self._students_cache:
@@ -159,6 +166,36 @@ class EnrollmentsView(QWidget):
                 continue
             display = f"{label} - {identification}" if identification else label
             self.student_combo.addItem(display, student.get("id_estudiante"))
+        if selected_student:
+            self._restore_combo_selection(self.student_combo, selected_student)
+
+    @staticmethod
+    def _restore_combo_selection(combo: QComboBox, selected_value: str | None) -> None:
+        if not selected_value:
+            return
+        index = combo.findData(selected_value)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+
+    def select_enrollment(self, row: int, _column: int) -> None:
+        item = self.table.item(row, 0)
+        self.selected_enrollment_id = item.text() if item else None
+
+    def delete_enrollment(self) -> None:
+        if not self.selected_enrollment_id:
+            QMessageBox.warning(self, "Validación", "Seleccione una matrícula de la tabla.")
+            return
+        if QMessageBox.question(self, "Confirmación", "¿Desea borrar la matrícula seleccionada?") != QMessageBox.Yes:
+            return
+        ok, message = self.enrollment_service.eliminar_matricula(self.selected_enrollment_id)
+        if ok:
+            QMessageBox.information(self, "Éxito", message)
+            self.selected_enrollment_id = None
+            self.load_enrollments()
+            if self.app_signals:
+                self.app_signals.data_changed.emit("enrollments")
+        else:
+            QMessageBox.warning(self, "Validación", message)
 
     def refresh_data(self) -> None:
         self.load_combos()
