@@ -94,7 +94,10 @@ class EnrollmentsView(QWidget):
         selected_parallel = self.parallel_combo.currentData()
         selected_period = self.period_combo.currentData()
 
-        self._students_cache = self.student_service.listar_estudiantes()
+        self._students_cache = sorted(
+            self.student_service.listar_estudiantes(),
+            key=lambda row: f"{row.get('apellidos', '').strip().lower()} {row.get('nombres', '').strip().lower()}",
+        )
         self._filter_students(selected_student)
 
         self.course_combo.clear()
@@ -132,6 +135,13 @@ class EnrollmentsView(QWidget):
     def load_enrollments(self) -> None:
         rows = self.enrollment_service.listar_matriculas()
         students = {s.get("id_estudiante"): s for s in self.student_service.listar_estudiantes()}
+        rows = sorted(
+            rows,
+            key=lambda row: (
+                students.get(row.get("estudiante_id"), {}).get("apellidos", "").strip().lower(),
+                students.get(row.get("estudiante_id"), {}).get("nombres", "").strip().lower(),
+            ),
+        )
 
         self.table.setRowCount(0)
         for row_data in rows:

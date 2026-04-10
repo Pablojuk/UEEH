@@ -35,6 +35,7 @@ class TeachingAssignmentsView(QWidget):
         self.teacher_service = teacher_service
         self.catalog_service = catalog_service
         self.app_signals = app_signals
+        self.selected_assignment_id: str | None = None
 
         root = QVBoxLayout(self)
         title = QLabel("Asignaciones Académicas")
@@ -61,12 +62,16 @@ class TeachingAssignmentsView(QWidget):
         actions = QHBoxLayout()
         self.save_button = QPushButton("Guardar asignación")
         self.save_button.clicked.connect(self.save_assignment)
+        self.delete_button = QPushButton("Borrar")
+        self.delete_button.clicked.connect(self.delete_assignment)
         actions.addWidget(self.save_button)
+        actions.addWidget(self.delete_button)
         actions.addStretch(1)
 
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(["ID", "Docente", "Asignatura", "Curso", "Paralelo", "Período"])
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.cellClicked.connect(self.select_assignment)
 
         root.addWidget(title)
         root.addWidget(subtitle)
@@ -129,6 +134,26 @@ class TeachingAssignmentsView(QWidget):
             self.table.setItem(row, 3, QTableWidgetItem(row_data.get("curso_id", "")))
             self.table.setItem(row, 4, QTableWidgetItem(row_data.get("paralelo_id", "")))
             self.table.setItem(row, 5, QTableWidgetItem(row_data.get("periodo_id", "")))
+
+    def select_assignment(self, row: int, _column: int) -> None:
+        item = self.table.item(row, 0)
+        self.selected_assignment_id = item.text() if item else None
+
+    def delete_assignment(self) -> None:
+        if not self.selected_assignment_id:
+            QMessageBox.warning(self, "Validación", "Seleccione una asignación de la tabla.")
+            return
+        if QMessageBox.question(self, "Confirmación", "¿Desea borrar la asignación seleccionada?") != QMessageBox.Yes:
+            return
+        ok, message = self.teaching_assignment_service.eliminar_asignacion(self.selected_assignment_id)
+        if ok:
+            QMessageBox.information(self, "Éxito", message)
+            self.selected_assignment_id = None
+            self.load_assignments()
+            if self.app_signals:
+                self.app_signals.data_changed.emit("teaching_assignments")
+        else:
+            QMessageBox.warning(self, "Validación", message)
 
     def refresh_data(self) -> None:
         self.load_combos()

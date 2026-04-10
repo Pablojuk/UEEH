@@ -84,3 +84,14 @@ class TestStudentImportService(unittest.TestCase):
         student = self.student_service.listar_estudiantes()[0]
         self.assertEqual(student["identificacion"], "0123456789")
         os.remove(path)
+
+    def test_importacion_identificacion_numerica_se_rellena_a_diez_digitos(self) -> None:
+        path = self._create_csv(
+            ["nombres", "apellidos", "identificacion"],
+            [["Luis", "Mora", "105370365"]],
+        )
+        result = self.import_service.import_file(path)
+        self.assertEqual(result["importados"], 1)
+        student = self.student_service.listar_estudiantes()[0]
+        self.assertEqual(student["identificacion"], "0105370365")
+        os.remove(path)

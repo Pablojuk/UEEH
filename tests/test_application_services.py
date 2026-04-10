@@ -90,13 +90,13 @@ class TestApplicationServices(unittest.TestCase):
         csv_file = tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w", encoding="utf-8", newline="")
         try:
             csv_file.write("ID docente,nombres,apellidos,cedula\n")
-            csv_file.write("DOC-001,Ana,Perez,0123456789\n")
+            csv_file.write("DOC-001,Ana,Perez,105370365\n")
             csv_file.close()
             result = self.teacher_service.importar_desde_excel(csv_file.name)
             self.assertEqual(result["importados"], 1)
             docente = self.teacher_service.obtener_docente("DOC-001")
             self.assertIsNotNone(docente)
-            self.assertEqual(docente["identificacion"], "0123456789")
+            self.assertEqual(docente["identificacion"], "0105370365")
         finally:
             path = Path(csv_file.name)
             if path.exists():

@@ -158,6 +158,8 @@ class TeacherService:
         nombres = get("nombres", "nombre")
         apellidos = get("apellidos", "apellido")
         identificacion = get("identificacion", "identificación", "cedula", "cédula", "dni")
+        if identificacion.isdigit() and len(identificacion) < 10:
+            identificacion = identificacion.zfill(10)
 
         if not docente_id:
             docente_id = f"DOC-{uuid.uuid4().hex[:8].upper()}"

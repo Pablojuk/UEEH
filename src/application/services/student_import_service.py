@@ -156,6 +156,8 @@ class StudentImportService:
                 base = text[:-2]
                 if base.isdigit():
                     text = base
+            if key == "identificacion" and text.isdigit() and len(text) < 10:
+                text = text.zfill(10)
             return text
 
         return {

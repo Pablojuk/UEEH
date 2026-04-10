@@ -77,6 +77,13 @@ class TeachingAssignmentService:
         self.repo.actualizar(assignment_id, merged)
         return True, "Asignación actualizada"
 
+    def eliminar_asignacion(self, assignment_id: str) -> tuple[bool, str]:
+        existing = self.repo.obtener_por_id(assignment_id)
+        if not existing:
+            return False, "Asignación no encontrada"
+        self.repo.eliminar(assignment_id)
+        return True, "Asignación eliminada"
+
     def _es_duplicada(self, data: dict, exclude_id: str | None = None) -> bool:
         for row in self.listar_asignaciones():
             if exclude_id and row.get("id_asignacion") == exclude_id:
