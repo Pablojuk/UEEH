@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from PySide6.QtGui import QColor, QFont
 
 ORIENTACION_A4 = "portrait"
@@ -23,8 +25,9 @@ def esc(valor: int) -> int:
 
 A4_MARGEN_EXTERNO = esc(8)
 
-RUTA_LOGO_INSTITUCION = r"C:\Users\ASUS\OneDrive\Escritorio\-preview.png"
-RUTA_LOGO_MINEDUC = r"C:\Users\ASUS\OneDrive\Escritorio\MINEDEC.png"
+BASE_DIR = Path(__file__).resolve().parents[1]
+RUTA_LOGO_INSTITUCION = str(BASE_DIR / "resources" / "logos" / "institucion.png")
+RUTA_LOGO_MINEDUC = str(BASE_DIR / "resources" / "logos" / "mineduc.png")
 LOGO_ANCHO = 130
 LOGO_ALTO = 130
 
