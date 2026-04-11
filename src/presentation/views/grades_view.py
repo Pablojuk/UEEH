@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QShortcut
 from PySide6.QtWidgets import (
+    QApplication,
+    QAbstractItemView,
     QComboBox,
     QFrame,
     QHBoxLayout,
@@ -34,6 +37,7 @@ class GradesView(QWidget):
         ("promedio_sumativo_30", "Promedio Evaluación Sumativa 30%"),
         ("nota_trimestral", "Promedio Trimestral"),
         ("cualitativo", "Cualitativo"),
+        ("cualitativo_adicional", "Cualitativo adicional"),
     ]
 
     def __init__(self, grade_registration_service: GradeRegistrationService, app_signals: AppSignals | None = None) -> None:
@@ -91,6 +95,20 @@ class GradesView(QWidget):
 
         self.table = QTableWidget(0, 1)
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setSelectionMode(QAbstractItemView.ContiguousSelection)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.table.setStyleSheet(
+            """
+            QTableWidget::item:selected {
+                background-color: #CCFFFF;
+                color: #1f2937;
+            }
+            """
+        )
+        self.copy_shortcut = QShortcut("Ctrl+C", self.table)
+        self.copy_shortcut.activated.connect(self._copy_selected_cells)
+        self.paste_shortcut = QShortcut("Ctrl+V", self.table)
+        self.paste_shortcut.activated.connect(self._paste_from_clipboard)
 
         root.addWidget(title)
         root.addWidget(subtitle)
@@ -185,7 +203,7 @@ class GradesView(QWidget):
             self._table_columns.append((f"promedio_{idx}", f"Promedio {idx}"))
         self._table_columns.extend(self.SUMMATIVE_COLUMNS)
         self.table.setColumnCount(len(self._table_columns))
-        self.table.setHorizontalHeaderLabels([title for _, title in self._table_columns])
+        self.table.setHorizontalHeaderLabels([self._format_header_label(title) for _, title in self._table_columns])
 
     def _fill_table(self, rows: list[dict]) -> None:
         self._clear_table()
@@ -198,8 +216,9 @@ class GradesView(QWidget):
                 value = row_data.get(field)
                 text = "" if value is None else str(value)
                 item = QTableWidgetItem(text)
-                if field.startswith("promedio_") or field in {"estudiante", "nota_trimestral", "cualitativo"}:
+                if field.startswith("promedio_") or field in {"estudiante", "nota_trimestral", "cualitativo", "cualitativo_adicional"}:
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                self._apply_item_colors(item, field, value)
                 self.table.setItem(row, col, item)
 
     def _collect_rows_from_table(self) -> list[dict]:
@@ -220,3 +239,88 @@ class GradesView(QWidget):
 
     def refresh_data(self) -> None:
         self.load_contexts()
+
+    @staticmethod
+    def _format_header_label(title: str) -> str:
+        words = title.split()
+        if len(words) <= 2:
+            return title
+        split_index = len(words) // 2
+        return f"{' '.join(words[:split_index])}\n{' '.join(words[split_index:])}"
+
+    @staticmethod
+    def _is_numeric_field(field: str) -> bool:
+        return (
+            field.startswith("actividad_")
+            or field.startswith("mejora_")
+            or field.startswith("promedio_")
+            or field in {"proyecto", "evaluacion", "refuerzo", "mejora_sumativa", "nota_trimestral"}
+        )
+
+    def _apply_item_colors(self, item: QTableWidgetItem, field: str, value: object) -> None:
+        if field.startswith("promedio_") or field in {"promedio_evaluacion_sumativa", "promedio_formativo", "promedio_formativo_70", "promedio_sumativo_30"}:
+            item.setBackground(QColor("#B7E6A7"))
+        if field in {"cualitativo", "cualitativo_adicional"}:
+            item.setBackground(QColor("#FFE6FF"))
+
+        try:
+            numeric_value = float(value) if value is not None and str(value).strip() != "" else None
+        except (TypeError, ValueError):
+            numeric_value = None
+        if numeric_value is not None and numeric_value < 7:
+            item.setForeground(QColor("#FFADB1"))
+
+    def _copy_selected_cells(self) -> None:
+        ranges = self.table.selectedRanges()
+        if not ranges:
+            return
+        selected_range = ranges[0]
+        lines: list[str] = []
+        for row in range(selected_range.topRow(), selected_range.bottomRow() + 1):
+            cells: list[str] = []
+            for col in range(selected_range.leftColumn(), selected_range.rightColumn() + 1):
+                item = self.table.item(row, col)
+                cells.append(item.text() if item else "")
+            lines.append("\t".join(cells))
+        QApplication.clipboard().setText("\n".join(lines))
+
+    def _paste_from_clipboard(self) -> None:
+        text = QApplication.clipboard().text()
+        if not text.strip():
+            return
+        current_row = self.table.currentRow()
+        current_col = self.table.currentColumn()
+        if current_row < 0 or current_col < 0:
+            return
+
+        rows = [line.split("\t") for line in text.splitlines()]
+        for row_offset, values in enumerate(rows):
+            target_row = current_row + row_offset
+            if target_row >= self.table.rowCount():
+                break
+            for col_offset, value in enumerate(values):
+                target_col = current_col + col_offset
+                if target_col >= self.table.columnCount():
+                    break
+                item = self.table.item(target_row, target_col)
+                if item is None:
+                    item = QTableWidgetItem("")
+                    self.table.setItem(target_row, target_col, item)
+                if item.flags() & Qt.ItemIsEditable:
+                    field = self._table_columns[target_col][0] if target_col < len(self._table_columns) else ""
+                    item.setText(self._normalize_clipboard_value(value, field))
+
+    def _normalize_clipboard_value(self, value: str, field: str) -> str:
+        text = str(value).strip()
+        if not text:
+            return ""
+        if not self._is_numeric_field(field):
+            return text
+
+        normalized = text.replace(",", ".")
+        try:
+            number = float(normalized)
+        except ValueError:
+            return text
+        formatted = f"{number:.2f}".rstrip("0").rstrip(".")
+        return formatted
