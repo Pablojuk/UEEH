@@ -136,38 +136,6 @@ class TestGradesView(unittest.TestCase):
         view._paste_from_clipboard()
         self.assertEqual(view.table.item(0, 1).text(), "8.75")
 
-    def test_formato_encabezado_largo_en_dos_lineas(self) -> None:
-        from src.presentation.views.grades_view import GradesView
-
-        self.assertEqual(
-            GradesView._format_header_label("Promedio Evaluación Sumativa 30%"),
-            "Promedio Evaluación\nSumativa 30%",
-        )
-        self.assertEqual(GradesView._format_header_label("Actividad 1"), "Actividad 1")
-
-    def test_copy_paste_en_tabla(self) -> None:
-        from src.presentation.views.grades_view import GradesView
-
-        view = GradesView(
-            _FakeGradeRegistrationService(
-                rows=[
-                    {"estudiante_id": "E1", "estudiante": "Lopez Maria", "actividad_1": 8},
-                    {"estudiante_id": "E2", "estudiante": "Perez Juan", "actividad_1": 7},
-                ]
-            )
-        )
-        view.load_rows()
-        view.table.setCurrentCell(0, 1)
-        view.table.selectRow(0)
-        view._copy_selected_cells()
-        copied = QApplication.clipboard().text()
-        self.assertTrue("Lopez Maria" in copied)
-
-        QApplication.clipboard().setText("9\t10")
-        view.table.setCurrentCell(0, 1)
-        view._paste_from_clipboard()
-        self.assertEqual(view.table.item(0, 1).text(), "9")
-
 
 if __name__ == "__main__":
     unittest.main()

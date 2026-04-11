@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QColor, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -100,11 +100,12 @@ class GradesView(QWidget):
         self.table.setStyleSheet(
             """
             QTableWidget::item:selected {
-                background-color: #CCFFFF;
+                background-color: #F8F8FF;
                 color: #1f2937;
             }
             """
         )
+        self.table.installEventFilter(self)
         self.copy_shortcut = QShortcut("Ctrl+C", self.table)
         self.copy_shortcut.activated.connect(self._copy_selected_cells)
         self.paste_shortcut = QShortcut("Ctrl+V", self.table)
@@ -258,7 +259,7 @@ class GradesView(QWidget):
         )
 
     def _apply_item_colors(self, item: QTableWidgetItem, field: str, value: object) -> None:
-        if field.startswith("promedio_") or field in {"promedio_evaluacion_sumativa", "promedio_formativo", "promedio_formativo_70", "promedio_sumativo_30"}:
+        if field.startswith("promedio_") or field in {"promedio_evaluacion_sumativa", "promedio_formativo", "promedio_formativo_70", "promedio_sumativo_30", "nota_trimestral"}:
             item.setBackground(QColor("#B7E6A7"))
         if field in {"cualitativo", "cualitativo_adicional"}:
             item.setBackground(QColor("#FFE6FF"))
@@ -268,7 +269,17 @@ class GradesView(QWidget):
         except (TypeError, ValueError):
             numeric_value = None
         if numeric_value is not None and numeric_value < 7:
-            item.setForeground(QColor("#FFADB1"))
+            item.setForeground(QColor("#FF0000"))
+
+    def eventFilter(self, obj, event):  # type: ignore[override]
+        if obj is self.table and event.type() == QEvent.KeyPress:
+            if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_C:
+                self._copy_selected_cells()
+                return True
+            if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_V:
+                self._paste_from_clipboard()
+                return True
+        return super().eventFilter(obj, event)
 
     def _copy_selected_cells(self) -> None:
         ranges = self.table.selectedRanges()
