@@ -141,8 +141,7 @@ class StudentService:
             base = text[:-2]
             if base.isdigit():
                 text = base
-        normalized = "".join(char for char in text if char.isalnum())
-        return normalized or None
+        return text
 
     @staticmethod
     def _normalizar_codigo(value: object) -> str | None:
