@@ -146,8 +146,8 @@ class PdfReportExporter:
         from reportlab.lib import colors
         from reportlab.lib.units import cm
 
-        header_top = ["N°", "Nómina", "Primer Trimestre", "", "Segundo Trimestre", "", "Tercer Trimestre", "", "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Observación"]
-        header_sub = ["", "", "Calificación", "Cualitativa", "Calificación", "Cualitativa", "Calificación", "Cualitativa", "", "", "", "", ""]
+        header_top = ["N°", "Nómina", "Primer Trimestre", "", "Segundo Trimestre", "", "Tercer Trimestre", "", "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo Final", "Observación"]
+        header_sub = ["", "", "Calificación", "Cualitativa", "Calificación", "Cualitativa", "Calificación", "Cualitativa", "", "", "", "", "", ""]
         data = [header_top, header_sub]
         for idx, row in enumerate(rows, start=1):
             data.append([
@@ -163,10 +163,11 @@ class PdfReportExporter:
                 row.get("cualitativa_anual", ""),
                 self._fmt(row.get("supletorio")),
                 self._fmt(row.get("promedio_final")),
+                row.get("cualitativo_final", ""),
                 row.get("observacion", ""),
             ])
 
-        table = Table(data, colWidths=[0.8*cm, 5.5*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.2*cm, 1.4*cm, 1.6*cm], repeatRows=2)
+        table = Table(data, colWidths=[0.8*cm, 5.1*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.1*cm, 1.3*cm, 1.4*cm, 1.4*cm], repeatRows=2)
         style = [
             ("GRID", (0, 0), (-1, -1), 0.45, colors.black),
             ("BACKGROUND", (0, 0), (-1, 1), colors.HexColor("#E5E7EB")),

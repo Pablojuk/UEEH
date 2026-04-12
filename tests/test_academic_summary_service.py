@@ -94,6 +94,7 @@ class TestAcademicSummaryService(unittest.TestCase):
         row = self.service.obtener_resumen_por_asignacion("AS1")[0]
         self.assertEqual(row["promedio_final"], 7.0)
         self.assertEqual(row["cualitativo"], "B-")
+        self.assertEqual(row["cualitativo_final"], "B-")
         self.assertEqual(row["observacion"], "APB")
 
     def test_aplicar_supletorio_correctamente(self) -> None:

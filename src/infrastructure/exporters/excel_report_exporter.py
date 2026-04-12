@@ -87,7 +87,7 @@ class ExcelReportExporter:
                 "Primer Trimestre Calificación", "Primer Trimestre Cualitativa",
                 "Segundo Trimestre Calificación", "Segundo Trimestre Cualitativa",
                 "Tercer Trimestre Calificación", "Tercer Trimestre Cualitativa",
-                "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Observación",
+                "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo Final", "Observación",
             ]
             start_row = 6
             for col, title in enumerate(headers, start=1):
@@ -111,6 +111,7 @@ class ExcelReportExporter:
                     row.get("cualitativa_anual", ""),
                     row.get("supletorio"),
                     row.get("promedio_final"),
+                    row.get("cualitativo_final", ""),
                     row.get("observacion", ""),
                 ]
                 for cidx, value in enumerate(values, start=1):
@@ -119,7 +120,7 @@ class ExcelReportExporter:
                     cell.border = border
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
-            widths = [5, 30, 12, 12, 12, 12, 12, 12, 9, 10, 10, 10, 12]
+            widths = [5, 30, 12, 12, 12, 12, 12, 12, 9, 10, 10, 10, 12, 12]
 
         for idx, w in enumerate(widths, start=1):
             ws.column_dimensions[chr(ord("A") + idx - 1)].width = w

@@ -218,6 +218,7 @@ class AcademicSummaryService:
                     "supletorio": supletorio,
                     "promedio_final": promedio_final,
                     "cualitativo": calcular_cualitativo(promedio) if promedio is not None else "",
+                    "cualitativo_final": calcular_cualitativo(promedio_final) if promedio_final is not None else "",
                     "observacion": calcular_observacion_final(promedio_final) if promedio_final is not None else "",
                     "nota_definitiva": promedio_final,
                 }
@@ -251,6 +252,7 @@ class AcademicSummaryService:
                     "cualitativa_anual": self._calcular_equivalencia(promedio),
                     "promedio_final": promedio_final,
                     "cualitativo": calcular_cualitativo(promedio) if promedio is not None else "",
+                    "cualitativo_final": calcular_cualitativo(promedio_final) if promedio_final is not None else "",
                     "observacion": calcular_observacion_final(promedio_final) if promedio_final is not None else "",
                     "supletorio": supletorio,
                     "nota_definitiva": promedio_final,
