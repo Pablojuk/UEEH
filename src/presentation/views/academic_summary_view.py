@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
+    QApplication,
+    QAbstractItemView,
     QComboBox,
     QFileDialog,
     QFrame,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -61,6 +65,12 @@ class AcademicSummaryView(QWidget):
         self.report_export_service = report_export_service
         self._rows_meta: list[dict] = []
         self._table_columns = list(self.ANNUAL_COLUMNS)
+        self._firmantes: dict[str, str] = {
+            "docente": "",
+            "coordinador_area": "",
+            "rector": "",
+            "tutor_curso": "",
+        }
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -103,16 +113,43 @@ class AcademicSummaryView(QWidget):
         filter_row.addWidget(self.export_pdf_button)
         filter_row.addWidget(self.export_excel_button)
 
+        sign_card = QGroupBox("Firmantes del reporte")
+        sign_layout = QHBoxLayout(sign_card)
+        self.signer_docente_combo = QComboBox()
+        self.signer_coordinador_combo = QComboBox()
+        self.signer_rector_combo = QComboBox()
+        self.signer_tutor_combo = QComboBox()
+        self.signer_docente_combo.currentIndexChanged.connect(self._update_signers)
+        self.signer_coordinador_combo.currentIndexChanged.connect(self._update_signers)
+        self.signer_rector_combo.currentIndexChanged.connect(self._update_signers)
+        self.signer_tutor_combo.currentIndexChanged.connect(self._update_signers)
+
+        sign_layout.addWidget(QLabel("Docente"))
+        sign_layout.addWidget(self.signer_docente_combo, 1)
+        sign_layout.addWidget(QLabel("Coordinador de Área"))
+        sign_layout.addWidget(self.signer_coordinador_combo, 1)
+        sign_layout.addWidget(QLabel("Rector"))
+        sign_layout.addWidget(self.signer_rector_combo, 1)
+        sign_layout.addWidget(QLabel("Tutor de Curso"))
+        sign_layout.addWidget(self.signer_tutor_combo, 1)
+
         self.table = QTableWidget(0, len(self._table_columns))
         self.table.setHorizontalHeaderLabels([label for _, label in self._table_columns])
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.table.installEventFilter(self)
+        self.copy_shortcut = QShortcut("Ctrl+C", self.table)
+        self.copy_shortcut.activated.connect(self._copy_selected_cells)
 
         root.addWidget(title)
         root.addWidget(subtitle)
         root.addWidget(filter_card)
+        root.addWidget(sign_card)
         root.addWidget(self.table, 1)
 
         self.load_contexts()
+        self._load_signer_options()
         self._on_report_type_changed()
 
     def load_contexts(self) -> None:
@@ -208,6 +245,7 @@ class AcademicSummaryView(QWidget):
                 selected_path,
                 report_type=report_type,
                 trimestre_num=trimestre_num,
+                firmantes=self._firmantes,
             )
         else:
             report_type, trimestre_num = self.report_type_combo.currentData()
@@ -216,6 +254,7 @@ class AcademicSummaryView(QWidget):
                 selected_path,
                 report_type=report_type,
                 trimestre_num=trimestre_num,
+                firmantes=self._firmantes,
             )
 
         if ok:
@@ -262,3 +301,47 @@ class AcademicSummaryView(QWidget):
         self.table.setHorizontalHeaderLabels([label for _, label in self._table_columns])
         self.table.setRowCount(0)
         self._rows_meta = []
+
+    def _load_signer_options(self) -> None:
+        options = self.academic_summary_service.listar_firmantes_disponibles()
+        combos = [
+            self.signer_docente_combo,
+            self.signer_coordinador_combo,
+            self.signer_rector_combo,
+            self.signer_tutor_combo,
+        ]
+        for combo in combos:
+            combo.clear()
+            combo.addItem("Seleccione", "")
+            for row in options:
+                combo.addItem(row.get("firma", ""), row.get("firma", ""))
+        self._update_signers()
+
+    def _update_signers(self) -> None:
+        self._firmantes = {
+            "docente": self.signer_docente_combo.currentData() or "",
+            "coordinador_area": self.signer_coordinador_combo.currentData() or "",
+            "rector": self.signer_rector_combo.currentData() or "",
+            "tutor_curso": self.signer_tutor_combo.currentData() or "",
+        }
+
+    def eventFilter(self, obj, event):  # type: ignore[override]
+        if obj is self.table and event.type() == QEvent.KeyPress:
+            if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_C:
+                self._copy_selected_cells()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _copy_selected_cells(self) -> None:
+        ranges = self.table.selectedRanges()
+        if not ranges:
+            return
+        selected_range = ranges[0]
+        lines: list[str] = []
+        for row in range(selected_range.topRow(), selected_range.bottomRow() + 1):
+            values: list[str] = []
+            for col in range(selected_range.leftColumn(), selected_range.rightColumn() + 1):
+                item = self.table.item(row, col)
+                values.append(item.text() if item else "")
+            lines.append("\t".join(values))
+        QApplication.clipboard().setText("\n".join(lines))

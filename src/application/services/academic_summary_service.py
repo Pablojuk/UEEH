@@ -61,6 +61,32 @@ class AcademicSummaryService:
             contextos.append(item)
         return contextos
 
+    def listar_firmantes_disponibles(self) -> list[dict[str, str]]:
+        rows = self.connection.execute(
+            """
+            SELECT id_docente, titulo, nombres, apellidos
+            FROM docentes
+            WHERE activo = 1
+            ORDER BY apellidos, nombres
+            """
+        ).fetchall()
+
+        firmantes: list[dict[str, str]] = []
+        for row in rows:
+            nombres = str(row["nombres"] or "").strip().split()
+            apellidos = str(row["apellidos"] or "").strip().split()
+            primer_nombre = nombres[0] if nombres else ""
+            primer_apellido = apellidos[0] if apellidos else ""
+            titulo = str(row["titulo"] or "").strip()
+            firma = " ".join(part for part in [titulo, primer_nombre, primer_apellido] if part).strip()
+            firmantes.append(
+                {
+                    "id_docente": row["id_docente"],
+                    "firma": firma,
+                }
+            )
+        return firmantes
+
     def obtener_resumen_por_asignacion(self, asignacion_id: str) -> list[dict[str, Any]]:
         return self.obtener_reporte_anual(asignacion_id)
 

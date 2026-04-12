@@ -124,5 +124,30 @@ class ExcelReportExporter:
         for idx, w in enumerate(widths, start=1):
             ws.column_dimensions[chr(ord("A") + idx - 1)].width = w
 
+        self._draw_signatures(ws, start_row + len(rows) + 3, len(widths), context.get("firmantes", {}))
         wb.save(str(path))
         return str(path)
+
+    @staticmethod
+    def _draw_signatures(ws, start_row: int, max_cols: int, firmantes: dict[str, str]) -> None:
+        from openpyxl.styles import Alignment
+
+        roles = [
+            ("Docente", firmantes.get("docente", "")),
+            ("Coordinador de Área", firmantes.get("coordinador_area", "")),
+            ("Rector", firmantes.get("rector", "")),
+            ("Tutor de Curso", firmantes.get("tutor_curso", "")),
+        ]
+        block = max(1, max_cols // 4)
+        for idx, (rol, firma) in enumerate(roles):
+            col_start = (idx * block) + 1
+            col_end = min(max_cols, col_start + block - 1)
+            ws.merge_cells(start_row=start_row, start_column=col_start, end_row=start_row, end_column=col_end)
+            ws.merge_cells(start_row=start_row + 1, start_column=col_start, end_row=start_row + 1, end_column=col_end)
+            ws.merge_cells(start_row=start_row + 2, start_column=col_start, end_row=start_row + 2, end_column=col_end)
+            ws.cell(row=start_row, column=col_start, value="_____________________________")
+            ws.cell(row=start_row + 1, column=col_start, value=firma or "")
+            ws.cell(row=start_row + 2, column=col_start, value=rol)
+            ws.cell(row=start_row, column=col_start).alignment = Alignment(horizontal="center")
+            ws.cell(row=start_row + 1, column=col_start).alignment = Alignment(horizontal="center")
+            ws.cell(row=start_row + 2, column=col_start).alignment = Alignment(horizontal="center")

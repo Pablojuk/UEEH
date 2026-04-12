@@ -38,7 +38,7 @@ class PdfReportExporter:
         else:
             self._draw_anual_table(c, width, height, rows)
 
-        self._draw_signatures(c, width)
+        self._draw_signatures(c, width, context.get("firmantes", {}))
         c.save()
         return str(path)
 
@@ -235,18 +235,24 @@ class PdfReportExporter:
         drawing.add(pie)
         drawing.drawOn(c, width - 8.2 * cm, 2.1 * cm)
 
-    def _draw_signatures(self, c, width: float) -> None:
+    def _draw_signatures(self, c, width: float, firmantes: dict[str, str]) -> None:
         from reportlab.lib.units import cm
 
-        roles = ["Docente", "Coordinador de Área", "Rector", "Tutor de Curso"]
+        roles = [
+            ("Docente", firmantes.get("docente", "")),
+            ("Coordinador de Área", firmantes.get("coordinador_area", "")),
+            ("Rector", firmantes.get("rector", "")),
+            ("Tutor de Curso", firmantes.get("tutor_curso", "")),
+        ]
         start_x = 2 * cm
         gap = (width - 4 * cm) / 4
         y = 1.2 * cm
-        for idx, role in enumerate(roles):
+        for idx, (role, firma) in enumerate(roles):
             x = start_x + idx * gap
             c.line(x, y + 0.8 * cm, x + 3.8 * cm, y + 0.8 * cm)
             c.setFont("Helvetica", 7)
-            c.drawCentredString(x + 1.9 * cm, y + 0.4 * cm, role)
+            c.drawCentredString(x + 1.9 * cm, y + 0.45 * cm, firma or "")
+            c.drawCentredString(x + 1.9 * cm, y + 0.2 * cm, role)
 
     @staticmethod
     def _fmt(value: Any) -> str:

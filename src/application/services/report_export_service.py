@@ -35,8 +35,16 @@ class ReportExportService:
         output_path: str,
         report_type: str = "anual",
         trimestre_num: int | None = None,
+        firmantes: dict[str, str] | None = None,
     ) -> tuple[bool, str]:
-        return self._exportar(asignacion_id, output_path, export_kind="pdf", report_type=report_type, trimestre_num=trimestre_num)
+        return self._exportar(
+            asignacion_id,
+            output_path,
+            export_kind="pdf",
+            report_type=report_type,
+            trimestre_num=trimestre_num,
+            firmantes=firmantes,
+        )
 
     def exportar_resumen_excel(
         self,
@@ -44,8 +52,16 @@ class ReportExportService:
         output_path: str,
         report_type: str = "anual",
         trimestre_num: int | None = None,
+        firmantes: dict[str, str] | None = None,
     ) -> tuple[bool, str]:
-        return self._exportar(asignacion_id, output_path, export_kind="excel", report_type=report_type, trimestre_num=trimestre_num)
+        return self._exportar(
+            asignacion_id,
+            output_path,
+            export_kind="excel",
+            report_type=report_type,
+            trimestre_num=trimestre_num,
+            firmantes=firmantes,
+        )
 
     def _exportar(
         self,
@@ -54,6 +70,7 @@ class ReportExportService:
         export_kind: str,
         report_type: str,
         trimestre_num: int | None,
+        firmantes: dict[str, str] | None,
     ) -> tuple[bool, str]:
         if not str(asignacion_id or "").strip():
             return False, "Debe seleccionar una asignación"
@@ -62,6 +79,7 @@ class ReportExportService:
             context = self._build_context(asignacion_id)
             context["report_type"] = report_type
             context["trimestre_num"] = trimestre_num
+            context["firmantes"] = firmantes or {}
             rows = (
                 self.academic_summary_service.obtener_reporte_trimestral(asignacion_id, trimestre_num or 1)
                 if report_type == "trimestral"

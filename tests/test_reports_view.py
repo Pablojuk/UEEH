@@ -27,6 +27,9 @@ class _FakeAcademicSummaryService:
     def obtener_reporte_trimestral(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
         return []
 
+    def listar_firmantes_disponibles(self) -> list[dict]:
+        return []
+
     def recalcular_resumenes(self, rows: list[dict]) -> list[dict]:
         return rows
 

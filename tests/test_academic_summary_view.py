@@ -35,6 +35,9 @@ class _FakeAcademicSummaryService:
     def guardar_supletorios(self, asignacion_id: str, rows: list[dict]) -> tuple[bool, str]:
         return True, f"Supletorios procesados: {len(rows)}"
 
+    def listar_firmantes_disponibles(self) -> list[dict]:
+        return [{"id_docente": "D1", "firma": "Econ. Pablo Juca"}]
+
 
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
 class TestAcademicSummaryView(unittest.TestCase):
