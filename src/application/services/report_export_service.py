@@ -80,6 +80,7 @@ class ReportExportService:
             context["report_type"] = report_type
             context["trimestre_num"] = trimestre_num
             context["firmantes"] = firmantes or {}
+            context["template_data"] = self._build_template_data(context, report_type, trimestre_num)
             rows = (
                 self.academic_summary_service.obtener_reporte_trimestral(asignacion_id, trimestre_num or 1)
                 if report_type == "trimestral"
@@ -149,3 +150,27 @@ class ReportExportService:
             ):
                 return True
         return False
+
+    @staticmethod
+    def _build_template_data(context: dict[str, Any], report_type: str, trimestre_num: int | None) -> dict[str, Any]:
+        trimestre_text = f"Trimestre {trimestre_num}" if report_type == "trimestral" else "Anual"
+        return {
+            "institucion_nombre": context.get("institucion_nombre", ""),
+            "docente_nombre": context.get("docente_nombre", ""),
+            "docente": context.get("docente_nombre", ""),
+            "asignatura_nombre": context.get("asignatura_nombre", ""),
+            "asignatura": context.get("asignatura_nombre", ""),
+            "curso_nombre": context.get("curso_nombre", ""),
+            "curso": context.get("curso_nombre", ""),
+            "paralelo_nombre": context.get("paralelo_nombre", ""),
+            "paralelo": context.get("paralelo_nombre", ""),
+            "nivel": context.get("curso_nivel", ""),
+            "trimestre": trimestre_text,
+            "periodo": trimestre_text,
+            "periodo_lectivo": context.get("periodo_id", ""),
+            "tutor": context.get("firmantes", {}).get("tutor_curso", ""),
+            "firma_docente": context.get("firmantes", {}).get("docente", ""),
+            "firma_coordinador": context.get("firmantes", {}).get("coordinador_area", ""),
+            "firma_rector": context.get("firmantes", {}).get("rector", ""),
+            "firma_tutor": context.get("firmantes", {}).get("tutor_curso", ""),
+        }

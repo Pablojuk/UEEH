@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -226,6 +227,8 @@ class PdfReportExporter:
         table.wrapOn(c, width, 5 * cm)
         table.drawOn(c, 1.2 * cm, 2.2 * cm)
 
+        from reportlab.graphics.shapes import Drawing
+        from reportlab.graphics.charts.piecharts import Pie
         drawing = Drawing(6 * cm, 4 * cm)
         pie = Pie()
         pie.x = 1.0 * cm
@@ -310,11 +313,16 @@ class PdfReportExporter:
         values = {
             "institucion_nombre": context.get("institucion_nombre", "Institución"),
             "docente_nombre": context.get("docente_nombre", ""),
+            "docente": context.get("docente_nombre", ""),
             "asignatura_nombre": context.get("asignatura_nombre", ""),
+            "asignatura": context.get("asignatura_nombre", ""),
             "curso_nombre": context.get("curso_nombre", ""),
+            "curso": context.get("curso_nombre", ""),
             "paralelo_nombre": context.get("paralelo_nombre", ""),
+            "paralelo": context.get("paralelo_nombre", ""),
             "nivel": context.get("curso_nivel", ""),
             "trimestre": f"Trimestre {context.get('trimestre_num')}" if context.get("report_type") == "trimestral" else "Anual",
+            "periodo": f"Trimestre {context.get('trimestre_num')}" if context.get("report_type") == "trimestral" else "Anual",
             "tutor": context.get("firmantes", {}).get("tutor_curso", ""),
             "fecha": datetime.now().strftime("%Y-%m-%d"),
             "rows_html": body_rows,
@@ -325,15 +333,22 @@ class PdfReportExporter:
             "firma_rector": context.get("firmantes", {}).get("rector", ""),
             "firma_tutor": context.get("firmantes", {}).get("tutor_curso", ""),
         }
+        values.update(context.get("template_data", {}))
         rendered = template
         raw_keys = {"rows_html", "logros_rows_html"}
-        for key, value in values.items():
-            replacement = str(value) if key in raw_keys else html.escape(str(value))
-            rendered = rendered.replace(f"[[{key}]]", replacement)
+        pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_]+)\s*\]\]")
+
+        def replace_token(match: re.Match[str]) -> str:
+            key = match.group(1) or match.group(2) or ""
+            value = values.get(key, "")
+            return str(value) if key in raw_keys else html.escape(str(value))
+
+        rendered = pattern.sub(replace_token, rendered)
         return rendered
 
     def _render_html_to_pdf(self, html_content: str, output_path: Path) -> None:
-        from PySide6.QtCore import QMarginsF
+        from PySide6.QtCore import QMarginsF, QSizeF
+        from PySide6.QtGui import QPageLayout, QPageSize, QPainter
         from PySide6.QtGui import QTextDocument
         from PySide6.QtPrintSupport import QPrinter
         from PySide6.QtWidgets import QApplication
@@ -343,13 +358,17 @@ class PdfReportExporter:
         printer = QPrinter(QPrinter.HighResolution)
         printer.setOutputFormat(QPrinter.PdfFormat)
         printer.setOutputFileName(str(output_path))
+        printer.setPageOrientation(QPageLayout.Landscape)
+        printer.setPageSize(QPageSize(QPageSize.A4))
         printer.setPageMargins(QMarginsF(10, 10, 10, 10))
         document = QTextDocument()
+        document.setDocumentMargin(0)
         document.setHtml(html_content)
-        try:
-            document.print(printer)  # type: ignore[attr-defined]
-        except AttributeError:
-            document.print_(printer)
+        page_rect = printer.pageRect(QPrinter.DevicePixel)
+        document.setPageSize(QSizeF(float(page_rect.width()), float(page_rect.height())))
+        painter = QPainter(printer)
+        document.drawContents(painter)
+        painter.end()
 
     def _build_trimestral_rows_html(self, rows: list[dict[str, Any]]) -> str:
         html_rows: list[str] = []
@@ -368,6 +387,8 @@ class PdfReportExporter:
                 f"<td>{html.escape(str(row.get('observacion', '')))}</td>"
                 "</tr>"
             )
+        for _ in range(len(rows), 34):
+            html_rows.append("<tr><td>&nbsp;</td>" + "<td>&nbsp;</td>" * 9 + "</tr>")
         return "".join(html_rows)
 
     def _build_anual_rows_html(self, rows: list[dict[str, Any]]) -> str:
@@ -387,6 +408,8 @@ class PdfReportExporter:
                 f"<td>{html.escape(str(row.get('observacion', '')))}</td>"
                 "</tr>"
             )
+        for _ in range(len(rows), 34):
+            html_rows.append("<tr><td>&nbsp;</td>" + "<td>&nbsp;</td>" * 12 + "</tr>")
         return "".join(html_rows)
 
     def _build_logros_rows_html(self, rows: list[dict[str, Any]]) -> str:
