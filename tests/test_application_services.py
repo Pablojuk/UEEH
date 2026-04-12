@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from pathlib import Path
 
 from src.application.services.catalog_service import CatalogService
 from src.application.services.institution_service import InstitutionService
@@ -84,6 +85,22 @@ class TestApplicationServices(unittest.TestCase):
         self.assertEqual(len(self.catalog_service.listar_paralelos()), 1)
         self.assertEqual(len(self.catalog_service.listar_asignaturas()), 1)
         self.assertEqual(len(self.catalog_service.listar_periodos_lectivos()), 1)
+
+    def test_docentes_importa_id_y_identificacion_texto(self) -> None:
+        csv_file = tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w", encoding="utf-8", newline="")
+        try:
+            csv_file.write("ID docente,nombres,apellidos,cedula\n")
+            csv_file.write("DOC-001,Ana,Perez,105370365\n")
+            csv_file.close()
+            result = self.teacher_service.importar_desde_excel(csv_file.name)
+            self.assertEqual(result["importados"], 1)
+            docente = self.teacher_service.obtener_docente("DOC-001")
+            self.assertIsNotNone(docente)
+            self.assertEqual(docente["identificacion"], "0105370365")
+        finally:
+            path = Path(csv_file.name)
+            if path.exists():
+                path.unlink()
 
 
 if __name__ == "__main__":

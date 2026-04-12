@@ -38,7 +38,7 @@ class PdfReportExporter:
         else:
             self._draw_anual_table(c, width, height, rows)
 
-        self._draw_signatures(c, width)
+        self._draw_signatures(c, width, context.get("firmantes", {}))
         c.save()
         return str(path)
 
@@ -97,44 +97,33 @@ class PdfReportExporter:
         header1 = [
             "N°",
             "Nómina",
-            "Aportes/Insumos",
-            "70%",
-            "Proyecto Integrador",
-            "15%",
-            "Examen",
-            "15%",
-            "Promedio",
-            "Cualitativa",
-            "Supletorio",
+            "Aportes/Insumos\nCalificación",
+            "Aportes/Insumos\n70%",
+            "Evaluaciones sumativas\nCalificación",
+            "Evaluaciones sumativas\n30%",
             "Promedio Final",
+            "Cualitativa",
+            "Equivalencia",
             "Observación",
-            "Logro de evaluación\nde aprendizaje",
         ]
         data = [header1]
         for idx, row in enumerate(rows, start=1):
-            aportes = row.get("aportes")
-            proyecto = row.get("proyecto_integrador")
-            examen = row.get("examen")
             data.append(
                 [
                     idx,
                     row.get("estudiante", ""),
-                    self._fmt(aportes),
-                    self._fmt((aportes or 0) * 0.70 if aportes is not None else None),
-                    self._fmt(proyecto),
-                    self._fmt((proyecto or 0) * 0.15 if proyecto is not None else None),
-                    self._fmt(examen),
-                    self._fmt((examen or 0) * 0.15 if examen is not None else None),
-                    self._fmt(row.get("promedio")),
-                    row.get("cualitativo", ""),
-                    self._fmt(row.get("supletorio")),
+                    self._fmt(row.get("aportes_calificacion")),
+                    self._fmt(row.get("aportes_70")),
+                    self._fmt(row.get("sumativas_calificacion")),
+                    self._fmt(row.get("sumativas_30")),
                     self._fmt(row.get("promedio_final")),
-                    "",
-                    row.get("logro", ""),
+                    row.get("cualitativa", ""),
+                    row.get("equivalencia", ""),
+                    row.get("observacion", ""),
                 ]
             )
 
-        col_widths = [0.8 * cm, 5.6 * cm, 1.4 * cm, 1.0 * cm, 1.6 * cm, 1.0 * cm, 1.3 * cm, 1.0 * cm, 1.3 * cm, 1.4 * cm, 1.2 * cm, 1.4 * cm, 1.4 * cm, 2.2 * cm]
+        col_widths = [0.8 * cm, 6.0 * cm, 2.0 * cm, 1.8 * cm, 2.2 * cm, 1.8 * cm, 1.5 * cm, 1.6 * cm, 1.6 * cm, 1.8 * cm]
         table = Table(data, colWidths=col_widths, repeatRows=1)
         table.setStyle(
             TableStyle(
@@ -150,34 +139,35 @@ class PdfReportExporter:
             )
         )
         table.wrapOn(c, width - 3 * cm, height)
-        table.drawOn(c, 1.0 * cm, 6.1 * cm)
+        table.drawOn(c, 1.0 * cm, 7.2 * cm)
 
     def _draw_anual_table(self, c, width: float, height: float, rows: list[dict[str, Any]]) -> None:
         from reportlab.platypus import Table, TableStyle
         from reportlab.lib import colors
         from reportlab.lib.units import cm
 
-        header_top = ["N°", "Nómina", "Primer Trimestre", "", "Segundo Trimestre", "", "Tercer Trimestre", "", "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Observación"]
-        header_sub = ["", "", "Calificación", "Cualitativa", "Calificación", "Cualitativa", "Calificación", "Cualitativa", "", "", "", "", ""]
+        header_top = ["N°", "Nómina", "Primer Trimestre", "", "Segundo Trimestre", "", "Tercer Trimestre", "", "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo", "Observación"]
+        header_sub = ["", "", "Calificación", "Cualitativa", "Calificación", "Cualitativa", "Calificación", "Cualitativa", "", "", "", "", "", ""]
         data = [header_top, header_sub]
         for idx, row in enumerate(rows, start=1):
             data.append([
                 idx,
                 row.get("estudiante", ""),
                 self._fmt(row.get("trimestre_1")),
-                "",
+                row.get("equivalencia_t1", ""),
                 self._fmt(row.get("trimestre_2")),
-                "",
+                row.get("equivalencia_t2", ""),
                 self._fmt(row.get("trimestre_3")),
-                "",
-                self._fmt(row.get("promedio_final")),
-                row.get("cualitativo", ""),
+                row.get("equivalencia_t3", ""),
+                self._fmt(row.get("promedio")),
+                row.get("cualitativa_anual", ""),
                 self._fmt(row.get("supletorio")),
-                self._fmt(row.get("nota_definitiva")),
+                self._fmt(row.get("promedio_final")),
+                row.get("cualitativo_final", ""),
                 row.get("observacion", ""),
             ])
 
-        table = Table(data, colWidths=[0.8*cm, 5.5*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.2*cm, 1.4*cm, 1.6*cm], repeatRows=2)
+        table = Table(data, colWidths=[0.8*cm, 5.1*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.1*cm, 1.3*cm, 1.4*cm, 1.4*cm], repeatRows=2)
         style = [
             ("GRID", (0, 0), (-1, -1), 0.45, colors.black),
             ("BACKGROUND", (0, 0), (-1, 1), colors.HexColor("#E5E7EB")),
@@ -246,18 +236,24 @@ class PdfReportExporter:
         drawing.add(pie)
         drawing.drawOn(c, width - 8.2 * cm, 2.1 * cm)
 
-    def _draw_signatures(self, c, width: float) -> None:
+    def _draw_signatures(self, c, width: float, firmantes: dict[str, str]) -> None:
         from reportlab.lib.units import cm
 
-        roles = ["Docente", "Coordinador de Área", "Rector", "Tutor de Curso"]
+        roles = [
+            ("Docente", firmantes.get("docente", "")),
+            ("Coordinador de Área", firmantes.get("coordinador_area", "")),
+            ("Rector", firmantes.get("rector", "")),
+            ("Tutor de Curso", firmantes.get("tutor_curso", "")),
+        ]
         start_x = 2 * cm
         gap = (width - 4 * cm) / 4
         y = 1.2 * cm
-        for idx, role in enumerate(roles):
+        for idx, (role, firma) in enumerate(roles):
             x = start_x + idx * gap
             c.line(x, y + 0.8 * cm, x + 3.8 * cm, y + 0.8 * cm)
             c.setFont("Helvetica", 7)
-            c.drawCentredString(x + 1.9 * cm, y + 0.4 * cm, role)
+            c.drawCentredString(x + 1.9 * cm, y + 0.45 * cm, firma or "")
+            c.drawCentredString(x + 1.9 * cm, y + 0.2 * cm, role)
 
     @staticmethod
     def _fmt(value: Any) -> str:
