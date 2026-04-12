@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import unicodedata
 import uuid
 from pathlib import Path
 
@@ -132,20 +133,33 @@ class TeacherService:
 
     @staticmethod
     def _normalizar_docente_row(raw: dict) -> dict | None:
-        keys = {str(k).strip().lower(): k for k in raw.keys()}
+        def normalize_key(value: object) -> str:
+            text = unicodedata.normalize("NFKD", str(value).strip().lower())
+            text = "".join(ch for ch in text if not unicodedata.combining(ch))
+            clean = "".join(ch if ch.isalnum() else " " for ch in text)
+            return " ".join(clean.split())
+
+        keys = {normalize_key(k): k for k in raw.keys()}
 
         def get(*aliases: str) -> str:
             for alias in aliases:
-                source = keys.get(alias)
+                source = keys.get(normalize_key(alias.replace("_", " ")))
                 if source is not None:
                     value = raw.get(source)
-                    return str(value).strip() if value is not None else ""
+                    text = str(value).strip() if value is not None else ""
+                    if text.endswith(".0"):
+                        base = text[:-2]
+                        if base.isdigit():
+                            text = base
+                    return text
             return ""
 
-        docente_id = get("id_docente", "id", "codigo_docente", "codigo")
+        docente_id = get("id_docente", "id docente", "id", "codigo_docente", "codigo docente", "codigo")
         nombres = get("nombres", "nombre")
         apellidos = get("apellidos", "apellido")
         identificacion = get("identificacion", "identificación", "cedula", "cédula", "dni")
+        if identificacion.isdigit() and len(identificacion) < 10:
+            identificacion = identificacion.zfill(10)
 
         if not docente_id:
             docente_id = f"DOC-{uuid.uuid4().hex[:8].upper()}"

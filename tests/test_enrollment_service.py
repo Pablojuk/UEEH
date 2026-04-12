@@ -72,3 +72,15 @@ class TestEnrollmentService(unittest.TestCase):
         })
         rows = self.enrollment_service.listar_por_grupo("C1", "P1", "2025-2026")
         self.assertEqual(len(rows), 1)
+
+    def test_eliminar_matricula(self) -> None:
+        self.enrollment_service.crear_matricula({
+            "estudiante_id": self.student_id,
+            "curso_id": "C1",
+            "paralelo_id": "P1",
+            "periodo_id": "2025-2026",
+        })
+        enrollment_id = self.enrollment_service.listar_matriculas()[0]["id_matricula"]
+        ok, _ = self.enrollment_service.eliminar_matricula(enrollment_id)
+        self.assertTrue(ok)
+        self.assertEqual(len(self.enrollment_service.listar_matriculas()), 0)
