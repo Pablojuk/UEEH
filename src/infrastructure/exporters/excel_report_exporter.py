@@ -47,8 +47,10 @@ class ExcelReportExporter:
 
         if context.get("report_type") == "trimestral":
             headers = [
-                "N°", "Nómina", "Aportes", "70%", "Proyecto", "15%", "Examen", "15%", "Promedio", "Cualitativa",
-                "Supletorio", "Promedio final", "Observación", "Logro de evaluación\nde aprendizaje",
+                "N°", "Nómina",
+                "Aportes/Insumos Calificación", "Aportes/Insumos 70%",
+                "Evaluaciones sumativas Calificación", "Evaluaciones sumativas 30%",
+                "Promedio Final", "Cualitativa", "Equivalencia", "Observación",
             ]
             start_row = 6
             for col, title in enumerate(headers, start=1):
@@ -63,18 +65,14 @@ class ExcelReportExporter:
                 values = [
                     idx,
                     row.get("estudiante", ""),
-                    row.get("aportes"),
-                    (row.get("aportes") or 0) * 0.70 if row.get("aportes") is not None else None,
-                    row.get("proyecto_integrador"),
-                    (row.get("proyecto_integrador") or 0) * 0.15 if row.get("proyecto_integrador") is not None else None,
-                    row.get("examen"),
-                    (row.get("examen") or 0) * 0.15 if row.get("examen") is not None else None,
-                    row.get("promedio"),
-                    row.get("cualitativo", ""),
-                    row.get("supletorio"),
+                    row.get("aportes_calificacion"),
+                    row.get("aportes_70"),
+                    row.get("sumativas_calificacion"),
+                    row.get("sumativas_30"),
                     row.get("promedio_final"),
-                    "",
-                    row.get("logro", ""),
+                    row.get("cualitativa", ""),
+                    row.get("equivalencia", ""),
+                    row.get("observacion", ""),
                 ]
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
@@ -82,10 +80,14 @@ class ExcelReportExporter:
                     cell.border = border
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
-            widths = [5, 30, 9, 8, 9, 8, 9, 8, 9, 9, 9, 10, 11, 15]
+            widths = [5, 30, 14, 12, 15, 12, 10, 10, 10, 12]
         else:
             headers = [
-                "N°", "Nómina", "T1", "Cual", "T2", "Cual", "T3", "Cual", "Promedio", "Cualitativa", "Supletorio", "Promedio final", "Observación",
+                "N°", "Nómina",
+                "Primer Trimestre Calificación", "Primer Trimestre Cualitativa",
+                "Segundo Trimestre Calificación", "Segundo Trimestre Cualitativa",
+                "Tercer Trimestre Calificación", "Tercer Trimestre Cualitativa",
+                "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Observación",
             ]
             start_row = 6
             for col, title in enumerate(headers, start=1):
@@ -96,14 +98,28 @@ class ExcelReportExporter:
                 cell.border = border
             for idx, row in enumerate(rows, start=1):
                 r = start_row + idx
-                values = [idx, row.get("estudiante", ""), row.get("trimestre_1"), "", row.get("trimestre_2"), "", row.get("trimestre_3"), "", row.get("promedio_final"), row.get("cualitativo", ""), row.get("supletorio"), row.get("nota_definitiva"), row.get("observacion", "")]
+                values = [
+                    idx,
+                    row.get("estudiante", ""),
+                    row.get("trimestre_1"),
+                    row.get("equivalencia_t1", ""),
+                    row.get("trimestre_2"),
+                    row.get("equivalencia_t2", ""),
+                    row.get("trimestre_3"),
+                    row.get("equivalencia_t3", ""),
+                    row.get("promedio"),
+                    row.get("cualitativa_anual", ""),
+                    row.get("supletorio"),
+                    row.get("promedio_final"),
+                    row.get("observacion", ""),
+                ]
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
                     cell.alignment = Alignment(horizontal="center", vertical="center")
                     cell.border = border
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
-            widths = [5, 30, 8, 8, 8, 8, 8, 8, 9, 10, 10, 10, 12]
+            widths = [5, 30, 12, 12, 12, 12, 12, 12, 9, 10, 10, 10, 12]
 
         for idx, w in enumerate(widths, start=1):
             ws.column_dimensions[chr(ord("A") + idx - 1)].width = w
