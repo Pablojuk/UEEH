@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 10px; }
+    h1, h2 { text-align: center; margin: 4px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #333; padding: 3px; text-align: center; }
+    th { background: #e5e7eb; }
+    .meta td { text-align: left; }
+    .firmas { margin-top: 20px; width: 100%; }
+    .firmas td { border: none; text-align: center; width: 25%; }
+  </style>
+</head>
+<body>
+  <h1>[[institucion_nombre]]</h1>
+  <h2>CUADRO DE CALIFICACIÓN TRIMESTRAL</h2>
+
+  <table class="meta">
+    <tr><td><b>Docente:</b> [[docente_nombre]]</td><td><b>Asignatura:</b> [[asignatura_nombre]]</td></tr>
+    <tr><td><b>Curso:</b> [[curso_nombre]]</td><td><b>Paralelo:</b> [[paralelo_nombre]]</td></tr>
+    <tr><td><b>Nivel:</b> [[nivel]]</td><td><b>Tutor:</b> [[tutor]]</td></tr>
+    <tr><td><b>Trimestre:</b> [[trimestre]]</td><td><b>Fecha:</b> [[fecha]]</td></tr>
+  </table>
+
+  <table>
+    <thead>
+      <tr>
+        <th>N°</th><th>Nómina</th><th>Aportes/Insumos Calificación</th><th>Aportes/Insumos 70%</th>
+        <th>Evaluaciones sumativas Calificación</th><th>Evaluaciones sumativas 30%</th>
+        <th>Promedio Final</th><th>Cualitativa</th><th>Equivalencia</th><th>Observación</th>
+      </tr>
+    </thead>
+    <tbody>[[rows_html]]</tbody>
+  </table>
+
+  <table>
+    <tr><th colspan="4">Cuadro de logros en la evaluación de los aprendizajes</th></tr>
+    <tr><th>Detalle</th><th>Escala</th><th>Siglas</th><th>%</th></tr>
+    [[logros_rows_html]]
+    <tr><td colspan="2"><b>Promedio general</b></td><td colspan="2">[[promedio_general]]</td></tr>
+  </table>
+
+  <table class="firmas">
+    <tr><td>__________________________</td><td>__________________________</td><td>__________________________</td><td>__________________________</td></tr>
+    <tr><td>[[firma_docente]]</td><td>[[firma_coordinador]]</td><td>[[firma_rector]]</td><td>[[firma_tutor]]</td></tr>
+    <tr><td>Docente</td><td>Coordinador de Área</td><td>Rector</td><td>Tutor de Curso</td></tr>
+  </table>
+</body>
+</html>

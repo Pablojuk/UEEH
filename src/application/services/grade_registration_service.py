@@ -230,6 +230,7 @@ class GradeRegistrationService:
         data["promedio_sumativo"] = promedio_con_mejora
         data["nota_trimestral"] = promedio_trimestral
         data["cualitativo"] = calcular_cualitativo_trimestral(promedio_trimestral)
+        data["cualitativo_adicional"] = self._calcular_cualitativo_adicional(promedio_trimestral)
         return data
 
     def _normalizar_nota(self, valor: Any, campo: str) -> float | None:
@@ -242,15 +243,16 @@ class GradeRegistrationService:
         if texto.upper() in {"J", "JP", "JUST", "JUSTIFICADO", "NP", "N/P", "NO PRESENTADO"}:
             return None
 
+        texto_normalizado = texto.replace(",", ".")
         try:
-            nota = float(texto)
+            nota = float(texto_normalizado)
         except (TypeError, ValueError) as exc:
             raise ValueError(f"Valor no numérico en {campo}") from exc
 
         if nota < self.min_grade or nota > self.max_grade:
             raise ValueError(f"Valor fuera de rango en {campo}. Rango permitido {self.min_grade} a {self.max_grade}")
 
-        return nota
+        return redondear_2_decimales(nota)
 
     def _fila_base_estudiante(self, estudiante: dict[str, Any], numero_actividades: int) -> dict[str, Any]:
         base = {
@@ -273,6 +275,7 @@ class GradeRegistrationService:
             "promedio_sumativo": None,
             "nota_trimestral": None,
             "cualitativo": "",
+            "cualitativo_adicional": "",
         }
         for idx in range(1, numero_actividades + 1):
             base[f"actividad_{idx}"] = None
@@ -318,3 +321,15 @@ class GradeRegistrationService:
         actividades = [data.get(f"actividad_{idx}") for idx in range(1, numero_actividades + 1)]
         mejoras = [data.get(f"mejora_{idx}") for idx in range(1, numero_actividades + 1)]
         return actividades, mejoras
+
+    @staticmethod
+    def _calcular_cualitativo_adicional(nota_trimestral: float | None) -> str:
+        if nota_trimestral is None:
+            return ""
+        if nota_trimestral >= 9:
+            return "DA"
+        if nota_trimestral >= 7:
+            return "AA"
+        if nota_trimestral >= 5:
+            return "PA"
+        return "NA"
