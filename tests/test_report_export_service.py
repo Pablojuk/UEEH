@@ -13,7 +13,10 @@ from src.infrastructure.persistence.db import initialize_database
 
 
 class _FakePdfExporter:
+    last_context: dict | None = None
+
     def exportar(self, output_path: str, report_title: str, context: dict, rows: list[dict]) -> str:
+        _FakePdfExporter.last_context = context
         Path(output_path).write_text("pdf", encoding="utf-8")
         return output_path
 
@@ -132,6 +135,26 @@ class TestReportExportService(unittest.TestCase):
         ok, message = service.exportar_resumen_pdf("AS1", "/root/no_access/reporte.pdf")
         self.assertFalse(ok)
         self.assertIn("Error al exportar", message)
+
+    def test_exporta_firmantes_en_contexto(self) -> None:
+        service = ReportExportService(
+            connection=self.conn,
+            academic_summary_service=self.academic_summary_service,
+            institution_service=self.institution_service,
+            pdf_exporter=_FakePdfExporter(),
+            excel_exporter=_FakeExcelExporter(),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            output = str(Path(tmp) / "firmas.pdf")
+            ok, _ = service.exportar_resumen_pdf(
+                "AS1",
+                output,
+                firmantes={"docente": "Econ. Pablo Juca", "rector": "Msc. Ana Perez"},
+            )
+            self.assertTrue(ok)
+            context = _FakePdfExporter.last_context or {}
+            self.assertIn("firmantes", context)
+            self.assertEqual(context["firmantes"].get("docente"), "Econ. Pablo Juca")
 
 
 if __name__ == "__main__":

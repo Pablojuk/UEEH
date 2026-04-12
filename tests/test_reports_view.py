@@ -21,6 +21,15 @@ class _FakeAcademicSummaryService:
     def obtener_resumen_por_asignacion(self, asignacion_id: str) -> list[dict]:
         return []
 
+    def obtener_reporte_anual(self, asignacion_id: str) -> list[dict]:
+        return []
+
+    def obtener_reporte_trimestral(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
+        return []
+
+    def listar_firmantes_disponibles(self) -> list[dict]:
+        return []
+
     def recalcular_resumenes(self, rows: list[dict]) -> list[dict]:
         return rows
 
@@ -29,10 +38,10 @@ class _FakeAcademicSummaryService:
 
 
 class _FakeReportExportService:
-    def exportar_resumen_pdf(self, asignacion_id: str, output_path: str) -> tuple[bool, str]:
+    def exportar_resumen_pdf(self, asignacion_id: str, output_path: str, report_type: str = "anual", trimestre_num: int | None = None) -> tuple[bool, str]:
         return False, "No hay datos para exportar"
 
-    def exportar_resumen_excel(self, asignacion_id: str, output_path: str) -> tuple[bool, str]:
+    def exportar_resumen_excel(self, asignacion_id: str, output_path: str, report_type: str = "anual", trimestre_num: int | None = None) -> tuple[bool, str]:
         return False, "No hay datos para exportar"
 
 
