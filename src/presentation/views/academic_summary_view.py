@@ -38,7 +38,7 @@ class AcademicSummaryView(QWidget):
         ("cualitativa_anual", "Cualitativa"),
         ("supletorio", "Supletorio"),
         ("promedio_final", "Promedio Final"),
-        ("cualitativo_final", "Cualitativo Final"),
+        ("cualitativo_final", "Cualitativo"),
         ("observacion", "Observación"),
     ]
 

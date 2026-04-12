@@ -87,7 +87,7 @@ class ExcelReportExporter:
                 "Primer Trimestre Calificación", "Primer Trimestre Cualitativa",
                 "Segundo Trimestre Calificación", "Segundo Trimestre Cualitativa",
                 "Tercer Trimestre Calificación", "Tercer Trimestre Cualitativa",
-                "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo Final", "Observación",
+                "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo", "Observación",
             ]
             start_row = 6
             for col, title in enumerate(headers, start=1):

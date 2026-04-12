@@ -146,7 +146,7 @@ class PdfReportExporter:
         from reportlab.lib import colors
         from reportlab.lib.units import cm
 
-        header_top = ["N°", "Nómina", "Primer Trimestre", "", "Segundo Trimestre", "", "Tercer Trimestre", "", "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo Final", "Observación"]
+        header_top = ["N°", "Nómina", "Primer Trimestre", "", "Segundo Trimestre", "", "Tercer Trimestre", "", "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo", "Observación"]
         header_sub = ["", "", "Calificación", "Cualitativa", "Calificación", "Cualitativa", "Calificación", "Cualitativa", "", "", "", "", "", ""]
         data = [header_top, header_sub]
         for idx, row in enumerate(rows, start=1):
