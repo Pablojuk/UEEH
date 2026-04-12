@@ -121,6 +121,33 @@ class TestAcademicSummaryService(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["aportes_calificacion"], 7)
         self.assertEqual(rows[0]["sumativas_calificacion"], 7)
+        self.assertEqual(rows[0]["promedio_final"], 7)
+
+    def test_reporte_trimestral_preserva_promedio_original(self) -> None:
+        with self.conn:
+            self.conn.execute(
+                """
+                UPDATE grade_records
+                SET promedio_formativo = ?, promedio_sumativo = ?, nota_trimestral = ?
+                WHERE id_registro = ?
+                """,
+                (5.71, 9.99, 6.99, "G2"),
+            )
+
+        rows = self.service.obtener_reporte_trimestral("AS1", 2)
+        self.assertEqual(rows[0]["promedio_original"], 6.99)
+        self.assertEqual(rows[0]["promedio_final"], 6.99)
+        self.assertEqual(rows[0]["equivalencia"], "PA")
+        self.assertEqual(rows[0]["observacion"], "SPL")
+
+    def test_reporte_trimestral_sin_notas_no_rompe_observacion(self) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM grade_records WHERE id_registro = ?", ("G3",))
+
+        rows = self.service.obtener_reporte_trimestral("AS1", 3)
+        self.assertEqual(rows[0]["promedio_final"], None)
+        self.assertEqual(rows[0]["equivalencia"], "")
+        self.assertEqual(rows[0]["observacion"], "")
 
     def test_reporte_anual_incluye_equivalencias_por_trimestre(self) -> None:
         row = self.service.obtener_reporte_anual("AS1")[0]
