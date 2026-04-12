@@ -6,12 +6,72 @@ import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from src.infrastructure.exporters.pdf_report_exporter import PdfReportExporter
 
 
-@unittest.skipIf(importlib.util.find_spec("reportlab") is None, "reportlab no instalado")
 class TestPdfReportExporter(unittest.TestCase):
+    def test_render_html_con_placeholders_nuevos(self) -> None:
+        exporter = PdfReportExporter()
+        rows = [
+            {
+                "estudiante": "Lopez Maria",
+                "aportes_calificacion": 9.2,
+                "aportes_70": 6.4,
+                "sumativas_calificacion": 8.7,
+                "sumativas_30": 2.6,
+                "promedio_final": 9.0,
+                "cualitativa": "Excelente",
+                "equivalencia": "DA",
+                "observacion": "Aprobado",
+            }
+        ]
+
+        custom_template = """
+        <h1>[[institucion_nombre]]</h1>
+        <p>[[institucion_subtitulo]]</p>
+        <img src="[[logo_inst_src]]"/>
+        <img src="[[logo_mineduc_src]]"/>
+        <h2>Promedio General</h2>
+        <div>[[promedio_general]]</div>
+        <table><tbody>[[rows_html]]</tbody></table>
+        <table><tbody>[[logros_rows_html]]</tbody></table>
+        <section>[[chart_svg]]</section>
+        """
+        original_read_text = Path.read_text
+
+        def fake_read_text(path_obj: Path, *args, **kwargs) -> str:
+            if path_obj.name == "reporte_trimestral.html":
+                return custom_template
+            return original_read_text(path_obj, *args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            logo_inst = Path(tmp) / "logo_inst.png"
+            logo_mineduc = Path(tmp) / "logo_mineduc.png"
+            logo_inst.write_bytes(b"PNG")
+            logo_mineduc.write_bytes(b"PNG")
+
+            context = {
+                "report_type": "trimestral",
+                "trimestre_num": 1,
+                "institucion_nombre": "UEEH",
+                "institucion": {"parroquia": "Centro", "ciudad": "Quito"},
+                "logo_path": str(logo_inst),
+                "logo_ministerio_path": str(logo_mineduc),
+            }
+
+            with patch.object(Path, "read_text", new=fake_read_text):
+                rendered = exporter._render_report_html(context, rows)
+
+        self.assertIn("UEEH", rendered)
+        self.assertIn("file://", rendered)
+        self.assertIn("Promedio General", rendered)
+        self.assertIn("<svg", rendered)
+        self.assertIn("class='nomina'", rendered)
+        self.assertNotIn("[[", rendered)
+
+    @unittest.skipIf(importlib.util.find_spec("reportlab") is None, "reportlab no instalado")
     def test_generar_archivo_pdf_no_vacio(self) -> None:
         exporter = PdfReportExporter()
         rows = [
@@ -27,7 +87,7 @@ class TestPdfReportExporter(unittest.TestCase):
                 "nota_definitiva": 7,
             }
         ]
-        context = {"contexto_display": "AS1", "institucion_nombre": "UEEH"}
+        context = {"contexto_display": "AS1", "institucion_nombre": "UEEH", "report_type": "anual"}
 
         with tempfile.TemporaryDirectory() as tmp:
             output = str(Path(tmp) / "reporte.pdf")
