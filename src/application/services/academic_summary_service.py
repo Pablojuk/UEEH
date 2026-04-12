@@ -39,6 +39,7 @@ class AcademicSummaryService:
                 d.apellidos AS docente_apellidos,
                 s.nombre AS asignatura_nombre,
                 c.nombre AS curso_nombre,
+                c.nivel AS curso_nivel,
                 p.nombre AS paralelo_nombre
             FROM asignaciones_docente a
             LEFT JOIN docentes d ON d.id_docente = a.docente_id

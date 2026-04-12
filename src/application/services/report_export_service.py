@@ -119,6 +119,7 @@ class ReportExportService:
             "docente_nombre": f"{context.get('docente_apellidos', '')} {context.get('docente_nombres', '')}".strip(),
             "asignatura_nombre": context.get("asignatura_nombre") or context.get("asignatura_id"),
             "curso_nombre": context.get("curso_nombre") or context.get("curso_id"),
+            "curso_nivel": context.get("curso_nivel"),
             "paralelo_nombre": context.get("paralelo_nombre") or context.get("paralelo_id"),
             "logo_path": institucion.get("logo_path"),
             "logo_ministerio_path": institucion.get("logo_ministerio_path"),

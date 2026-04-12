@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -9,22 +10,32 @@ from typing import Any
 
 class PdfReportExporter:
     def exportar(self, output_path: str, report_title: str, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
-        try:
-            from reportlab.lib import colors
-            from reportlab.lib.pagesizes import letter, landscape
-            from reportlab.lib.units import cm
-            from reportlab.pdfgen import canvas
-            from reportlab.graphics.shapes import Drawing
-            from reportlab.graphics.charts.piecharts import Pie
-            from reportlab.platypus import Table, TableStyle
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError("reportlab no está instalado") from exc
-
         if not rows:
             raise ValueError("No hay datos para exportar")
 
         path = Path(output_path).expanduser().resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
+
+        if self._can_render_html_template():
+            rendered = self._render_report_html(context, rows)
+            if rendered:
+                self._render_html_to_pdf(rendered, path)
+                return str(path)
+
+        return self._exportar_con_reportlab(path, report_title, context, rows)
+
+    def _exportar_con_reportlab(
+        self,
+        path: Path,
+        report_title: str,
+        context: dict[str, Any],
+        rows: list[dict[str, Any]],
+    ) -> str:
+        try:
+            from reportlab.lib.pagesizes import letter, landscape
+            from reportlab.pdfgen import canvas
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("reportlab no está instalado") from exc
 
         c = canvas.Canvas(str(path), pagesize=landscape(letter))
         width, height = landscape(letter)
@@ -71,7 +82,7 @@ class PdfReportExporter:
         data = [
             ["Docente", context.get("docente_nombre", "N/D"), "Asignatura", context.get("asignatura_nombre", "N/D")],
             ["Curso", context.get("curso_nombre", "N/D"), "Paralelo", context.get("paralelo_nombre", "N/D")],
-            ["Tutor", context.get("docente_nombre", "N/D"), "Nivel", context.get("curso_nombre", "N/D")],
+            ["Tutor", context.get("firmantes", {}).get("tutor_curso") or "N/D", "Nivel", context.get("curso_nivel", "N/D")],
             ["Trimestre", trimestre_text, "Fecha", datetime.now().strftime("%Y-%m-%d")],
         ]
         table = Table(data, colWidths=[2.3 * cm, 7.2 * cm, 2.3 * cm, 7.2 * cm])
@@ -188,17 +199,8 @@ class PdfReportExporter:
         from reportlab.lib import colors
         from reportlab.lib.units import cm
 
+        logro_counts = self._build_logros(rows)
         total = max(len(rows), 1)
-        ranges = [
-            ("Destreza alcanzada", "DA", lambda v: v is not None and 9 <= v <= 10),
-            ("Alcanza los Aprendizajes", "AA", lambda v: v is not None and 7 <= v < 9),
-            ("Próximo a alcanzar", "PA", lambda v: v is not None and 5 <= v < 7),
-            ("No alcanza los aprendizajes", "NA", lambda v: v is not None and v < 5),
-        ]
-        logro_counts = []
-        for detail, sigla, fn in ranges:
-            count = sum(1 for r in rows if fn(r.get("promedio_final")))
-            logro_counts.append((detail, sigla, count, round((count / total) * 100, 2)))
 
         data = [["Cuadro de logros en la evaluación de los aprendizajes", "", "", ""], ["Detalle", "Escala", "Siglas", "%"]]
         scale_map = {"DA": "9 - 10", "AA": "7 - 8,99", "PA": "5 - 6,99", "NA": "<= 5"}
@@ -263,3 +265,137 @@ class PdfReportExporter:
             return f"{float(value):.2f}"
         except Exception:  # noqa: BLE001
             return str(value)
+
+    @staticmethod
+    def _build_logros(rows: list[dict[str, Any]]) -> list[tuple[str, str, int, float]]:
+        total = max(len(rows), 1)
+        defs = [
+            ("Destreza alcanzada", "DA"),
+            ("Alcanza los Aprendizajes", "AA"),
+            ("Próximo a alcanzar", "PA"),
+            ("No alcanza los aprendizajes", "NA"),
+        ]
+        counts = {sigla: 0 for _, sigla in defs}
+        for row in rows:
+            sigla = str(row.get("equivalencia") or "").strip()
+            if sigla in counts:
+                counts[sigla] += 1
+        return [
+            (label, sigla, counts[sigla], round((counts[sigla] / total) * 100, 2))
+            for label, sigla in defs
+        ]
+
+    @staticmethod
+    def _can_render_html_template() -> bool:
+        try:
+            from PySide6.QtGui import QTextDocument  # noqa: F401
+            from PySide6.QtPrintSupport import QPrinter  # noqa: F401
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _render_report_html(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
+        template_name = "reporte_trimestral.html" if context.get("report_type") == "trimestral" else "reporte_anual.html"
+        template_path = Path(__file__).resolve().parent.parent / "templates" / template_name
+        if not template_path.exists():
+            return ""
+
+        template = template_path.read_text(encoding="utf-8")
+        if context.get("report_type") == "trimestral":
+            body_rows = self._build_trimestral_rows_html(rows)
+        else:
+            body_rows = self._build_anual_rows_html(rows)
+        logros_rows = self._build_logros_rows_html(rows)
+        promedio_general = self._fmt(sum((r.get("promedio_final") or 0) for r in rows) / max(len(rows), 1))
+        values = {
+            "institucion_nombre": context.get("institucion_nombre", "Institución"),
+            "docente_nombre": context.get("docente_nombre", ""),
+            "asignatura_nombre": context.get("asignatura_nombre", ""),
+            "curso_nombre": context.get("curso_nombre", ""),
+            "paralelo_nombre": context.get("paralelo_nombre", ""),
+            "nivel": context.get("curso_nivel", ""),
+            "trimestre": f"Trimestre {context.get('trimestre_num')}" if context.get("report_type") == "trimestral" else "Anual",
+            "tutor": context.get("firmantes", {}).get("tutor_curso", ""),
+            "fecha": datetime.now().strftime("%Y-%m-%d"),
+            "rows_html": body_rows,
+            "logros_rows_html": logros_rows,
+            "promedio_general": promedio_general,
+            "firma_docente": context.get("firmantes", {}).get("docente", ""),
+            "firma_coordinador": context.get("firmantes", {}).get("coordinador_area", ""),
+            "firma_rector": context.get("firmantes", {}).get("rector", ""),
+            "firma_tutor": context.get("firmantes", {}).get("tutor_curso", ""),
+        }
+        rendered = template
+        raw_keys = {"rows_html", "logros_rows_html"}
+        for key, value in values.items():
+            replacement = str(value) if key in raw_keys else html.escape(str(value))
+            rendered = rendered.replace(f"[[{key}]]", replacement)
+        return rendered
+
+    def _render_html_to_pdf(self, html_content: str, output_path: Path) -> None:
+        from PySide6.QtCore import QMarginsF
+        from PySide6.QtGui import QTextDocument
+        from PySide6.QtPrintSupport import QPrinter
+        from PySide6.QtWidgets import QApplication
+
+        app = QApplication.instance() or QApplication([])
+        _ = app  # mantener referencia
+        printer = QPrinter(QPrinter.HighResolution)
+        printer.setOutputFormat(QPrinter.PdfFormat)
+        printer.setOutputFileName(str(output_path))
+        printer.setPageMargins(QMarginsF(10, 10, 10, 10))
+        document = QTextDocument()
+        document.setHtml(html_content)
+        document.print(printer)
+
+    def _build_trimestral_rows_html(self, rows: list[dict[str, Any]]) -> str:
+        html_rows: list[str] = []
+        for idx, row in enumerate(rows, start=1):
+            html_rows.append(
+                "<tr>"
+                f"<td>{idx}</td>"
+                f"<td>{html.escape(str(row.get('estudiante', '')))}</td>"
+                f"<td>{self._fmt(row.get('aportes_calificacion'))}</td>"
+                f"<td>{self._fmt(row.get('aportes_70'))}</td>"
+                f"<td>{self._fmt(row.get('sumativas_calificacion'))}</td>"
+                f"<td>{self._fmt(row.get('sumativas_30'))}</td>"
+                f"<td>{self._fmt(row.get('promedio_final'))}</td>"
+                f"<td>{html.escape(str(row.get('cualitativa', '')))}</td>"
+                f"<td>{html.escape(str(row.get('equivalencia', '')))}</td>"
+                f"<td>{html.escape(str(row.get('observacion', '')))}</td>"
+                "</tr>"
+            )
+        return "".join(html_rows)
+
+    def _build_anual_rows_html(self, rows: list[dict[str, Any]]) -> str:
+        html_rows: list[str] = []
+        for idx, row in enumerate(rows, start=1):
+            html_rows.append(
+                "<tr>"
+                f"<td>{idx}</td>"
+                f"<td>{html.escape(str(row.get('estudiante', '')))}</td>"
+                f"<td>{self._fmt(row.get('trimestre_1'))}</td><td>{html.escape(str(row.get('equivalencia_t1', '')))}</td>"
+                f"<td>{self._fmt(row.get('trimestre_2'))}</td><td>{html.escape(str(row.get('equivalencia_t2', '')))}</td>"
+                f"<td>{self._fmt(row.get('trimestre_3'))}</td><td>{html.escape(str(row.get('equivalencia_t3', '')))}</td>"
+                f"<td>{self._fmt(row.get('promedio'))}</td>"
+                f"<td>{html.escape(str(row.get('cualitativa_anual', '')))}</td>"
+                f"<td>{self._fmt(row.get('supletorio'))}</td>"
+                f"<td>{self._fmt(row.get('promedio_final'))}</td>"
+                f"<td>{html.escape(str(row.get('observacion', '')))}</td>"
+                "</tr>"
+            )
+        return "".join(html_rows)
+
+    def _build_logros_rows_html(self, rows: list[dict[str, Any]]) -> str:
+        scale_map = {"DA": "9 - 10", "AA": "7 - 8,99", "PA": "5 - 6,99", "NA": "<= 5"}
+        parts: list[str] = []
+        for detalle, sigla, count, pct in self._build_logros(rows):
+            parts.append(
+                "<tr>"
+                f"<td>{html.escape(detalle)}</td>"
+                f"<td>{html.escape(scale_map[sigla])}</td>"
+                f"<td>{html.escape(sigla)} ({count})</td>"
+                f"<td>{pct}%</td>"
+                "</tr>"
+            )
+        return "".join(parts)
