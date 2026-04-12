@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
@@ -65,6 +67,7 @@ class AcademicSummaryView(QWidget):
         self.academic_summary_service = academic_summary_service
         self.report_export_service = report_export_service
         self._rows_meta: list[dict] = []
+        self._contexts_by_id: dict[str, dict] = {}
         self._table_columns = list(self.ANNUAL_COLUMNS)
         self._firmantes: dict[str, str] = {
             "docente": "",
@@ -147,6 +150,12 @@ class AcademicSummaryView(QWidget):
         root.addWidget(subtitle)
         root.addWidget(filter_card)
         root.addWidget(sign_card)
+        self.annual_preview = QLabel()
+        self.annual_preview.setObjectName("AnnualPreview")
+        self.annual_preview.setTextFormat(Qt.RichText)
+        self.annual_preview.setWordWrap(True)
+        self.annual_preview.setStyleSheet("background: #ffffff; border: 1px solid #d1d5db; padding: 10px;")
+        root.addWidget(self.annual_preview)
         root.addWidget(self.table, 1)
 
         self.load_contexts()
@@ -156,6 +165,7 @@ class AcademicSummaryView(QWidget):
     def load_contexts(self) -> None:
         self.assignment_combo.clear()
         contexts = self.academic_summary_service.listar_contextos_disponibles()
+        self._contexts_by_id = {str(row.get("id_asignacion")): row for row in contexts if row.get("id_asignacion")}
         if not contexts:
             self.assignment_combo.addItem("Sin asignaciones disponibles", None)
             return
@@ -175,6 +185,7 @@ class AcademicSummaryView(QWidget):
         else:
             rows = self.academic_summary_service.obtener_reporte_anual(asignacion_id)
         self._fill_table(rows)
+        self._update_annual_preview(rows)
 
     def recalculate_rows(self) -> None:
         report_type, _ = self.report_type_combo.currentData()
@@ -295,13 +306,16 @@ class AcademicSummaryView(QWidget):
         if report_type == "trimestral":
             self._table_columns = list(self.TRIMESTRAL_COLUMNS)
             self.save_button.setEnabled(False)
+            self.annual_preview.hide()
         else:
             self._table_columns = list(self.ANNUAL_COLUMNS)
             self.save_button.setEnabled(True)
+            self.annual_preview.show()
         self.table.setColumnCount(len(self._table_columns))
         self.table.setHorizontalHeaderLabels([label for _, label in self._table_columns])
         self.table.setRowCount(0)
         self._rows_meta = []
+        self._update_annual_preview([])
 
     def _load_signer_options(self) -> None:
         options = self.academic_summary_service.listar_firmantes_disponibles()
@@ -325,6 +339,70 @@ class AcademicSummaryView(QWidget):
             "rector": self.signer_rector_combo.currentData() or "",
             "tutor_curso": self.signer_tutor_combo.currentData() or "",
         }
+        self._update_annual_preview(self._rows_meta)
+
+    def _update_annual_preview(self, rows: list[dict]) -> None:
+        report_type, _ = self.report_type_combo.currentData()
+        if report_type != "anual":
+            self.annual_preview.clear()
+            return
+
+        context = self._contexts_by_id.get(str(self.assignment_combo.currentData()), {})
+        institucion_nombre = "Institución educativa"
+        if self.report_export_service is not None:
+            institucion = self.report_export_service.institution_service.obtener_actual() or {}
+            institucion_nombre = institucion.get("nombre") or institucion_nombre
+
+        promedio_general = ""
+        valores = [float(r.get("promedio_final")) for r in rows if r.get("promedio_final") is not None]
+        if valores:
+            promedio_general = f"{sum(valores) / len(valores):.2f}"
+
+        total = max(len(rows), 1)
+        scale_defs = [
+            ("Destreza alcanzada", "9 - 10", "DA"),
+            ("Alcanza los Aprendizajes", "7 - 8,99", "AA"),
+            ("Próximo a alcanzar", "5 - 6,99", "PA"),
+            ("No alcanza los aprendizajes", "<= 5", "NA"),
+        ]
+        counts = {sigla: 0 for _, _, sigla in scale_defs}
+        for row in rows:
+            sigla = str(row.get("cualitativa_anual") or "").strip()
+            if sigla in counts:
+                counts[sigla] += 1
+        logros_rows = "".join(
+            f"<tr><td>{detalle}</td><td>{escala}</td><td>{sigla} ({counts[sigla]})</td><td>{(counts[sigla] / total) * 100:.2f}%</td></tr>"
+            for detalle, escala, sigla in scale_defs
+        )
+
+        html_preview = f"""
+        <div style="font-family: Arial, sans-serif; font-size: 10px;">
+          <h2 style="text-align:center; margin: 2px 0;">{institucion_nombre}</h2>
+          <h3 style="text-align:center; margin: 2px 0;">CUADRO DE CALIFICACIÓN ANUAL</h3>
+          <table border="1" cellspacing="0" cellpadding="3" width="100%">
+            <tr><td><b>Docente:</b> {context.get("docente_apellidos", "")} {context.get("docente_nombres", "")}</td><td><b>Asignatura:</b> {context.get("asignatura_nombre", "")}</td></tr>
+            <tr><td><b>Curso:</b> {context.get("curso_nombre", "")}</td><td><b>Paralelo:</b> {context.get("paralelo_nombre", "")}</td></tr>
+            <tr><td><b>Nivel:</b> {context.get("curso_nivel", "")}</td><td><b>Tutor:</b> {self._firmantes.get("tutor_curso", "")}</td></tr>
+            <tr><td><b>Periodo:</b> Anual</td><td><b>Fecha:</b> {datetime.now().strftime("%Y-%m-%d")}</td></tr>
+          </table>
+          <table border="1" cellspacing="0" cellpadding="3" width="100%" style="margin-top:8px;">
+            <tr><th colspan="4">Cuadro estadístico anual</th></tr>
+            <tr><th>Detalle</th><th>Escala</th><th>Siglas</th><th>%</th></tr>
+            {logros_rows}
+            <tr><td colspan="2"><b>Promedio general anual</b></td><td colspan="2">{promedio_general}</td></tr>
+          </table>
+          <table cellspacing="0" cellpadding="3" width="100%" style="margin-top:8px; text-align:center;">
+            <tr>
+              <td>____________________</td><td>____________________</td><td>____________________</td><td>____________________</td>
+            </tr>
+            <tr>
+              <td>{self._firmantes.get("docente", "")}</td><td>{self._firmantes.get("coordinador_area", "")}</td><td>{self._firmantes.get("rector", "")}</td><td>{self._firmantes.get("tutor_curso", "")}</td>
+            </tr>
+            <tr><td>Docente</td><td>Coordinador de Área</td><td>Rector</td><td>Tutor de Curso</td></tr>
+          </table>
+        </div>
+        """
+        self.annual_preview.setText(html_preview)
 
     def eventFilter(self, obj, event):  # type: ignore[override]
         if obj is self.table and event.type() == QEvent.KeyPress:

@@ -60,6 +60,7 @@ class TestAcademicSummaryView(unittest.TestCase):
         self.assertEqual(view.table.rowCount(), 0)
         self.assertEqual(view.table.horizontalHeaderItem(0).text(), "N°")
         self.assertEqual(view.table.horizontalHeaderItem(1).text(), "Nómina")
+        self.assertIn("CUADRO DE CALIFICACIÓN ANUAL", view.annual_preview.text())
 
     def test_poblar_tabla_con_datos(self) -> None:
         from src.presentation.views.academic_summary_view import AcademicSummaryView
