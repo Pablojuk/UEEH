@@ -268,6 +268,9 @@ class GradesView(QWidget):
             numeric_value = float(value) if value is not None and str(value).strip() != "" else None
         except (TypeError, ValueError):
             numeric_value = None
+        if field in {"promedio_formativo_70", "promedio_sumativo_30"}:
+            item.setForeground(QColor("#000000"))
+            return
         if numeric_value is not None and numeric_value < 7:
             item.setForeground(QColor("#FF0000"))
 
