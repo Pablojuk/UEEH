@@ -23,11 +23,20 @@ class _FakeAcademicSummaryService:
     def obtener_resumen_por_asignacion(self, asignacion_id: str) -> list[dict]:
         return list(self.rows)
 
+    def obtener_reporte_anual(self, asignacion_id: str) -> list[dict]:
+        return list(self.rows)
+
+    def obtener_reporte_trimestral(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
+        return list(self.rows)
+
     def recalcular_resumenes(self, rows: list[dict]) -> list[dict]:
         return rows
 
     def guardar_supletorios(self, asignacion_id: str, rows: list[dict]) -> tuple[bool, str]:
         return True, f"Supletorios procesados: {len(rows)}"
+
+    def listar_firmantes_disponibles(self) -> list[dict]:
+        return [{"id_docente": "D1", "firma": "Econ. Pablo Juca"}]
 
 
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
@@ -60,8 +69,13 @@ class TestAcademicSummaryView(unittest.TestCase):
                         "estudiante_id": "E1",
                         "estudiante": "Lopez Maria",
                         "trimestre_1": 8,
+                        "equivalencia_t1": "AA",
                         "trimestre_2": 7,
+                        "equivalencia_t2": "AA",
                         "trimestre_3": 6,
+                        "equivalencia_t3": "PA",
+                        "promedio": 7,
+                        "cualitativa_anual": "AA",
                         "promedio_final": 7,
                         "cualitativo": "B-",
                         "observacion": "APB",

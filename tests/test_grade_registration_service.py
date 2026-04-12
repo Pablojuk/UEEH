@@ -121,6 +121,25 @@ class TestGradeRegistrationService(unittest.TestCase):
         self.assertEqual(fila["promedio_formativo_70"], 5.83)
         self.assertEqual(fila["promedio_sumativo_30"], 2.55)
         self.assertEqual(fila["nota_trimestral"], 8.38)
+        self.assertEqual(fila["cualitativo_adicional"], "AA")
+
+    def test_acepta_decimal_con_coma_y_redondea(self) -> None:
+        fila = self.service.validar_y_normalizar_fila(
+            {
+                "actividad_1": "8,756",
+                "mejora_1": None,
+                "actividad_2": "7.1",
+                "mejora_2": None,
+                "actividad_3": "6",
+                "mejora_3": None,
+                "proyecto": "9,5",
+                "evaluacion": "8.333",
+                "refuerzo": None,
+                "mejora_sumativa": None,
+            }
+        )
+        self.assertEqual(fila["actividad_1"], 8.76)
+        self.assertEqual(fila["evaluacion"], 8.33)
 
     def test_contexto_sin_estudiantes_retorna_vacio(self) -> None:
         with self.conn:

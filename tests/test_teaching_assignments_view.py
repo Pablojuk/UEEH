@@ -30,5 +30,7 @@ class TestTeachingAssignmentsView(unittest.TestCase):
         view = TeachingAssignmentsView(TeachingAssignmentService(conn), TeacherService(conn), CatalogService(conn))
         self.assertIsNotNone(view.teacher_combo)
         self.assertIsNotNone(view.table)
+        self.assertIsNotNone(view.delete_button)
+        self.assertFalse(hasattr(view, "search_input"))
         self.assertEqual(view.table.rowCount(), 0)
         conn.close()

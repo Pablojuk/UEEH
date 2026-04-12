@@ -55,4 +55,5 @@ class TestUIManagementViews(unittest.TestCase):
         self.assertEqual(view.courses_table.rowCount(), 0)
         self.assertEqual(view.parallels_table.rowCount(), 0)
         self.assertEqual(view.subjects_table.rowCount(), 0)
+        self.assertEqual(view.subjects_table.columnCount(), 2)
         self.assertEqual(view.periods_table.rowCount(), 0)

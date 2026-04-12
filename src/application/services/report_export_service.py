@@ -35,8 +35,16 @@ class ReportExportService:
         output_path: str,
         report_type: str = "anual",
         trimestre_num: int | None = None,
+        firmantes: dict[str, str] | None = None,
     ) -> tuple[bool, str]:
-        return self._exportar(asignacion_id, output_path, export_kind="pdf", report_type=report_type, trimestre_num=trimestre_num)
+        return self._exportar(
+            asignacion_id,
+            output_path,
+            export_kind="pdf",
+            report_type=report_type,
+            trimestre_num=trimestre_num,
+            firmantes=firmantes,
+        )
 
     def exportar_resumen_excel(
         self,
@@ -44,8 +52,16 @@ class ReportExportService:
         output_path: str,
         report_type: str = "anual",
         trimestre_num: int | None = None,
+        firmantes: dict[str, str] | None = None,
     ) -> tuple[bool, str]:
-        return self._exportar(asignacion_id, output_path, export_kind="excel", report_type=report_type, trimestre_num=trimestre_num)
+        return self._exportar(
+            asignacion_id,
+            output_path,
+            export_kind="excel",
+            report_type=report_type,
+            trimestre_num=trimestre_num,
+            firmantes=firmantes,
+        )
 
     def _exportar(
         self,
@@ -54,6 +70,7 @@ class ReportExportService:
         export_kind: str,
         report_type: str,
         trimestre_num: int | None,
+        firmantes: dict[str, str] | None,
     ) -> tuple[bool, str]:
         if not str(asignacion_id or "").strip():
             return False, "Debe seleccionar una asignación"
@@ -62,10 +79,11 @@ class ReportExportService:
             context = self._build_context(asignacion_id)
             context["report_type"] = report_type
             context["trimestre_num"] = trimestre_num
+            context["firmantes"] = firmantes or {}
             rows = (
-                self._build_trimestral_rows(asignacion_id, trimestre_num or 1)
+                self.academic_summary_service.obtener_reporte_trimestral(asignacion_id, trimestre_num or 1)
                 if report_type == "trimestral"
-                else self.academic_summary_service.obtener_resumen_por_asignacion(asignacion_id)
+                else self.academic_summary_service.obtener_reporte_anual(asignacion_id)
             )
             if not rows or not self._hay_datos_exportables(rows, report_type):
                 return False, "No hay datos para exportar"
@@ -101,6 +119,7 @@ class ReportExportService:
             "docente_nombre": f"{context.get('docente_apellidos', '')} {context.get('docente_nombres', '')}".strip(),
             "asignatura_nombre": context.get("asignatura_nombre") or context.get("asignatura_id"),
             "curso_nombre": context.get("curso_nombre") or context.get("curso_id"),
+            "curso_nivel": context.get("curso_nivel"),
             "paralelo_nombre": context.get("paralelo_nombre") or context.get("paralelo_id"),
             "logo_path": institucion.get("logo_path"),
             "logo_ministerio_path": institucion.get("logo_ministerio_path"),
@@ -122,39 +141,11 @@ class ReportExportService:
     @staticmethod
     def _hay_datos_exportables(rows: list[dict[str, Any]], report_type: str) -> bool:
         if report_type == "trimestral":
-            return any(row.get("promedio") is not None or row.get("promedio_final") is not None for row in rows)
+            return any(row.get("promedio_final") is not None for row in rows)
         for row in rows:
             if any(
                 row.get(k) is not None
-                for k in ("trimestre_1", "trimestre_2", "trimestre_3", "supletorio")
+                for k in ("trimestre_1", "trimestre_2", "trimestre_3", "promedio", "supletorio")
             ):
                 return True
         return False
-
-    def _build_trimestral_rows(self, asignacion_id: str, trimestre_num: int) -> list[dict[str, Any]]:
-        rows = self.connection.execute(
-            """
-            SELECT
-                e.apellidos || ' ' || e.nombres AS estudiante,
-                g.promedio_formativo AS aportes,
-                g.proyecto AS proyecto_integrador,
-                g.evaluacion AS examen,
-                g.nota_trimestral AS promedio,
-                g.cualitativo,
-                s.nota_supletorio AS supletorio,
-                COALESCE(s.nota_supletorio, g.nota_trimestral) AS promedio_final,
-                CASE
-                    WHEN COALESCE(s.nota_supletorio, g.nota_trimestral) >= 9 THEN 'DA'
-                    WHEN COALESCE(s.nota_supletorio, g.nota_trimestral) >= 7 THEN 'AA'
-                    WHEN COALESCE(s.nota_supletorio, g.nota_trimestral) >= 5 THEN 'PA'
-                    ELSE 'NA'
-                END AS logro
-            FROM grade_records g
-            JOIN estudiantes e ON e.id_estudiante = g.estudiante_id
-            LEFT JOIN final_supplementary s ON s.estudiante_id = g.estudiante_id AND s.asignacion_id = g.asignacion_id
-            WHERE g.asignacion_id = ? AND g.trimestre_num = ?
-            ORDER BY e.apellidos, e.nombres
-            """,
-            (asignacion_id, trimestre_num),
-        ).fetchall()
-        return [dict(row) for row in rows]
