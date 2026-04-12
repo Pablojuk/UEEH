@@ -1,53 +1,458 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <style>
-    body { font-family: Arial, sans-serif; font-size: 10px; }
-    h1, h2 { text-align: center; margin: 4px 0; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid #333; padding: 3px; text-align: center; }
-    th { background: #e5e7eb; }
-    .meta td { text-align: left; }
-    .firmas { margin-top: 20px; width: 100%; }
-    .firmas td { border: none; text-align: center; width: 25%; }
-  </style>
+<meta charset="UTF-8">
+<title>Cuadro de Calificación — Anual</title>
+<style>
+  :root {
+    --azul-oscuro:    #1F4E79;
+    --azul-medio:     #2E75B6;
+    --azul-claro:     #9DC3E6;
+    --azul-linea:     #1E4DFF;
+    --gris-tabla:     #B7B7B7;
+    --verde-aprobado: #E2EFDA;
+    --rojo-reporte:   #FCE4D6;
+    --fila-par:       #FFFFFF;
+    --fila-impar:     #F0F7FF;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #C8C8C8;
+    font-family: 'Calibri', 'Trebuchet MS', sans-serif;
+    font-size: 8.5pt;
+    color: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 0 48px;
+  }
+
+  .hoja {
+    width: 794px;
+    background: white;
+    border: 2.5px solid var(--azul-linea);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .header-top {
+    background: var(--azul-oscuro);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    min-height: 74px;
+    flex-shrink: 0;
+  }
+
+  .logo-box {
+    width: 78px;
+    height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .logo-box img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .logo-placeholder {
+    width: 62px;
+    height: 54px;
+    border: 1.5px solid rgba(255,255,255,0.45);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.1);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.75);
+    font-size: 7pt;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .header-center {
+    flex: 1;
+    text-align: center;
+    padding: 0 8px;
+  }
+
+  .inst-nombre {
+    font-size: 20pt;
+    font-weight: bold;
+    color: white;
+    line-height: 1.15;
+  }
+
+  .inst-subtitulo {
+    font-size: 8.5pt;
+    color: rgba(255,255,255,0.88);
+    margin-top: 1px;
+  }
+
+  .meta-bloque {
+    background: var(--azul-claro);
+    padding: 4px 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px 20px;
+    flex-shrink: 0;
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: baseline;
+    font-size: 8.5pt;
+    line-height: 1.55;
+  }
+
+  .meta-label {
+    font-weight: bold;
+    font-style: italic;
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+
+  .tabla-wrap {
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  table.principal {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 7pt;
+  }
+
+  table.principal col.c-num     { width: 24px; }
+  table.principal col.c-nomina  { width: 162px; }
+  table.principal col.c-t1-cal  { width: 49px; }
+  table.principal col.c-t1-cual { width: 38px; }
+  table.principal col.c-t2-cal  { width: 49px; }
+  table.principal col.c-t2-cual { width: 38px; }
+  table.principal col.c-t3-cal  { width: 49px; }
+  table.principal col.c-t3-cual { width: 38px; }
+  table.principal col.c-prom    { width: 52px; }
+  table.principal col.c-cual    { width: 42px; }
+  table.principal col.c-sup     { width: 42px; }
+  table.principal col.c-pfinal  { width: 56px; }
+  table.principal col.c-cfinal  { width: 44px; }
+  table.principal col.c-obs     { width: 75px; }
+
+  table.principal th,
+  table.principal td {
+    border: 1px solid var(--gris-tabla);
+    text-align: center;
+    vertical-align: middle;
+    padding: 1px 2px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  table.principal thead tr.head1 th {
+    background: var(--azul-medio);
+    color: white;
+    font-weight: bold;
+    font-size: 7.5pt;
+    height: 26px;
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  table.principal thead tr.head2 th {
+    background: var(--azul-claro);
+    color: #000;
+    font-weight: normal;
+    font-size: 6.5pt;
+    height: 26px;
+    white-space: normal;
+    line-height: 1.2;
+    vertical-align: middle;
+    text-align: center;
+    padding: 2px 1px;
+  }
+
+  table.principal td.nomina {
+    text-align: left;
+    padding-left: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 7pt;
+  }
+
+  table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); }
+  table.principal tbody tr:nth-child(odd)  td { background: var(--fila-par); }
+
+  table.principal td.aprobado  { background: var(--verde-aprobado) !important; }
+  table.principal td.reprobado { background: var(--rojo-reporte) !important; }
+  table.principal td.sin-datos { background: #F5F5F5 !important; color: #AAA; }
+  table.principal td.prom-bold { font-weight: bold; }
+
+  .bloque-inferior {
+    padding: 10px 14px 0;
+    flex-shrink: 0;
+  }
+
+  .fila-logros {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 10px;
+  }
+
+  table.logros {
+    border-collapse: collapse;
+    font-size: 7.8pt;
+    width: 390px;
+  }
+
+  table.logros th,
+  table.logros td {
+    border: 1px solid #000;
+    padding: 2px 5px;
+  }
+
+  table.logros thead th {
+    background: white;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  table.logros td.l-desc { text-align: left; }
+  table.logros td.l-cnt  { text-align: center; width: 50px; }
+  table.logros td.l-pct  { text-align: center; width: 44px; }
+  table.logros td.l-num  { text-align: center; width: 26px; }
+
+  .grafico-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    background: white;
+    min-width: 250px;
+    min-height: 130px;
+  }
+
+  .fila-promedio {
+    display: flex;
+    justify-content: center;
+    margin: 8px 0 0;
+  }
+
+  table.promedio {
+    border-collapse: collapse;
+    font-size: 8pt;
+    width: 360px;
+  }
+
+  table.promedio td {
+    border: 1px solid #000;
+    padding: 3px 8px;
+  }
+
+  table.promedio td.p-label { text-align: center; }
+  table.promedio td.p-valor {
+    text-align: center;
+    font-weight: bold;
+    width: 68px;
+  }
+
+  .firmas {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 48px;
+    padding: 0 10px 20px;
+    flex-shrink: 0;
+  }
+
+  .firma-bloque {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 160px;
+  }
+
+  .firma-linea {
+    width: 100%;
+    border-top: 1px solid #000;
+    margin-bottom: 3px;
+  }
+
+  .firma-nombre {
+    font-size: 8.5pt;
+    text-align: center;
+    font-weight: bold;
+  }
+
+  .firma-cargo {
+    font-size: 8pt;
+    text-align: center;
+    color: #222;
+  }
+
+  @media print {
+    body {
+      background: white;
+      padding: 0;
+      margin: 0;
+    }
+
+    .hoja {
+      width: 210mm;
+      border: none;
+      margin: 0;
+      page-break-after: always;
+    }
+
+    .hoja:last-child {
+      page-break-after: avoid;
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+  }
+</style>
 </head>
 <body>
-  <h1>[[institucion_nombre]]</h1>
-  <h2>CUADRO DE CALIFICACIÓN ANUAL</h2>
+<div class="hoja">
 
-  <table class="meta">
-    <tr><td><b>Docente:</b> [[docente_nombre]]</td><td><b>Asignatura:</b> [[asignatura_nombre]]</td></tr>
-    <tr><td><b>Curso:</b> [[curso_nombre]]</td><td><b>Paralelo:</b> [[paralelo_nombre]]</td></tr>
-    <tr><td><b>Nivel:</b> [[nivel]]</td><td><b>Tutor:</b> [[tutor]]</td></tr>
-    <tr><td><b>Periodo:</b> [[trimestre]]</td><td><b>Fecha:</b> [[fecha]]</td></tr>
-  </table>
+  <div class="header-top">
+    <div class="logo-box">
+      <img src="[[logo_inst_src]]" alt="Logo institución"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+      <div class="logo-placeholder">LOGO<br>INST.</div>
+    </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>N°</th><th>Nómina</th>
-        <th>T1 Calificación</th><th>T1 Cualitativa</th>
-        <th>T2 Calificación</th><th>T2 Cualitativa</th>
-        <th>T3 Calificación</th><th>T3 Cualitativa</th>
-        <th>Promedio</th><th>Cualitativa</th><th>Supletorio</th><th>Promedio Final</th><th>Observación</th>
-      </tr>
-    </thead>
-    <tbody>[[rows_html]]</tbody>
-  </table>
+    <div class="header-center">
+      <div class="inst-nombre">[[institucion_nombre]]</div>
+      <div class="inst-subtitulo">[[institucion_subtitulo]]</div>
+      <div class="inst-subtitulo" style="font-weight:bold;font-size:9pt;margin-top:2px;color:white;">
+        CUADRO DE CALIFICACIÓN ANUAL
+      </div>
+    </div>
 
-  <table>
-    <tr><th colspan="4">Cuadro estadístico anual</th></tr>
-    <tr><th>Detalle</th><th>Escala</th><th>Siglas</th><th>%</th></tr>
-    [[logros_rows_html]]
-    <tr><td colspan="2"><b>Promedio general anual</b></td><td colspan="2">[[promedio_general]]</td></tr>
-  </table>
+    <div class="logo-box">
+      <img src="[[logo_mineduc_src]]" alt="Logo ministerio"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+      <div class="logo-placeholder">MINE-<br>DUC</div>
+    </div>
+  </div>
 
-  <table class="firmas">
-    <tr><td>__________________________</td><td>__________________________</td><td>__________________________</td><td>__________________________</td></tr>
-    <tr><td>[[firma_docente]]</td><td>[[firma_coordinador]]</td><td>[[firma_rector]]</td><td>[[firma_tutor]]</td></tr>
-    <tr><td>Docente</td><td>Coordinador de Área</td><td>Rector</td><td>Tutor de Curso</td></tr>
-  </table>
+  <div class="meta-bloque">
+    <div class="meta-row"><span class="meta-label">Docente:</span> [[docente_nombre]]</div>
+    <div class="meta-row"><span class="meta-label">Asignatura:</span> [[asignatura_nombre]]</div>
+    <div class="meta-row"><span class="meta-label">Curso:</span> [[curso_nombre]] &nbsp;&nbsp;<span class="meta-label">Nivel:</span> [[nivel]]</div>
+    <div class="meta-row"><span class="meta-label">Paralelo:</span> [[paralelo_nombre]] &nbsp;&nbsp;<span class="meta-label">Tutor:</span> [[tutor]]</div>
+    <div class="meta-row"><span class="meta-label">Año lectivo:</span> [[periodo_lectivo]]</div>
+    <div class="meta-row"><span class="meta-label">Fecha:</span> [[fecha]]</div>
+  </div>
+
+  <div class="tabla-wrap">
+    <table class="principal">
+      <colgroup>
+        <col class="c-num">
+        <col class="c-nomina">
+        <col class="c-t1-cal"><col class="c-t1-cual">
+        <col class="c-t2-cal"><col class="c-t2-cual">
+        <col class="c-t3-cal"><col class="c-t3-cual">
+        <col class="c-prom">
+        <col class="c-cual">
+        <col class="c-sup">
+        <col class="c-pfinal">
+        <col class="c-cfinal">
+        <col class="c-obs">
+      </colgroup>
+
+      <thead>
+        <tr class="head1">
+          <th rowspan="2">N°</th>
+          <th rowspan="2">Nómina</th>
+          <th colspan="2">Primer<br>Trimestre</th>
+          <th colspan="2">Segundo<br>Trimestre</th>
+          <th colspan="2">Tercer<br>Trimestre</th>
+          <th rowspan="2">Promedio</th>
+          <th rowspan="2">Cualitativa</th>
+          <th rowspan="2">Supletorio</th>
+          <th rowspan="2">Promedio<br>Final</th>
+          <th rowspan="2">Cualitativa<br>Final</th>
+          <th rowspan="2">Observación</th>
+        </tr>
+        <tr class="head2">
+          <th>Calificación</th><th>Cualitativa</th>
+          <th>Calificación</th><th>Cualitativa</th>
+          <th>Calificación</th><th>Cualitativa</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        [[rows_html]]
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bloque-inferior">
+    <div class="fila-logros">
+      <div>
+        <table class="logros">
+          <thead>
+            <tr><th colspan="4">Cuadro estadístico anual</th></tr>
+          </thead>
+          <tbody>
+            [[estadistica_rows_html]]
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grafico-wrap">
+        [[chart_svg]]
+      </div>
+    </div>
+
+    <div class="fila-promedio">
+      <table class="promedio">
+        <tr>
+          <td class="p-label">Promedio General Anual</td>
+          <td class="p-valor">[[promedio_general]]</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="firmas">
+    <div class="firma-bloque">
+      <div class="firma-linea"></div>
+      <div class="firma-nombre">[[firma_docente]]</div>
+      <div class="firma-cargo">Docente</div>
+    </div>
+    <div class="firma-bloque">
+      <div class="firma-linea"></div>
+      <div class="firma-nombre">[[firma_coordinador]]</div>
+      <div class="firma-cargo">Coordinador de Área</div>
+    </div>
+    <div class="firma-bloque">
+      <div class="firma-linea"></div>
+      <div class="firma-nombre">[[firma_rector]]</div>
+      <div class="firma-cargo">Rector</div>
+    </div>
+    <div class="firma-bloque">
+      <div class="firma-linea"></div>
+      <div class="firma-nombre">[[firma_tutor]]</div>
+      <div class="firma-cargo">Tutor de Curso</div>
+    </div>
+  </div>
+
+</div>
 </body>
 </html>
