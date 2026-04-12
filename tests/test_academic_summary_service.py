@@ -94,6 +94,7 @@ class TestAcademicSummaryService(unittest.TestCase):
         row = self.service.obtener_resumen_por_asignacion("AS1")[0]
         self.assertEqual(row["promedio_final"], 7.0)
         self.assertEqual(row["cualitativo"], "B-")
+        self.assertEqual(row["cualitativo_final"], "B-")
         self.assertEqual(row["observacion"], "APB")
 
     def test_aplicar_supletorio_correctamente(self) -> None:
@@ -114,6 +115,18 @@ class TestAcademicSummaryService(unittest.TestCase):
             self.conn.execute("DELETE FROM matriculas")
         rows = self.service.obtener_resumen_por_asignacion("AS1")
         self.assertEqual(rows, [])
+
+    def test_reporte_trimestral_usa_trimestre_seleccionado(self) -> None:
+        rows = self.service.obtener_reporte_trimestral("AS1", 2)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["aportes_calificacion"], 7)
+        self.assertEqual(rows[0]["sumativas_calificacion"], 7)
+
+    def test_reporte_anual_incluye_equivalencias_por_trimestre(self) -> None:
+        row = self.service.obtener_reporte_anual("AS1")[0]
+        self.assertEqual(row["equivalencia_t1"], "AA")
+        self.assertEqual(row["equivalencia_t2"], "AA")
+        self.assertEqual(row["equivalencia_t3"], "PA")
 
 
 if __name__ == "__main__":

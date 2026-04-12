@@ -39,8 +39,8 @@ class TestExcelReportExporter(unittest.TestCase):
 
             wb = load_workbook(result)
             ws = wb.active
-            self.assertEqual(ws["A5"].value, "Estudiante")
-            self.assertEqual(ws["B5"].value, "Trimestre 1")
+            self.assertEqual(ws["A6"].value, "N°")
+            self.assertEqual(ws["B6"].value, "Nómina")
             wb.close()
 
 

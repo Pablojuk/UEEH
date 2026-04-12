@@ -79,3 +79,17 @@ class TestTeachingAssignmentService(unittest.TestCase):
         self.assignment_service.crear_asignacion(payload)
         self.assertEqual(len(self.assignment_service.listar_por_docente("D1")), 1)
         self.assertEqual(len(self.assignment_service.listar_por_grupo("C1", "P1", "2025-2026")), 1)
+
+    def test_eliminar_asignacion(self) -> None:
+        ok, _ = self.assignment_service.crear_asignacion({
+            "docente_id": "D1",
+            "asignatura_id": "A1",
+            "curso_id": "C1",
+            "paralelo_id": "P1",
+            "periodo_id": "2025-2026",
+        })
+        self.assertTrue(ok)
+        assignment_id = self.assignment_service.listar_asignaciones()[0]["id_asignacion"]
+        deleted, _ = self.assignment_service.eliminar_asignacion(assignment_id)
+        self.assertTrue(deleted)
+        self.assertEqual(len(self.assignment_service.listar_asignaciones()), 0)

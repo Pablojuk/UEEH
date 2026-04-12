@@ -47,8 +47,10 @@ class ExcelReportExporter:
 
         if context.get("report_type") == "trimestral":
             headers = [
-                "N°", "Nómina", "Aportes", "70%", "Proyecto", "15%", "Examen", "15%", "Promedio", "Cualitativa",
-                "Supletorio", "Promedio final", "Observación", "Logro de evaluación\nde aprendizaje",
+                "N°", "Nómina",
+                "Aportes/Insumos Calificación", "Aportes/Insumos 70%",
+                "Evaluaciones sumativas Calificación", "Evaluaciones sumativas 30%",
+                "Promedio Final", "Cualitativa", "Equivalencia", "Observación",
             ]
             start_row = 6
             for col, title in enumerate(headers, start=1):
@@ -63,18 +65,14 @@ class ExcelReportExporter:
                 values = [
                     idx,
                     row.get("estudiante", ""),
-                    row.get("aportes"),
-                    (row.get("aportes") or 0) * 0.70 if row.get("aportes") is not None else None,
-                    row.get("proyecto_integrador"),
-                    (row.get("proyecto_integrador") or 0) * 0.15 if row.get("proyecto_integrador") is not None else None,
-                    row.get("examen"),
-                    (row.get("examen") or 0) * 0.15 if row.get("examen") is not None else None,
-                    row.get("promedio"),
-                    row.get("cualitativo", ""),
-                    row.get("supletorio"),
+                    row.get("aportes_calificacion"),
+                    row.get("aportes_70"),
+                    row.get("sumativas_calificacion"),
+                    row.get("sumativas_30"),
                     row.get("promedio_final"),
-                    "",
-                    row.get("logro", ""),
+                    row.get("cualitativa", ""),
+                    row.get("equivalencia", ""),
+                    row.get("observacion", ""),
                 ]
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
@@ -82,10 +80,14 @@ class ExcelReportExporter:
                     cell.border = border
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
-            widths = [5, 30, 9, 8, 9, 8, 9, 8, 9, 9, 9, 10, 11, 15]
+            widths = [5, 30, 14, 12, 15, 12, 10, 10, 10, 12]
         else:
             headers = [
-                "N°", "Nómina", "T1", "Cual", "T2", "Cual", "T3", "Cual", "Promedio", "Cualitativa", "Supletorio", "Promedio final", "Observación",
+                "N°", "Nómina",
+                "Primer Trimestre Calificación", "Primer Trimestre Cualitativa",
+                "Segundo Trimestre Calificación", "Segundo Trimestre Cualitativa",
+                "Tercer Trimestre Calificación", "Tercer Trimestre Cualitativa",
+                "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo Final", "Observación",
             ]
             start_row = 6
             for col, title in enumerate(headers, start=1):
@@ -96,17 +98,57 @@ class ExcelReportExporter:
                 cell.border = border
             for idx, row in enumerate(rows, start=1):
                 r = start_row + idx
-                values = [idx, row.get("estudiante", ""), row.get("trimestre_1"), "", row.get("trimestre_2"), "", row.get("trimestre_3"), "", row.get("promedio_final"), row.get("cualitativo", ""), row.get("supletorio"), row.get("nota_definitiva"), row.get("observacion", "")]
+                values = [
+                    idx,
+                    row.get("estudiante", ""),
+                    row.get("trimestre_1"),
+                    row.get("equivalencia_t1", ""),
+                    row.get("trimestre_2"),
+                    row.get("equivalencia_t2", ""),
+                    row.get("trimestre_3"),
+                    row.get("equivalencia_t3", ""),
+                    row.get("promedio"),
+                    row.get("cualitativa_anual", ""),
+                    row.get("supletorio"),
+                    row.get("promedio_final"),
+                    row.get("cualitativo_final", ""),
+                    row.get("observacion", ""),
+                ]
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
                     cell.alignment = Alignment(horizontal="center", vertical="center")
                     cell.border = border
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
-            widths = [5, 30, 8, 8, 8, 8, 8, 8, 9, 10, 10, 10, 12]
+            widths = [5, 30, 12, 12, 12, 12, 12, 12, 9, 10, 10, 10, 12, 12]
 
         for idx, w in enumerate(widths, start=1):
             ws.column_dimensions[chr(ord("A") + idx - 1)].width = w
 
+        self._draw_signatures(ws, start_row + len(rows) + 3, len(widths), context.get("firmantes", {}))
         wb.save(str(path))
         return str(path)
+
+    @staticmethod
+    def _draw_signatures(ws, start_row: int, max_cols: int, firmantes: dict[str, str]) -> None:
+        from openpyxl.styles import Alignment
+
+        roles = [
+            ("Docente", firmantes.get("docente", "")),
+            ("Coordinador de Área", firmantes.get("coordinador_area", "")),
+            ("Rector", firmantes.get("rector", "")),
+            ("Tutor de Curso", firmantes.get("tutor_curso", "")),
+        ]
+        block = max(1, max_cols // 4)
+        for idx, (rol, firma) in enumerate(roles):
+            col_start = (idx * block) + 1
+            col_end = min(max_cols, col_start + block - 1)
+            ws.merge_cells(start_row=start_row, start_column=col_start, end_row=start_row, end_column=col_end)
+            ws.merge_cells(start_row=start_row + 1, start_column=col_start, end_row=start_row + 1, end_column=col_end)
+            ws.merge_cells(start_row=start_row + 2, start_column=col_start, end_row=start_row + 2, end_column=col_end)
+            ws.cell(row=start_row, column=col_start, value="_____________________________")
+            ws.cell(row=start_row + 1, column=col_start, value=firma or "")
+            ws.cell(row=start_row + 2, column=col_start, value=rol)
+            ws.cell(row=start_row, column=col_start).alignment = Alignment(horizontal="center")
+            ws.cell(row=start_row + 1, column=col_start).alignment = Alignment(horizontal="center")
+            ws.cell(row=start_row + 2, column=col_start).alignment = Alignment(horizontal="center")
