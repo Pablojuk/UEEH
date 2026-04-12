@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Cuadro de Calificación — Trimestral</title>
+<style>
+  /* ══════════════════════════════════════════
+     VARIABLES
+  ══════════════════════════════════════════ */
+  :root {
+    --azul-oscuro:    #1F4E79;
+    --azul-medio:     #2E75B6;
+    --azul-claro:     #9DC3E6;
+    --azul-linea:     #1E4DFF;
+    --gris-tabla:     #B7B7B7;
+    --verde-aprobado: #E2EFDA;
+    --rojo-reporte:   #FCE4D6;
+    --fila-par:       #FFFFFF;
+    --fila-impar:     #F0F7FF;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #C8C8C8;
+    font-family: 'Calibri', 'Trebuchet MS', sans-serif;
+    font-size: 8.5pt;
+    color: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 0 48px;
+  }
+
+  /* ══ Hoja A4 portrait: 794 × 1123 px ══ */
+  .hoja {
+    width: 794px;
+    background: white;
+    border: 2.5px solid var(--azul-linea);
+    display: flex;
+    flex-direction: column;
+    /* Sin alto fijo: el JS oculta filas y el bloque se ajusta solo */
+  }
+
+  /* ══ HEADER ══ */
+  .header-top {
+    background: var(--azul-oscuro);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    min-height: 74px;
+    flex-shrink: 0;
+  }
+  .logo-box {
+    width: 78px; height: 62px;
+    display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0;
+  }
+  .logo-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .logo-placeholder {
+    width: 62px; height: 54px;
+    border: 1.5px solid rgba(255,255,255,0.45);
+    border-radius: 4px; background: rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.75); font-size: 7pt;
+    font-weight: bold; text-align: center; line-height: 1.3;
+  }
+  .header-center { flex: 1; text-align: center; padding: 0 8px; }
+  .inst-nombre {
+    font-size: 20pt; font-weight: bold;
+    color: white; line-height: 1.15;
+  }
+  .inst-subtitulo {
+    font-size: 8.5pt; color: rgba(255,255,255,0.88); margin-top: 1px;
+  }
+
+  /* ══ METADATOS ══ */
+  .meta-bloque {
+    background: var(--azul-claro);
+    padding: 4px 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px 20px;
+    flex-shrink: 0;
+  }
+  .meta-row {
+    display: flex; align-items: baseline;
+    font-size: 8.5pt; line-height: 1.55;
+  }
+  .meta-label {
+    font-weight: bold; font-style: italic;
+    margin-right: 4px; white-space: nowrap;
+  }
+
+  /* ══ TABLA PRINCIPAL ══
+     Columnas (10):
+     N° | Nómina | Cal-Aportes | 70% |
+     Cal-EvSum | 30% |
+     Promedio Final | Cualitativa | Equivalencia | Observaciones
+  ══════════════════════════════════════════ */
+  .tabla-wrap { flex-shrink: 0; overflow: hidden; }
+
+  table.principal {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 7.8pt;
+  }
+
+  table.principal col.c-num    { width: 28px; }
+  table.principal col.c-nomina { width: 220px; }
+  table.principal col.c-cal-a  { width: 68px; }
+  table.principal col.c-pond-a { width: 44px; }
+  table.principal col.c-cal-s  { width: 68px; }
+  table.principal col.c-pond-s { width: 44px; }
+  table.principal col.c-prom   { width: 64px; }
+  table.principal col.c-cual   { width: 56px; }
+  table.principal col.c-equiv  { width: 56px; }
+  table.principal col.c-obs    { width: 86px; }
+
+  table.principal th,
+  table.principal td {
+    border: 1px solid var(--gris-tabla);
+    text-align: center;
+    vertical-align: middle;
+    padding: 1px 2px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  /* Encabezado grupo (fila 1) */
+  table.principal thead tr.head1 th {
+    background: var(--azul-medio); color: white;
+    font-weight: bold; font-size: 7.8pt;
+    height: 30px; white-space: normal; line-height: 1.2;
+  }
+  /* Subencabezado (fila 2) */
+  table.principal thead tr.head2 th {
+    background: var(--azul-claro); color: #000;
+    font-weight: normal; font-size: 7.5pt; height: 20px;
+  }
+
+  table.principal td.nomina {
+    text-align: left; padding-left: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* Filas alternadas */
+  table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); }
+  table.principal tbody tr:nth-child(odd)  td { background: var(--fila-par); }
+
+  table.principal td.aprobado  { background: var(--verde-aprobado) !important; }
+  table.principal td.reprobado { background: var(--rojo-reporte) !important; }
+  table.principal td.sin-datos { background: #F5F5F5 !important; color: #AAA; }
+  table.principal td.prom-bold { font-weight: bold; }
+
+  /* Filas de datos vacíos — ocultadas por JS */
+  table.principal tbody tr.fila-vacia td {
+    height: 18px;
+    background: white !important;
+  }
+
+  /* ══ BLOQUE INFERIOR ══ */
+  .bloque-inferior { padding: 10px 14px 0; flex-shrink: 0; }
+
+  .fila-logros {
+    display: flex; align-items: flex-start;
+    gap: 24px; margin-bottom: 10px;
+  }
+
+  table.logros {
+    border-collapse: collapse; font-size: 7.8pt; width: 390px;
+  }
+  table.logros th,
+  table.logros td { border: 1px solid #000; padding: 2px 5px; }
+  table.logros thead th {
+    background: white; font-weight: bold; text-align: center;
+  }
+  table.logros td.l-desc { text-align: left; width: 250px; }
+  table.logros td.l-cnt  { text-align: center; width: 46px; }
+  table.logros td.l-pct  { text-align: center; width: 42px; }
+  table.logros td.l-num  { text-align: center; width: 26px; }
+
+  .grafico-wrap {
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid #ccc; padding: 6px 8px; background: white;
+    min-width: 250px; min-height: 130px;
+  }
+
+  .fila-promedio { display: flex; justify-content: center; margin: 8px 0 0; }
+  table.promedio { border-collapse: collapse; font-size: 8pt; width: 360px; }
+  table.promedio td { border: 1px solid #000; padding: 3px 8px; }
+  table.promedio td.p-label { text-align: center; }
+  table.promedio td.p-valor { text-align: center; font-weight: bold; width: 68px; }
+
+  /* ══ FIRMAS ══ */
+  .firmas {
+    display: flex; justify-content: space-around;
+    margin-top: 48px; padding: 0 10px 20px; flex-shrink: 0;
+  }
+  .firma-bloque {
+    display: flex; flex-direction: column;
+    align-items: center; width: 160px;
+  }
+  .firma-linea  { width: 100%; border-top: 1px solid #000; margin-bottom: 3px; }
+  .firma-nombre { font-size: 8.5pt; text-align: center; font-weight: bold; }
+  .firma-cargo  { font-size: 8pt; text-align: center; color: #222; }
+
+  /* ══ PRINT ══ */
+  @media print {
+    body { background: white; padding: 0; margin: 0; }
+    .hoja {
+      width: 210mm;
+      border: none;
+      margin: 0;
+      page-break-after: always;
+    }
+    .hoja:last-child { page-break-after: avoid; }
+    @page { size: A4 portrait; margin: 10mm; }
+  }
+</style>
+</head>
+<body>
+<div class="hoja">
+
+  <!-- ══ HEADER ══ -->
+  <div class="header-top">
+    <div class="logo-box">
+      <img src="C:\Users\ASUS\OneDrive\Escritorio\M1001.png" alt="Logo"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+      <div class="logo-placeholder" style="display:none;">LOGO<br>INST.</div>
+    </div>
+    <div class="header-center">
+      <div class="inst-nombre">Unidad Educativa Emiliano Hinoztroza</div>
+      <div class="inst-subtitulo">San Salvador de Caañaribamba</div>
+      <div class="inst-subtitulo" style="font-weight:bold;font-size:9pt;margin-top:2px;color:white;">
+        CUADRO DE CALIFICACIÓN
+      </div>
+    </div>
+    <div class="logo-box">
+      <img src="C:\Users\ASUS\OneDrive\Escritorio\MINEDEC.png" alt="Ministerio"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+      <div class="logo-placeholder" style="display:none;">MINE-<br>DUC</div>
+    </div>
+  </div>
+
+  <!-- ══ METADATOS ══ -->
+  <div class="meta-bloque">
+    <div class="meta-row"><span class="meta-label">Docente:</span> Econ. Pablo Hernan Juca Farfán</div>
+    <div class="meta-row"><span class="meta-label">Asignatura:</span> ECA</div>
+    <div class="meta-row"><span class="meta-label">Curso:</span> Octavo &nbsp;&nbsp;<span class="meta-label">Nivel:</span> EGB</div>
+    <div class="meta-row"><span class="meta-label">Paralelo:</span> A &nbsp;&nbsp;<span class="meta-label">Tutor:</span> Lcdo. José Sumba</div>
+    <div class="meta-row"><span class="meta-label">Trimestre:</span> Tercero</div>
+  </div>
+
+  <!-- ══ TABLA PRINCIPAL ══ -->
+  <div class="tabla-wrap">
+    <table class="principal">
+      <colgroup>
+        <col class="c-num">
+        <col class="c-nomina">
+        <col class="c-cal-a">
+        <col class="c-pond-a">
+        <col class="c-cal-s">
+        <col class="c-pond-s">
+        <col class="c-prom">
+        <col class="c-cual">
+        <col class="c-equiv">
+        <col class="c-obs">
+      </colgroup>
+      <thead>
+        <tr class="head1">
+          <th rowspan="2">N°</th>
+          <th rowspan="2">Nómina</th>
+          <th colspan="2">Aportes/<br>Insumos</th>
+          <th colspan="2">Evaluaciones<br>Sumativas</th>
+          <th rowspan="2">Promedio<br>Final</th>
+          <th rowspan="2">Cualitativa</th>
+          <th rowspan="2">Equivalencia</th>
+          <th rowspan="2">Observaciones</th>
+        </tr>
+        <tr class="head2">
+          <th>Calificación</th>
+          <th>70%</th>
+          <th>Calificación</th>
+          <th>30%</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-principal">
+        <!-- ═══════════════════════════════════════
+             34 FILAS — el JS oculta las no usadas
+             Las primeras N filas son de datos reales;
+             el resto tienen clase "fila-vacia".
+             AJUSTA "fila-vacia" según tus datos.
+        ═══════════════════════════════════════ -->
+
+        <!-- DATOS REALES (14 estudiantes de ejemplo) -->
+        <tr>
+          <td>1</td><td class="nomina">BENALCAZAR CORONEL ANGELY YULEIDI</td>
+          <td>7,94</td><td>5,55</td><td>8,21</td><td>2,46</td>
+          <td class="prom-bold">8,01</td><td>AA</td><td>8</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>2</td><td class="nomina">GUAMAN GUAILLASACA CRISTOPHER MATIAS</td>
+          <td>9,44</td><td>6,61</td><td>8,66</td><td>2,60</td>
+          <td class="prom-bold">9,21</td><td>DA</td><td>9</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>3</td><td class="nomina">GUAMAN GUAMAN NEICER JOSE</td>
+          <td>7,32</td><td>5,12</td><td>8,21</td><td>2,46</td>
+          <td class="prom-bold">7,58</td><td>AA</td><td>8</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>4</td><td class="nomina">GUAYLLAZACA LALVAY JORDY VALENTIN</td>
+          <td>7,50</td><td>5,25</td><td>7,50</td><td>2,25</td>
+          <td class="prom-bold">7,50</td><td>AA</td><td>8</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>5</td><td class="nomina">HERAS HERAS MAYRA ALEXANDRA</td>
+          <td>7,62</td><td>5,33</td><td>9,21</td><td>2,76</td>
+          <td class="prom-bold">8,09</td><td>AA</td><td>8</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>6</td><td class="nomina">MEJIA AUCAY JANETH CRISTINA</td>
+          <td>8,42</td><td>5,89</td><td>9,21</td><td>2,76</td>
+          <td class="prom-bold">8,65</td><td>AA</td><td>9</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>7</td><td class="nomina">MERCHAN PUCHA JHEYMI GABRIELA</td>
+          <td>7,75</td><td>5,42</td><td>9,43</td><td>2,83</td>
+          <td class="prom-bold">8,25</td><td>AA</td><td>8</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>8</td><td class="nomina">NIEVES GUAYLLASACA DYLAN SANTIAGO</td>
+          <td>7,87</td><td>5,51</td><td>8,66</td><td>2,60</td>
+          <td class="prom-bold">8,11</td><td>AA</td><td>8</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>9</td><td class="nomina">ORDOÑEZ PANDO JUSTIN SEBASTIAN</td>
+          <td class="sin-datos">—</td><td class="sin-datos">—</td>
+          <td class="sin-datos">—</td><td class="sin-datos">—</td>
+          <td class="sin-datos">—</td><td class="sin-datos">—</td>
+          <td class="sin-datos">—</td><td></td>
+        </tr>
+        <tr>
+          <td>10</td><td class="nomina">PANDO SEGOVIA KERLY JARITZA</td>
+          <td>7,81</td><td>5,46</td><td>9,43</td><td>2,83</td>
+          <td class="prom-bold">8,29</td><td>AA</td><td>8</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>11</td><td class="nomina">PESANTEZ BENALCAZAR LUIS ALBERTO</td>
+          <td>9,18</td><td>6,42</td><td>8,21</td><td>2,46</td>
+          <td class="prom-bold">8,88</td><td>AA</td><td>9</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>12</td><td class="nomina">RAMON BENALCAZAR ALISSON TATIANA</td>
+          <td>7,87</td><td>5,51</td><td>9,21</td><td>2,76</td>
+          <td class="prom-bold">8,27</td><td>AA</td><td>8</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>13</td><td class="nomina">SEGOVIA LALVAY LEIDY YANELA</td>
+          <td>7,87</td><td>5,51</td><td>9,43</td><td>2,83</td>
+          <td class="prom-bold">8,34</td><td>AA</td><td>8</td><td class="aprobado">Aprobado</td>
+        </tr>
+        <tr>
+          <td>14</td><td class="nomina">VELEPUCHA MERCHAN RODRIGO LEONARDO</td>
+          <td>7,51</td><td>5,25</td><td>8,66</td><td>2,60</td>
+          <td class="prom-bold">7,85</td><td>AA</td><td>8</td><td class="aprobado">Aprobado</td>
+        </tr>
+
+        <!-- FILAS VACÍAS (15–34) — JS las oculta automáticamente -->
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="fila-vacia"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══ BLOQUE INFERIOR ══ -->
+  <div class="bloque-inferior">
+    <div class="fila-logros">
+
+      <!-- Cuadro de logros -->
+      <div>
+        <table class="logros">
+          <thead>
+            <tr><th colspan="4">Cuadro de logros en la evaluación de los aprendizajes</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="l-num">1</td>
+              <td class="l-desc">Domina los aprendizajes (DA) 9 - 10</td>
+              <td class="l-cnt" id="cnt-da">2</td>
+              <td class="l-pct" id="pct-da">15%</td>
+            </tr>
+            <tr>
+              <td class="l-num">2</td>
+              <td class="l-desc">Alcanza los Aprendizajes (AA) 7 - 8,99</td>
+              <td class="l-cnt" id="cnt-aa">11</td>
+              <td class="l-pct" id="pct-aa">85%</td>
+            </tr>
+            <tr>
+              <td class="l-num">3</td>
+              <td class="l-desc">Próximo a alcanzar (PA) 5 - 6,99</td>
+              <td class="l-cnt" id="cnt-pa">0</td>
+              <td class="l-pct" id="pct-pa">0%</td>
+            </tr>
+            <tr>
+              <td class="l-num">4</td>
+              <td class="l-desc">No alcanza los aprendizajes (NA) &lt;=5</td>
+              <td class="l-cnt" id="cnt-na">0</td>
+              <td class="l-pct" id="pct-na">0%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Gráfico de pastel -->
+      <div class="grafico-wrap">
+        <svg id="pie-chart" width="180" height="120" viewBox="0 0 180 120"></svg>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-left:10px;font-size:7.5pt;">
+          <div style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:11px;height:11px;background:#4472C4;"></span> 1 DA</div>
+          <div style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:11px;height:11px;background:#ED7D31;"></span> 2 AA</div>
+          <div style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:11px;height:11px;background:#A5A5A5;"></span> 3 PA</div>
+          <div style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:11px;height:11px;background:#FFC000;"></span> 4 NA</div>
+        </div>
+      </div>
+
+    </div><!-- /fila-logros -->
+
+    <!-- Promedio centrado -->
+    <div class="fila-promedio">
+      <table class="promedio">
+        <tr>
+          <td class="p-label">Promedio</td>
+          <td class="p-valor" id="val-promedio">8,39</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ FIRMAS ══ -->
+  <div class="firmas">
+    <div class="firma-bloque">
+      <div class="firma-linea"></div>
+      <div class="firma-nombre">Econ. Pablo Juca</div>
+      <div class="firma-cargo">Docente</div>
+    </div>
+    <div class="firma-bloque">
+      <div class="firma-linea"></div>
+      <div class="firma-nombre">Lcdo. Nelson Bermeo</div>
+      <div class="firma-cargo">Coordinador de Área</div>
+    </div>
+    <div class="firma-bloque">
+      <div class="firma-linea"></div>
+      <div class="firma-nombre">Econ. Pablo Juca</div>
+      <div class="firma-cargo">Rector</div>
+    </div>
+    <div class="firma-bloque">
+      <div class="firma-linea"></div>
+      <div class="firma-nombre">Lcdo. José Sumba</div>
+      <div class="firma-cargo">Tutor de Curso</div>
+    </div>
+  </div>
+
+</div><!-- /hoja -->
+
+<!-- ══════════════════════════════════════════════
+     SCRIPT
+     ─ Oculta filas vacías dinámicamente
+     ─ Dibuja gráfico de pastel (SVG)
+     ─ Calcula y actualiza porcentajes
+══════════════════════════════════════════════ -->
+<script>
+  /* ── Configuración ────────────────────────
+     TOTAL_FILAS_DISEÑO: siempre 34 (capacidad máxima)
+     TOTAL_ESTUDIANTES : número real de alumnos en el reporte.
+                         Cambia este valor según el listado.
+  ─────────────────────────────────────────── */
+  const TOTAL_FILAS_DISENO  = 34;
+  const TOTAL_ESTUDIANTES   = 14; // ← AJUSTAR según datos reales
+
+  const COLORS = ['#4472C4', '#ED7D31', '#A5A5A5', '#FFC000'];
+
+  /* ── Ocultar filas vacías ── */
+  function ocultarFilasVacias() {
+    const tbody  = document.getElementById('tbody-principal');
+    const filas  = tbody.querySelectorAll('tr');
+    filas.forEach((fila, idx) => {
+      if (idx >= TOTAL_ESTUDIANTES) {
+        fila.style.display = 'none';
+      }
+    });
+  }
+
+  /* ── Gráfico de pastel ── */
+  function dibujarGrafico() {
+    const cant = [
+      parseInt(document.getElementById('cnt-da').textContent) || 0,
+      parseInt(document.getElementById('cnt-aa').textContent) || 0,
+      parseInt(document.getElementById('cnt-pa').textContent) || 0,
+      parseInt(document.getElementById('cnt-na').textContent) || 0,
+    ];
+    const total = cant.reduce((a, b) => a + b, 0);
+    const svg   = document.getElementById('pie-chart');
+    svg.innerHTML = '';
+    if (total === 0) return;
+
+    const cx = 62, cy = 60, r = 50;
+    let ang = -Math.PI / 2;
+
+    cant.forEach((cnt, i) => {
+      if (cnt === 0) return;
+      const frac = cnt / total;
+
+      if (frac >= 1) {
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', r);
+        c.setAttribute('fill', COLORS[i]);
+        svg.appendChild(c);
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        t.setAttribute('x', cx); t.setAttribute('y', cy + 4);
+        t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '11');
+        t.setAttribute('font-family', 'Calibri,sans-serif');
+        t.setAttribute('font-weight', 'bold'); t.setAttribute('fill', 'white');
+        t.textContent = '100%';
+        svg.appendChild(t);
+        return;
+      }
+
+      const a  = frac * 2 * Math.PI;
+      const ea = ang + a;
+      const x1 = cx + r * Math.cos(ang), y1 = cy + r * Math.sin(ang);
+      const x2 = cx + r * Math.cos(ea),  y2 = cy + r * Math.sin(ea);
+      const p  = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', `M${cx} ${cy} L${x1.toFixed(2)} ${y1.toFixed(2)} A${r} ${r} 0 ${a > Math.PI ? 1 : 0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`);
+      p.setAttribute('fill', COLORS[i]);
+      p.setAttribute('stroke', 'white'); p.setAttribute('stroke-width', '0.8');
+      svg.appendChild(p);
+
+      const ma = ang + a / 2;
+      const t  = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', (cx + r * 0.62 * Math.cos(ma)).toFixed(1));
+      t.setAttribute('y', (cy + r * 0.62 * Math.sin(ma) + 3).toFixed(1));
+      t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '8');
+      t.setAttribute('font-family', 'Calibri,sans-serif');
+      t.setAttribute('font-weight', 'bold'); t.setAttribute('fill', 'white');
+      t.textContent = `${Math.round(frac * 100)}%`;
+      svg.appendChild(t);
+      ang = ea;
+    });
+
+    // Actualizar porcentajes en tabla de logros
+    ['da', 'aa', 'pa', 'na'].forEach((k, i) => {
+      document.getElementById(`pct-${k}`).textContent =
+        total > 0 ? Math.round((cant[i] / total) * 100) + '%' : '0%';
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    ocultarFilasVacias();
+    dibujarGrafico();
+  });
+</script>
+</body>
+</html>
