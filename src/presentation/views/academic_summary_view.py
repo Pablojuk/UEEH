@@ -27,18 +27,18 @@ from src.application.services.report_export_service import ReportExportService
 
 class AcademicSummaryView(QWidget):
     ANNUAL_COLUMNS = [
-        ("estudiante", "Estudiante"),
-        ("trimestre_1", "Trimestre 1"),
+        ("numero_lista", "N°"),
+        ("estudiante", "Nómina"),
+        ("trimestre_1", "T1 Calificación"),
         ("equivalencia_t1", "Cualitativa T1"),
-        ("trimestre_2", "Trimestre 2"),
+        ("trimestre_2", "T2 Calificación"),
         ("equivalencia_t2", "Cualitativa T2"),
-        ("trimestre_3", "Trimestre 3"),
+        ("trimestre_3", "T3 Calificación"),
         ("equivalencia_t3", "Cualitativa T3"),
         ("promedio", "Promedio"),
         ("cualitativa_anual", "Cualitativa"),
         ("supletorio", "Supletorio"),
         ("promedio_final", "Promedio Final"),
-        ("cualitativo_final", "Cualitativo"),
         ("observacion", "Observación"),
     ]
 

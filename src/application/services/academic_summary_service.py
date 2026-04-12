@@ -133,14 +133,23 @@ class AcademicSummaryService:
             sumativas = item.get("sumativas_calificacion")
             aportes_70 = round((aportes or 0) * 0.70, 2) if aportes is not None else None
             sumativas_30 = round((sumativas or 0) * 0.30, 2) if sumativas is not None else None
-            promedio = round((aportes_70 or 0) + (sumativas_30 or 0), 2) if aportes_70 is not None and sumativas_30 is not None else None
+            promedio_original = item.get("promedio_original")
+            promedio = (
+                promedio_original
+                if promedio_original is not None
+                else round((aportes_70 or 0) + (sumativas_30 or 0), 2)
+                if aportes_70 is not None and sumativas_30 is not None
+                else None
+            )
 
             item["aportes_70"] = aportes_70
             item["sumativas_30"] = sumativas_30
             item["promedio_final"] = promedio
             item["cualitativa"] = calcular_cualitativo_trimestral(promedio)
             item["equivalencia"] = self._calcular_equivalencia(item.get("promedio_final"))
-            item["observacion"] = calcular_observacion_final(item.get("promedio_final"))
+            item["observacion"] = (
+                calcular_observacion_final(item.get("promedio_final")) if item.get("promedio_final") is not None else ""
+            )
             resultado.append(item)
         return resultado
 

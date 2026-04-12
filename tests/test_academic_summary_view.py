@@ -58,6 +58,8 @@ class TestAcademicSummaryView(unittest.TestCase):
         view = AcademicSummaryView(_FakeAcademicSummaryService(rows=[]))
         view.load_summary()
         self.assertEqual(view.table.rowCount(), 0)
+        self.assertEqual(view.table.horizontalHeaderItem(0).text(), "N°")
+        self.assertEqual(view.table.horizontalHeaderItem(1).text(), "Nómina")
 
     def test_poblar_tabla_con_datos(self) -> None:
         from src.presentation.views.academic_summary_view import AcademicSummaryView
@@ -87,7 +89,8 @@ class TestAcademicSummaryView(unittest.TestCase):
         )
         view.load_summary()
         self.assertEqual(view.table.rowCount(), 1)
-        self.assertEqual(view.table.item(0, 0).text(), "Lopez Maria")
+        self.assertEqual(view.table.item(0, 0).text(), "")
+        self.assertEqual(view.table.item(0, 1).text(), "Lopez Maria")
 
 
 if __name__ == "__main__":
