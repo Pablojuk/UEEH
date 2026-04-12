@@ -22,16 +22,31 @@ from src.application.services.report_export_service import ReportExportService
 
 
 class AcademicSummaryView(QWidget):
-    TABLE_COLUMNS = [
+    ANNUAL_COLUMNS = [
         ("estudiante", "Estudiante"),
         ("trimestre_1", "Trimestre 1"),
+        ("equivalencia_t1", "Cualitativa T1"),
         ("trimestre_2", "Trimestre 2"),
+        ("equivalencia_t2", "Cualitativa T2"),
         ("trimestre_3", "Trimestre 3"),
-        ("promedio_final", "Promedio Final"),
-        ("cualitativo", "Cualitativo"),
-        ("observacion", "Observación"),
+        ("equivalencia_t3", "Cualitativa T3"),
+        ("promedio", "Promedio"),
+        ("cualitativa_anual", "Cualitativa"),
         ("supletorio", "Supletorio"),
-        ("nota_definitiva", "Nota Definitiva"),
+        ("promedio_final", "Promedio Final"),
+        ("observacion", "Observación"),
+    ]
+
+    TRIMESTRAL_COLUMNS = [
+        ("estudiante", "Nómina"),
+        ("aportes_calificacion", "Aportes/Insumos Calificación"),
+        ("aportes_70", "Aportes/Insumos 70%"),
+        ("sumativas_calificacion", "Evaluaciones sumativas Calificación"),
+        ("sumativas_30", "Evaluaciones sumativas 30%"),
+        ("promedio_final", "Promedio Final"),
+        ("cualitativa", "Cualitativa"),
+        ("equivalencia", "Equivalencia"),
+        ("observacion", "Observación"),
     ]
 
     EDITABLE_COLUMNS = {"supletorio"}
@@ -45,6 +60,7 @@ class AcademicSummaryView(QWidget):
         self.academic_summary_service = academic_summary_service
         self.report_export_service = report_export_service
         self._rows_meta: list[dict] = []
+        self._table_columns = list(self.ANNUAL_COLUMNS)
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -65,6 +81,7 @@ class AcademicSummaryView(QWidget):
         self.report_type_combo.addItem("Primer Trimestre", ("trimestral", 1))
         self.report_type_combo.addItem("Segundo Trimestre", ("trimestral", 2))
         self.report_type_combo.addItem("Tercer Trimestre", ("trimestral", 3))
+        self.report_type_combo.currentIndexChanged.connect(self._on_report_type_changed)
         self.load_button = QPushButton("Cargar resumen")
         self.load_button.clicked.connect(self.load_summary)
         self.recalc_button = QPushButton("Recalcular")
@@ -86,8 +103,8 @@ class AcademicSummaryView(QWidget):
         filter_row.addWidget(self.export_pdf_button)
         filter_row.addWidget(self.export_excel_button)
 
-        self.table = QTableWidget(0, len(self.TABLE_COLUMNS))
-        self.table.setHorizontalHeaderLabels([label for _, label in self.TABLE_COLUMNS])
+        self.table = QTableWidget(0, len(self._table_columns))
+        self.table.setHorizontalHeaderLabels([label for _, label in self._table_columns])
         self.table.horizontalHeader().setStretchLastSection(True)
 
         root.addWidget(title)
@@ -96,6 +113,7 @@ class AcademicSummaryView(QWidget):
         root.addWidget(self.table, 1)
 
         self.load_contexts()
+        self._on_report_type_changed()
 
     def load_contexts(self) -> None:
         self.assignment_combo.clear()
@@ -113,10 +131,18 @@ class AcademicSummaryView(QWidget):
             self._fill_table([])
             return
 
-        rows = self.academic_summary_service.obtener_resumen_por_asignacion(asignacion_id)
+        report_type, trimestre_num = self.report_type_combo.currentData()
+        if report_type == "trimestral":
+            rows = self.academic_summary_service.obtener_reporte_trimestral(asignacion_id, int(trimestre_num))
+        else:
+            rows = self.academic_summary_service.obtener_reporte_anual(asignacion_id)
         self._fill_table(rows)
 
     def recalculate_rows(self) -> None:
+        report_type, _ = self.report_type_combo.currentData()
+        if report_type == "trimestral":
+            self.load_summary()
+            return
         rows = self._collect_rows_from_table()
         try:
             recalculated = self.academic_summary_service.recalcular_resumenes(rows)
@@ -132,6 +158,10 @@ class AcademicSummaryView(QWidget):
             QMessageBox.warning(self, "Validación", "Seleccione una asignación")
             return
 
+        report_type, _ = self.report_type_combo.currentData()
+        if report_type != "anual":
+            QMessageBox.information(self, "Información", "El supletorio solo aplica al reporte anual.")
+            return
         rows = self._collect_rows_from_table()
         try:
             ok, message = self.academic_summary_service.guardar_supletorios(asignacion_id, rows)
@@ -200,7 +230,7 @@ class AcademicSummaryView(QWidget):
         for row_data in rows:
             row = self.table.rowCount()
             self.table.insertRow(row)
-            for col, (field, _) in enumerate(self.TABLE_COLUMNS):
+            for col, (field, _) in enumerate(self._table_columns):
                 value = row_data.get(field)
                 text = "" if value is None else str(value)
                 item = QTableWidgetItem(text)
@@ -213,9 +243,22 @@ class AcademicSummaryView(QWidget):
         for row_idx in range(self.table.rowCount()):
             meta = self._rows_meta[row_idx] if row_idx < len(self._rows_meta) else {}
             row_data = dict(meta)
-            for col, (field, _) in enumerate(self.TABLE_COLUMNS):
+            for col, (field, _) in enumerate(self._table_columns):
                 item = self.table.item(row_idx, col)
                 text = item.text().strip() if item else ""
                 row_data[field] = text if text != "" else None
             rows.append(row_data)
         return rows
+
+    def _on_report_type_changed(self) -> None:
+        report_type, _ = self.report_type_combo.currentData()
+        if report_type == "trimestral":
+            self._table_columns = list(self.TRIMESTRAL_COLUMNS)
+            self.save_button.setEnabled(False)
+        else:
+            self._table_columns = list(self.ANNUAL_COLUMNS)
+            self.save_button.setEnabled(True)
+        self.table.setColumnCount(len(self._table_columns))
+        self.table.setHorizontalHeaderLabels([label for _, label in self._table_columns])
+        self.table.setRowCount(0)
+        self._rows_meta = []

@@ -8,6 +8,7 @@ from typing import Any
 
 from src.domain.calculations import (
     calcular_cualitativo,
+    calcular_cualitativo_trimestral,
     calcular_observacion_final,
     calcular_promedio_anual,
     calcular_resultado_con_supletorio,
@@ -61,6 +62,62 @@ class AcademicSummaryService:
         return contextos
 
     def obtener_resumen_por_asignacion(self, asignacion_id: str) -> list[dict[str, Any]]:
+        return self.obtener_reporte_anual(asignacion_id)
+
+    def obtener_reporte_trimestral(self, asignacion_id: str, trimestre_num: int) -> list[dict[str, Any]]:
+        if trimestre_num not in (1, 2, 3):
+            raise ValueError("El trimestre debe ser 1, 2 o 3")
+
+        asignacion = self.connection.execute(
+            "SELECT * FROM asignaciones_docente WHERE id_asignacion = ?", (asignacion_id,)
+        ).fetchone()
+        if not asignacion:
+            return []
+
+        rows = self.connection.execute(
+            """
+            SELECT
+                e.id_estudiante,
+                e.apellidos || ' ' || e.nombres AS estudiante,
+                m.numero_lista,
+                g.promedio_formativo AS aportes_calificacion,
+                g.promedio_sumativo AS sumativas_calificacion,
+                g.nota_trimestral AS promedio_original
+            FROM matriculas m
+            JOIN estudiantes e ON e.id_estudiante = m.estudiante_id
+            LEFT JOIN grade_records g
+                ON g.estudiante_id = e.id_estudiante
+                AND g.asignacion_id = ?
+                AND g.trimestre_num = ?
+            WHERE m.curso_id = ? AND m.paralelo_id = ? AND m.periodo_id = ?
+            ORDER BY
+                CASE WHEN m.numero_lista IS NULL THEN 1 ELSE 0 END,
+                m.numero_lista,
+                e.apellidos,
+                e.nombres
+            """,
+            (asignacion_id, trimestre_num, asignacion["curso_id"], asignacion["paralelo_id"], asignacion["periodo_id"]),
+        ).fetchall()
+
+        resultado: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            aportes = item.get("aportes_calificacion")
+            sumativas = item.get("sumativas_calificacion")
+            aportes_70 = round((aportes or 0) * 0.70, 2) if aportes is not None else None
+            sumativas_30 = round((sumativas or 0) * 0.30, 2) if sumativas is not None else None
+            promedio = round((aportes_70 or 0) + (sumativas_30 or 0), 2) if aportes_70 is not None and sumativas_30 is not None else None
+
+            item["aportes_70"] = aportes_70
+            item["sumativas_30"] = sumativas_30
+            item["promedio_final"] = promedio
+            item["cualitativa"] = calcular_cualitativo_trimestral(promedio)
+            item["equivalencia"] = self._calcular_equivalencia(item.get("promedio_final"))
+            item["observacion"] = calcular_observacion_final(item.get("promedio_final"))
+            resultado.append(item)
+        return resultado
+
+    def obtener_reporte_anual(self, asignacion_id: str) -> list[dict[str, Any]]:
         asignacion = self.connection.execute(
             "SELECT * FROM asignaciones_docente WHERE id_asignacion = ?", (asignacion_id,)
         ).fetchone()
@@ -111,9 +168,12 @@ class AcademicSummaryService:
             t1 = tri_map.get((student_id, 1))
             t2 = tri_map.get((student_id, 2))
             t3 = tri_map.get((student_id, 3))
-            promedio_final = self._calcular_promedio_anual_seguro(t1, t2, t3)
+            promedio = self._calcular_promedio_anual_seguro(t1, t2, t3)
             supletorio = supp_map.get(student_id)
-            nota_definitiva = calcular_resultado_con_supletorio(promedio_final, supletorio)
+            if promedio is None:
+                promedio_final = supletorio
+            else:
+                promedio_final = calcular_resultado_con_supletorio(promedio, supletorio)
 
             resumenes.append(
                 {
@@ -124,11 +184,16 @@ class AcademicSummaryService:
                     "trimestre_1": t1,
                     "trimestre_2": t2,
                     "trimestre_3": t3,
-                    "promedio_final": promedio_final,
-                    "cualitativo": calcular_cualitativo(promedio_final),
-                    "observacion": calcular_observacion_final(promedio_final),
+                    "equivalencia_t1": self._calcular_equivalencia(t1),
+                    "equivalencia_t2": self._calcular_equivalencia(t2),
+                    "equivalencia_t3": self._calcular_equivalencia(t3),
+                    "promedio": promedio,
+                    "cualitativa_anual": self._calcular_equivalencia(promedio),
                     "supletorio": supletorio,
-                    "nota_definitiva": nota_definitiva,
+                    "promedio_final": promedio_final,
+                    "cualitativo": calcular_cualitativo(promedio) if promedio is not None else "",
+                    "observacion": calcular_observacion_final(promedio_final) if promedio_final is not None else "",
+                    "nota_definitiva": promedio_final,
                 }
             )
 
@@ -142,18 +207,27 @@ class AcademicSummaryService:
             t3 = self._normalizar_nota_opcional(row.get("trimestre_3"), "trimestre_3")
             supletorio = self._normalizar_nota_opcional(row.get("supletorio"), "supletorio")
 
-            promedio_final = self._calcular_promedio_anual_seguro(t1, t2, t3)
+            promedio = self._calcular_promedio_anual_seguro(t1, t2, t3)
+            if promedio is None:
+                promedio_final = supletorio
+            else:
+                promedio_final = calcular_resultado_con_supletorio(promedio, supletorio)
             recalculados.append(
                 {
                     **row,
                     "trimestre_1": t1,
                     "trimestre_2": t2,
                     "trimestre_3": t3,
+                    "equivalencia_t1": self._calcular_equivalencia(t1),
+                    "equivalencia_t2": self._calcular_equivalencia(t2),
+                    "equivalencia_t3": self._calcular_equivalencia(t3),
+                    "promedio": promedio,
+                    "cualitativa_anual": self._calcular_equivalencia(promedio),
                     "promedio_final": promedio_final,
-                    "cualitativo": calcular_cualitativo(promedio_final),
-                    "observacion": calcular_observacion_final(promedio_final),
+                    "cualitativo": calcular_cualitativo(promedio) if promedio is not None else "",
+                    "observacion": calcular_observacion_final(promedio_final) if promedio_final is not None else "",
                     "supletorio": supletorio,
-                    "nota_definitiva": calcular_resultado_con_supletorio(promedio_final, supletorio),
+                    "nota_definitiva": promedio_final,
                 }
             )
         return recalculados
@@ -213,5 +287,19 @@ class AcademicSummaryService:
         return number
 
     @staticmethod
-    def _calcular_promedio_anual_seguro(t1: float | None, t2: float | None, t3: float | None) -> float:
+    def _calcular_promedio_anual_seguro(t1: float | None, t2: float | None, t3: float | None) -> float | None:
+        if t1 is None and t2 is None and t3 is None:
+            return None
         return calcular_promedio_anual(t1 or 0.0, t2 or 0.0, t3 or 0.0)
+
+    @staticmethod
+    def _calcular_equivalencia(nota: float | None) -> str:
+        if nota is None:
+            return ""
+        if nota >= 9:
+            return "DA"
+        if nota >= 7:
+            return "AA"
+        if nota >= 5:
+            return "PA"
+        return "NA"

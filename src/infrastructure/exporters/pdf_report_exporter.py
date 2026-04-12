@@ -97,44 +97,33 @@ class PdfReportExporter:
         header1 = [
             "N°",
             "Nómina",
-            "Aportes/Insumos",
-            "70%",
-            "Proyecto Integrador",
-            "15%",
-            "Examen",
-            "15%",
-            "Promedio",
-            "Cualitativa",
-            "Supletorio",
+            "Aportes/Insumos\nCalificación",
+            "Aportes/Insumos\n70%",
+            "Evaluaciones sumativas\nCalificación",
+            "Evaluaciones sumativas\n30%",
             "Promedio Final",
+            "Cualitativa",
+            "Equivalencia",
             "Observación",
-            "Logro de evaluación\nde aprendizaje",
         ]
         data = [header1]
         for idx, row in enumerate(rows, start=1):
-            aportes = row.get("aportes")
-            proyecto = row.get("proyecto_integrador")
-            examen = row.get("examen")
             data.append(
                 [
                     idx,
                     row.get("estudiante", ""),
-                    self._fmt(aportes),
-                    self._fmt((aportes or 0) * 0.70 if aportes is not None else None),
-                    self._fmt(proyecto),
-                    self._fmt((proyecto or 0) * 0.15 if proyecto is not None else None),
-                    self._fmt(examen),
-                    self._fmt((examen or 0) * 0.15 if examen is not None else None),
-                    self._fmt(row.get("promedio")),
-                    row.get("cualitativo", ""),
-                    self._fmt(row.get("supletorio")),
+                    self._fmt(row.get("aportes_calificacion")),
+                    self._fmt(row.get("aportes_70")),
+                    self._fmt(row.get("sumativas_calificacion")),
+                    self._fmt(row.get("sumativas_30")),
                     self._fmt(row.get("promedio_final")),
-                    "",
-                    row.get("logro", ""),
+                    row.get("cualitativa", ""),
+                    row.get("equivalencia", ""),
+                    row.get("observacion", ""),
                 ]
             )
 
-        col_widths = [0.8 * cm, 5.6 * cm, 1.4 * cm, 1.0 * cm, 1.6 * cm, 1.0 * cm, 1.3 * cm, 1.0 * cm, 1.3 * cm, 1.4 * cm, 1.2 * cm, 1.4 * cm, 1.4 * cm, 2.2 * cm]
+        col_widths = [0.8 * cm, 6.0 * cm, 2.0 * cm, 1.8 * cm, 2.2 * cm, 1.8 * cm, 1.5 * cm, 1.6 * cm, 1.6 * cm, 1.8 * cm]
         table = Table(data, colWidths=col_widths, repeatRows=1)
         table.setStyle(
             TableStyle(
@@ -150,7 +139,7 @@ class PdfReportExporter:
             )
         )
         table.wrapOn(c, width - 3 * cm, height)
-        table.drawOn(c, 1.0 * cm, 6.1 * cm)
+        table.drawOn(c, 1.0 * cm, 7.2 * cm)
 
     def _draw_anual_table(self, c, width: float, height: float, rows: list[dict[str, Any]]) -> None:
         from reportlab.platypus import Table, TableStyle
@@ -165,15 +154,15 @@ class PdfReportExporter:
                 idx,
                 row.get("estudiante", ""),
                 self._fmt(row.get("trimestre_1")),
-                "",
+                row.get("equivalencia_t1", ""),
                 self._fmt(row.get("trimestre_2")),
-                "",
+                row.get("equivalencia_t2", ""),
                 self._fmt(row.get("trimestre_3")),
-                "",
-                self._fmt(row.get("promedio_final")),
-                row.get("cualitativo", ""),
+                row.get("equivalencia_t3", ""),
+                self._fmt(row.get("promedio")),
+                row.get("cualitativa_anual", ""),
                 self._fmt(row.get("supletorio")),
-                self._fmt(row.get("nota_definitiva")),
+                self._fmt(row.get("promedio_final")),
                 row.get("observacion", ""),
             ])
 
