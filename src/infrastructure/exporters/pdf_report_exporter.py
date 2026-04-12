@@ -346,7 +346,10 @@ class PdfReportExporter:
         printer.setPageMargins(QMarginsF(10, 10, 10, 10))
         document = QTextDocument()
         document.setHtml(html_content)
-        document.print(printer)
+        try:
+            document.print(printer)  # type: ignore[attr-defined]
+        except AttributeError:
+            document.print_(printer)
 
     def _build_trimestral_rows_html(self, rows: list[dict[str, Any]]) -> str:
         html_rows: list[str] = []
