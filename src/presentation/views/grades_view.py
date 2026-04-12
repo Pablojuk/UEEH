@@ -37,7 +37,7 @@ class GradesView(QWidget):
         ("promedio_sumativo_30", "Promedio Evaluación Sumativa 30%"),
         ("nota_trimestral", "Promedio Trimestral"),
         ("cualitativo", "Cualitativo"),
-        ("cualitativo_adicional", "Cualitativo adicional"),
+        ("cualitativo_adicional", "Equivalencia"),
     ]
 
     def __init__(self, grade_registration_service: GradeRegistrationService, app_signals: AppSignals | None = None) -> None:

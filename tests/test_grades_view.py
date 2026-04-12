@@ -92,7 +92,7 @@ class TestGradesView(unittest.TestCase):
         self.assertEqual(view.table.rowCount(), 1)
         self.assertEqual(view.table.item(0, 0).text(), "Lopez Maria")
         headers = [view.table.horizontalHeaderItem(i).text() for i in range(view.table.columnCount())]
-        self.assertIn("Cualitativo\nadicional", headers)
+        self.assertIn("Equivalencia", headers)
 
     def test_formato_encabezado_largo_en_dos_lineas(self) -> None:
         from src.presentation.views.grades_view import GradesView
