@@ -9,6 +9,7 @@ from typing import Any
 from src.application.services.academic_summary_service import AcademicSummaryService
 from src.application.services.institution_service import InstitutionService
 from src.infrastructure.exporters.excel_report_exporter import ExcelReportExporter
+from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
 from src.infrastructure.exporters.pdf_report_exporter import PdfReportExporter
 
 
@@ -22,12 +23,14 @@ class ReportExportService:
         institution_service: InstitutionService,
         pdf_exporter: PdfReportExporter | None = None,
         excel_exporter: ExcelReportExporter | None = None,
+        html_renderer: HtmlReportRenderer | None = None,
     ) -> None:
         self.connection = connection
         self.academic_summary_service = academic_summary_service
         self.institution_service = institution_service
         self.pdf_exporter = pdf_exporter or PdfReportExporter()
         self.excel_exporter = excel_exporter or ExcelReportExporter()
+        self.html_renderer = html_renderer or HtmlReportRenderer()
 
     def exportar_resumen_pdf(
         self,
@@ -63,6 +66,18 @@ class ReportExportService:
             firmantes=firmantes,
         )
 
+    def generar_resumen_html(
+        self,
+        asignacion_id: str,
+        report_type: str = "anual",
+        trimestre_num: int | None = None,
+        firmantes: dict[str, str] | None = None,
+    ) -> str:
+        context, rows = self._prepare_report_context(asignacion_id, report_type, trimestre_num, firmantes)
+        if not rows or not self._hay_datos_exportables(rows, report_type):
+            raise ValueError("No hay datos para generar vista previa")
+        return self.html_renderer.render(context, rows)
+
     def _exportar(
         self,
         asignacion_id: str,
@@ -76,16 +91,7 @@ class ReportExportService:
             return False, "Debe seleccionar una asignación"
 
         try:
-            context = self._build_context(asignacion_id)
-            context["report_type"] = report_type
-            context["trimestre_num"] = trimestre_num
-            context["firmantes"] = firmantes or {}
-            context["template_data"] = self._build_template_data(context, report_type, trimestre_num)
-            rows = (
-                self.academic_summary_service.obtener_reporte_trimestral(asignacion_id, trimestre_num or 1)
-                if report_type == "trimestral"
-                else self.academic_summary_service.obtener_reporte_anual(asignacion_id)
-            )
+            context, rows = self._prepare_report_context(asignacion_id, report_type, trimestre_num, firmantes)
             if not rows or not self._hay_datos_exportables(rows, report_type):
                 return False, "No hay datos para exportar"
 
@@ -99,6 +105,25 @@ class ReportExportService:
             return True, f"Archivo generado: {result_path}"
         except Exception as exc:
             return False, f"Error al exportar: {exc}"
+
+    def _prepare_report_context(
+        self,
+        asignacion_id: str,
+        report_type: str,
+        trimestre_num: int | None,
+        firmantes: dict[str, str] | None,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        context = self._build_context(asignacion_id)
+        context["report_type"] = report_type
+        context["trimestre_num"] = trimestre_num
+        context["firmantes"] = firmantes or {}
+        context["template_data"] = self._build_template_data(context, report_type, trimestre_num)
+        rows = (
+            self.academic_summary_service.obtener_reporte_trimestral(asignacion_id, trimestre_num or 1)
+            if report_type == "trimestral"
+            else self.academic_summary_service.obtener_reporte_anual(asignacion_id)
+        )
+        return context, rows
 
     def _build_context(self, asignacion_id: str) -> dict[str, Any]:
         context = next(
