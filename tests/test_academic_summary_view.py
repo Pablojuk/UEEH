@@ -39,6 +39,22 @@ class _FakeAcademicSummaryService:
         return [{"id_docente": "D1", "firma": "Econ. Pablo Juca"}]
 
 
+class _FakeReportExportService:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def generar_resumen_html(self, asignacion_id: str, report_type: str = "anual", trimestre_num=None, firmantes=None) -> str:
+        self.calls.append(
+            {
+                "asignacion_id": asignacion_id,
+                "report_type": report_type,
+                "trimestre_num": trimestre_num,
+                "firmantes": firmantes or {},
+            }
+        )
+        return "<html><body><h1>Vista previa institucional</h1></body></html>"
+
+
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
 class TestAcademicSummaryView(unittest.TestCase):
     @classmethod
@@ -52,6 +68,12 @@ class TestAcademicSummaryView(unittest.TestCase):
         self.assertIsNotNone(view.assignment_combo)
         self.assertIsNotNone(view.table)
 
+    def test_boton_vista_previa_existe(self) -> None:
+        from src.presentation.views.academic_summary_view import AcademicSummaryView
+
+        view = AcademicSummaryView(_FakeAcademicSummaryService())
+        self.assertEqual(view.preview_button.text(), "Vista previa")
+
     def test_cargar_tabla_vacia_sin_romper(self) -> None:
         from src.presentation.views.academic_summary_view import AcademicSummaryView
 
@@ -60,7 +82,6 @@ class TestAcademicSummaryView(unittest.TestCase):
         self.assertEqual(view.table.rowCount(), 0)
         self.assertEqual(view.table.horizontalHeaderItem(0).text(), "N°")
         self.assertEqual(view.table.horizontalHeaderItem(1).text(), "Nómina")
-        self.assertIn("CUADRO DE CALIFICACIÓN ANUAL", view.annual_preview.text())
 
     def test_poblar_tabla_con_datos(self) -> None:
         from src.presentation.views.academic_summary_view import AcademicSummaryView
@@ -92,6 +113,19 @@ class TestAcademicSummaryView(unittest.TestCase):
         self.assertEqual(view.table.rowCount(), 1)
         self.assertEqual(view.table.item(0, 0).text(), "")
         self.assertEqual(view.table.item(0, 1).text(), "Lopez Maria")
+
+    def test_vista_previa_usa_servicio_generar_html(self) -> None:
+        from src.presentation.views.academic_summary_view import AcademicSummaryView
+
+        fake_report_service = _FakeReportExportService()
+        view = AcademicSummaryView(
+            _FakeAcademicSummaryService(rows=[]),
+            report_export_service=fake_report_service,
+        )
+        view.show_preview()
+        self.assertEqual(len(fake_report_service.calls), 1)
+        self.assertEqual(fake_report_service.calls[0]["asignacion_id"], "AS1")
+        self.assertEqual(view.tabs.currentIndex(), 1)
 
 
 if __name__ == "__main__":
