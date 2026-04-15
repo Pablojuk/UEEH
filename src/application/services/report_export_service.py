@@ -133,7 +133,7 @@ class ReportExportService:
         if not context:
             raise ValueError("Asignación no encontrada")
 
-        institucion = self.institution_service.obtener_actual() or {}
+        institucion = self._sanitize_institucion(self.institution_service.obtener_actual() or {})
         return {
             "contexto_display": context.get("display", asignacion_id),
             "institucion_nombre": institucion.get("nombre"),
@@ -151,6 +151,16 @@ class ReportExportService:
             "logo_ministerio_path": institucion.get("logo_ministerio_path"),
             "institucion": institucion,
         }
+
+
+    @staticmethod
+    def _sanitize_institucion(institucion: dict[str, Any]) -> dict[str, Any]:
+        cleaned = dict(institucion)
+        for key in ("subtitulo", "parroquia", "ciudad"):
+            value = str(cleaned.get(key) or "")
+            if value:
+                cleaned[key] = value.replace("Isabale", "Isabel")
+        return cleaned
 
     @staticmethod
     def _normalize_output_path(output_path: str, export_kind: str) -> str:

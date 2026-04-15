@@ -205,10 +205,11 @@ class HtmlReportRenderer:
         reprobados = 0
         for row in rows:
             observacion = str(row.get("observacion", "")).strip().lower()
-            has_final = not self._is_empty_value(row.get("promedio_final"))
-            if observacion == "aprobado":
+            if observacion in {"aprobado", "apr", "apb"}:
                 aprobados += 1
-            elif has_final:
+            elif observacion in {"rep", "reprobado", "spl"}:
+                reprobados += 1
+            elif not self._is_empty_value(row.get("promedio_final")):
                 reprobados += 1
         total = aprobados + reprobados
         if total == 0:
@@ -238,10 +239,11 @@ class HtmlReportRenderer:
         reprobados = 0
         for row in rows:
             observacion = str(row.get("observacion", "")).strip().lower()
-            has_final = not self._is_empty_value(row.get("promedio_final"))
-            if observacion == "aprobado":
+            if observacion in {"aprobado", "apr", "apb"}:
                 aprobados += 1
-            elif has_final:
+            elif observacion in {"rep", "reprobado", "spl"}:
+                reprobados += 1
+            elif not self._is_empty_value(row.get("promedio_final")):
                 reprobados += 1
         return self._build_pie_chart_svg([("Aprobados", aprobados, "#10B981"), ("Reprobados", reprobados, "#EF4444")])
 

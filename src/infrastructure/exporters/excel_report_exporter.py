@@ -28,25 +28,46 @@ class ExcelReportExporter:
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
         ws.merge_cells("A1:N1")
-        ws["A1"] = context.get("institucion_nombre") or "Institución"
-        ws["A1"].font = Font(bold=True, size=13)
+        ws["A1"] = (context.get("institucion_nombre") or "Institución").upper()
+        ws["A1"].font = Font(bold=True, size=20)
         ws["A1"].alignment = Alignment(horizontal="center")
 
         ws.merge_cells("A2:N2")
         ws["A2"] = report_title.upper()
-        ws["A2"].font = Font(bold=True, size=12)
+        ws["A2"].font = Font(bold=True, size=20)
         ws["A2"].alignment = Alignment(horizontal="center")
+
+        ws.merge_cells("A3:N3")
+        ws["A3"] = "San Salvador de Cañaribamba"
+        ws["A3"].font = Font(bold=True, size=11)
+        ws["A3"].alignment = Alignment(horizontal="center")
 
         self._add_logos(ws, context)
 
-        ws["A4"] = "Docente"; ws["B4"] = context.get("docente_nombre", "N/D")
-        ws["D4"] = "Asignatura"; ws["E4"] = context.get("asignatura_nombre", "N/D")
-        ws["G4"] = "Curso"; ws["H4"] = context.get("curso_nombre", "N/D")
-        ws["J4"] = "Paralelo"; ws["K4"] = context.get("paralelo_nombre", "N/D")
+        info_font = Font(bold=True, italic=True)
+        ws.merge_cells("A5:B5"); ws["A5"] = "Docente:"; ws["A5"].font = info_font
+        ws.merge_cells("C5:D5"); ws["C5"] = context.get("docente_nombre", "N/D")
+        ws.merge_cells("A6:B6"); ws["A6"] = "Curso:"; ws["A6"].font = info_font
+        ws.merge_cells("C6:D6"); ws["C6"] = context.get("curso_nombre", "N/D")
+        ws.merge_cells("A7:B7"); ws["A7"] = "Nivel:"; ws["A7"].font = info_font
+        ws.merge_cells("C7:D7"); ws["C7"] = context.get("curso_nivel", "N/D")
 
-        for cell in ("A4", "D4", "G4", "J4"):
-            ws[cell].font = Font(bold=True)
+        ws.merge_cells("F5:G5"); ws["F5"] = "Asignatura:"; ws["F5"].font = info_font
+        ws.merge_cells("H5:I5"); ws["H5"] = context.get("asignatura_nombre", "N/D")
+        ws.merge_cells("F6:G6"); ws["F6"] = "Paralelo:"; ws["F6"].font = info_font
+        ws.merge_cells("H6:I6"); ws["H6"] = context.get("paralelo_nombre", "N/D")
+        ws.merge_cells("F7:G7"); ws["F7"] = "Tipo de reporte:"; ws["F7"].font = info_font
+        ws.merge_cells("H7:I7")
+        ws["H7"] = "TRIMESTRAL" if context.get("report_type") == "trimestral" else "ANUAL"
 
+        ws.merge_cells("K5:L5"); ws["K5"] = "Tutor:"; ws["K5"].font = info_font
+        ws.merge_cells("M5:N5"); ws["M5"] = context.get("firmantes", {}).get("tutor_curso", "")
+
+        for row in range(5, 8):
+            for col in [1, 3, 6, 8, 11, 13]:
+                ws.cell(row=row, column=col).alignment = Alignment(horizontal="left", vertical="center")
+
+        start_row = 10
         if context.get("report_type") == "trimestral":
             headers = [
                 "N°", "Nómina",
@@ -54,7 +75,6 @@ class ExcelReportExporter:
                 "Evaluaciones sumativas Calificación", "Evaluaciones sumativas 30%",
                 "Promedio Final", "Cualitativa", "Equivalencia", "Observación",
             ]
-            start_row = 6
             for col, title in enumerate(headers, start=1):
                 cell = ws.cell(row=start_row, column=col, value=title)
                 cell.font = Font(bold=True)
@@ -78,21 +98,20 @@ class ExcelReportExporter:
                 ]
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
-                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.alignment = Alignment(horizontal="left" if cidx == 2 else "center", vertical="center")
                     cell.border = border
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
-            widths = [5, 30, 14, 12, 15, 12, 10, 10, 10, 12]
-            signatures_row = start_row + len(rows) + 3
+            widths = [5, 34, 14, 12, 15, 12, 10, 10, 10, 12]
+            signatures_row = max(start_row + len(rows) + 3, 39)
         else:
             headers = [
                 "N°", "Nómina",
-                "Primer Trimestre Calificación", "Primer Trimestre Cualitativa",
-                "Segundo Trimestre Calificación", "Segundo Trimestre Cualitativa",
-                "Tercer Trimestre Calificación", "Tercer Trimestre Cualitativa",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Trimestre Cali", "Trimestre Cuali",
                 "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo", "Observación",
             ]
-            start_row = 6
             for col, title in enumerate(headers, start=1):
                 cell = ws.cell(row=start_row, column=col, value=title)
                 cell.font = Font(bold=True)
@@ -119,12 +138,14 @@ class ExcelReportExporter:
                 ]
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
-                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    cell.alignment = Alignment(horizontal="left" if cidx == 2 else "center", vertical="center")
                     cell.border = border
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
-            widths = [5, 30, 12, 12, 12, 12, 12, 12, 9, 10, 10, 10, 12, 12]
-            signatures_row = self._draw_annual_statistics(ws, start_row + len(rows) + 3, border, rows)
+            widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
+            last_student_row = start_row + len(rows)
+            stats_start = max(last_student_row + 4, 39)
+            signatures_row = self._draw_annual_statistics(ws, stats_start, border, rows, last_student_row)
 
         for idx, w in enumerate(widths, start=1):
             ws.column_dimensions[chr(ord("A") + idx - 1)].width = w
@@ -132,6 +153,141 @@ class ExcelReportExporter:
         self._draw_signatures(ws, signatures_row, len(widths), context.get("firmantes", {}))
         wb.save(str(path))
         return str(path)
+
+    def _add_logos(self, ws, context: dict[str, Any]) -> None:
+        try:
+            from openpyxl.drawing.image import Image
+            from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
+            from openpyxl.utils.units import cm_to_EMU
+        except Exception:  # noqa: BLE001
+            return
+
+        logo_specs = [
+            {
+                "path": context.get("logo_path"),
+                "base_col": 0,
+                "base_row": 0,
+                "offset_x_cm": 2.0,
+                "offset_y_cm": 1.058,
+                "width_cm": 2.07,
+                "height_cm": 1.95,
+            },
+            {
+                "path": context.get("logo_ministerio_path"),
+                "base_col": 11,
+                "base_row": 0,
+                "offset_x_cm": 0.0,
+                "offset_y_cm": 1.058,
+                "width_cm": 2.85,
+                "height_cm": 1.31,
+            },
+        ]
+
+        for spec in logo_specs:
+            logo_path = spec["path"]
+            if not logo_path:
+                continue
+            path = Path(str(logo_path)).expanduser().resolve()
+            if not path.exists():
+                continue
+            try:
+                image = Image(str(path))
+                width_emu = cm_to_EMU(spec["width_cm"])
+                height_emu = cm_to_EMU(spec["height_cm"])
+                marker = AnchorMarker(
+                    col=spec["base_col"],
+                    row=spec["base_row"],
+                    colOff=cm_to_EMU(spec["offset_x_cm"]),
+                    rowOff=cm_to_EMU(spec["offset_y_cm"]),
+                )
+                image.anchor = OneCellAnchor(_from=marker, ext=(width_emu, height_emu))
+                ws.add_image(image)
+            except Exception:  # noqa: BLE001
+                continue
+
+    def _draw_annual_statistics(self, ws, start_row: int, border, rows: list[dict[str, Any]], last_student_row: int) -> int:
+        from openpyxl.chart import PieChart, Reference
+        from openpyxl.chart.label import DataLabelList
+        from openpyxl.styles import Alignment, Font
+
+        aprobados, reprobados = self._count_observations(rows)
+        total = aprobados + reprobados
+        pct_aprobados = round((aprobados / total) * 100, 2) if total else 0
+        pct_reprobados = round((reprobados / total) * 100, 2) if total else 0
+        promedio = self._average_promedio_final(rows)
+
+        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=6)
+        title_cell = ws.cell(row=start_row, column=1, value="Cuadro de logros en la evaluación de los aprendizajes")
+        title_cell.font = Font(bold=True)
+        title_cell.alignment = Alignment(horizontal="center")
+        for col in range(1, 7):
+            ws.cell(row=start_row, column=col).border = border
+
+        labels = ["Total aprobados", "Total reprobados"]
+        values = [aprobados, reprobados]
+        percentages = [pct_aprobados, pct_reprobados]
+
+        for idx, label in enumerate(labels, start=1):
+            r = start_row + idx
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+            ws.cell(row=r, column=1, value=label).alignment = Alignment(horizontal="left")
+            ws.cell(row=r, column=5, value=values[idx - 1]).alignment = Alignment(horizontal="center")
+            ws.cell(row=r, column=6, value=percentages[idx - 1] / 100).number_format = "0%"
+            ws.cell(row=r, column=6).alignment = Alignment(horizontal="center")
+            for col in range(1, 7):
+                ws.cell(row=r, column=col).border = border
+
+        promedio_row = start_row + 4
+        ws.merge_cells(start_row=promedio_row, start_column=1, end_row=promedio_row, end_column=5)
+        ws.cell(row=promedio_row, column=1, value="Promedio").alignment = Alignment(horizontal="center")
+        ws.cell(row=promedio_row, column=6, value=promedio if promedio is not None else "—")
+        if promedio is not None:
+            ws.cell(row=promedio_row, column=6).number_format = "0.00"
+        ws.cell(row=promedio_row, column=6).alignment = Alignment(horizontal="center")
+        for col in range(1, 7):
+            ws.cell(row=promedio_row, column=col).border = border
+
+        chart = PieChart()
+        data = Reference(ws, min_col=5, min_row=start_row + 1, max_row=start_row + 2)
+        cats = Reference(ws, min_col=1, min_row=start_row + 1, max_row=start_row + 2)
+        chart.add_data(data, titles_from_data=False)
+        chart.set_categories(cats)
+        chart.height = 3.04 / 2.54
+        chart.width = 7.16 / 2.54
+        chart.dataLabels = DataLabelList()
+        chart.dataLabels.showPercent = True
+        chart_row = last_student_row + 2
+        ws.add_chart(chart, f"H{chart_row}")
+
+        return max(promedio_row + 3, chart_row + 6)
+
+    @staticmethod
+    def _count_observations(rows: list[dict[str, Any]]) -> tuple[int, int]:
+        aprobados = 0
+        reprobados = 0
+        for row in rows:
+            obs = str(row.get("observacion", "")).strip().lower()
+            has_final = row.get("promedio_final") is not None
+            if obs in {"aprobado", "apr", "apb"}:
+                aprobados += 1
+            elif obs or has_final:
+                reprobados += 1
+        return aprobados, reprobados
+
+    @staticmethod
+    def _average_promedio_final(rows: list[dict[str, Any]]) -> float | None:
+        values: list[float] = []
+        for row in rows:
+            value = row.get("promedio_final")
+            if value is None:
+                continue
+            try:
+                values.append(float(value))
+            except Exception:  # noqa: BLE001
+                continue
+        if not values:
+            return None
+        return round(sum(values) / len(values), 2)
 
     @staticmethod
     def _add_logos(ws, context: dict[str, Any]) -> None:
