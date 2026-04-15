@@ -32,6 +32,15 @@ class _FailingExporter:
         raise OSError("no writable")
 
 
+class _FakeHtmlRenderer:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def render(self, context: dict, rows: list[dict]) -> str:
+        self.calls += 1
+        return f"<html>{context.get('report_type')}:{len(rows)}</html>"
+
+
 class TestReportExportService(unittest.TestCase):
     def setUp(self) -> None:
         self.conn = initialize_database(":memory:")
@@ -155,6 +164,37 @@ class TestReportExportService(unittest.TestCase):
             context = _FakePdfExporter.last_context or {}
             self.assertIn("firmantes", context)
             self.assertEqual(context["firmantes"].get("docente"), "Econ. Pablo Juca")
+
+    def test_generar_resumen_html_reutiliza_renderer(self) -> None:
+        fake_renderer = _FakeHtmlRenderer()
+        service = ReportExportService(
+            connection=self.conn,
+            academic_summary_service=self.academic_summary_service,
+            institution_service=self.institution_service,
+            pdf_exporter=_FakePdfExporter(),
+            excel_exporter=_FakeExcelExporter(),
+            html_renderer=fake_renderer,
+        )
+        html = service.generar_resumen_html("AS1", report_type="anual")
+        self.assertIn("anual", html)
+        self.assertEqual(fake_renderer.calls, 1)
+
+    def test_corrige_subtitulo_con_santa_isabel(self) -> None:
+        cleaned = ReportExportService._sanitize_institucion({"ciudad": "Santa Isabale", "parroquia": "Cañaribamba"})
+        self.assertEqual(cleaned["ciudad"], "Santa Isabel")
+
+
+    def test_normaliza_observacion_anual_desde_promedio_final(self) -> None:
+        rows = [
+            {"promedio_final": 8.5, "observacion": "SPL"},
+            {"promedio_final": 6.0, "observacion": "APB"},
+            {"promedio_final": None, "observacion": "SPL"},
+        ]
+        normalized = ReportExportService._normalize_rows_for_report(rows, "anual")
+        self.assertEqual(normalized[0]["observacion"], "APB")
+        self.assertEqual(normalized[1]["observacion"], "REP")
+        self.assertEqual(normalized[2]["observacion"], "SPL")
+
 
 
 if __name__ == "__main__":
