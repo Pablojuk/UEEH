@@ -63,10 +63,19 @@ class PdfReportExporter:
     def _draw_header(self, c, width: float, height: float, context: dict[str, Any], report_title: str) -> None:
         from reportlab.lib.units import cm
 
-        for xpos, logo_key in ((1.5 * cm, "logo_ministerio_path"), (width - 5.5 * cm, "logo_path")):
-            logo_path = context.get(logo_key)
-            if logo_path and Path(logo_path).exists():
+        for xpos, logo_key, logo_label in (
+            (1.5 * cm, "logo_path", "institucional"),
+            (width - 5.5 * cm, "logo_ministerio_path", "ministerio"),
+        ):
+            logo_path = self._normalize_existing_logo_path(context.get(logo_key))
+            if logo_path is None:
+                if context.get(logo_key):
+                    print(f"[Reportes] Logo {logo_label} no encontrado o ruta inválida: {context.get(logo_key)}")
+                continue
+            try:
                 c.drawImage(str(logo_path), xpos, height - 3.2 * cm, width=4 * cm, height=2 * cm, preserveAspectRatio=True)
+            except Exception:  # noqa: BLE001
+                print(f"[Reportes] No se pudo dibujar logo {logo_label}: {logo_path}")
 
         c.setFont("Helvetica-Bold", 12)
         c.drawCentredString(width / 2, height - 1.2 * cm, context.get("institucion_nombre") or "Institución")
@@ -326,3 +335,15 @@ class PdfReportExporter:
         painter = QPainter(printer)
         document.drawContents(painter)
         painter.end()
+
+    @staticmethod
+    def _normalize_existing_logo_path(path_value: Any) -> Path | None:
+        raw = str(path_value or "").strip().strip('"').strip("'")
+        if not raw:
+            return None
+        try:
+            path = Path(raw).expanduser()
+            normalized = path if path.is_absolute() else path.resolve()
+            return normalized if normalized.exists() else None
+        except Exception:  # noqa: BLE001
+            return None
