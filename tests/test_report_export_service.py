@@ -179,6 +179,11 @@ class TestReportExportService(unittest.TestCase):
         self.assertIn("anual", html)
         self.assertEqual(fake_renderer.calls, 1)
 
+    def test_corrige_subtitulo_con_santa_isabel(self) -> None:
+        cleaned = ReportExportService._sanitize_institucion({"ciudad": "Santa Isabale", "parroquia": "Cañaribamba"})
+        self.assertEqual(cleaned["ciudad"], "Santa Isabel")
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -43,6 +43,17 @@ class TestHtmlReportRenderer(unittest.TestCase):
         self.assertIn("class='nomina'", html)
         self.assertIn("<svg", html)
 
+    def test_estadistica_anual_trata_spl_como_reprobado(self) -> None:
+        renderer = HtmlReportRenderer()
+        stats = renderer._build_estadistica_rows_html([
+            {"observacion": "APB", "promedio_final": 9},
+            {"observacion": "SPL", "promedio_final": 5},
+        ])
+        self.assertIn("Total aprobados", stats)
+        self.assertIn(">1<", stats)
+        self.assertIn("Total reprobados", stats)
+
+
 
 if __name__ == "__main__":
     unittest.main()
