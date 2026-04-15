@@ -20,13 +20,14 @@ class PdfReportExporter:
         path = Path(output_path).expanduser().resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        if self._can_render_html_template():
-            rendered = self._render_report_html(context, rows)
-            if rendered:
-                self._render_html_to_pdf(rendered, path)
-                return str(path)
+        if not self._can_render_html_template():
+            raise RuntimeError("No se pudo inicializar el motor HTML para exportar PDF")
 
-        return self._exportar_con_reportlab(path, report_title, context, rows)
+        rendered = self._render_report_html(context, rows)
+        if not rendered:
+            raise RuntimeError("No se pudo renderizar la plantilla HTML del reporte")
+        self._render_html_to_pdf(rendered, path)
+        return str(path)
 
     def _render_report_html(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         return self.html_renderer.render(context, rows)
