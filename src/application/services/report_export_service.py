@@ -9,6 +9,7 @@ from typing import Any
 from src.application.services.academic_summary_service import AcademicSummaryService
 from src.application.services.institution_service import InstitutionService
 from src.infrastructure.exporters.excel_report_exporter import ExcelReportExporter
+from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
 from src.infrastructure.exporters.pdf_report_exporter import PdfReportExporter
 
 
@@ -22,12 +23,14 @@ class ReportExportService:
         institution_service: InstitutionService,
         pdf_exporter: PdfReportExporter | None = None,
         excel_exporter: ExcelReportExporter | None = None,
+        html_renderer: HtmlReportRenderer | None = None,
     ) -> None:
         self.connection = connection
         self.academic_summary_service = academic_summary_service
         self.institution_service = institution_service
         self.pdf_exporter = pdf_exporter or PdfReportExporter()
         self.excel_exporter = excel_exporter or ExcelReportExporter()
+        self.html_renderer = html_renderer or HtmlReportRenderer()
 
     def exportar_resumen_pdf(
         self,
@@ -63,6 +66,18 @@ class ReportExportService:
             firmantes=firmantes,
         )
 
+    def generar_resumen_html(
+        self,
+        asignacion_id: str,
+        report_type: str = "anual",
+        trimestre_num: int | None = None,
+        firmantes: dict[str, str] | None = None,
+    ) -> str:
+        context, rows = self._prepare_report_context(asignacion_id, report_type, trimestre_num, firmantes)
+        if not rows or not self._hay_datos_exportables(rows, report_type):
+            raise ValueError("No hay datos para generar vista previa")
+        return self.html_renderer.render(context, rows)
+
     def _exportar(
         self,
         asignacion_id: str,
@@ -76,16 +91,7 @@ class ReportExportService:
             return False, "Debe seleccionar una asignación"
 
         try:
-            context = self._build_context(asignacion_id)
-            context["report_type"] = report_type
-            context["trimestre_num"] = trimestre_num
-            context["firmantes"] = firmantes or {}
-            context["template_data"] = self._build_template_data(context, report_type, trimestre_num)
-            rows = (
-                self.academic_summary_service.obtener_reporte_trimestral(asignacion_id, trimestre_num or 1)
-                if report_type == "trimestral"
-                else self.academic_summary_service.obtener_reporte_anual(asignacion_id)
-            )
+            context, rows = self._prepare_report_context(asignacion_id, report_type, trimestre_num, firmantes)
             if not rows or not self._hay_datos_exportables(rows, report_type):
                 return False, "No hay datos para exportar"
 
@@ -100,6 +106,41 @@ class ReportExportService:
         except Exception as exc:
             return False, f"Error al exportar: {exc}"
 
+    def _prepare_report_context(
+        self,
+        asignacion_id: str,
+        report_type: str,
+        trimestre_num: int | None,
+        firmantes: dict[str, str] | None,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        context = self._build_context(asignacion_id)
+        context["report_type"] = report_type
+        context["trimestre_num"] = trimestre_num
+        context["firmantes"] = firmantes or {}
+        context["template_data"] = self._build_template_data(context, report_type, trimestre_num)
+        rows = (
+            self.academic_summary_service.obtener_reporte_trimestral(asignacion_id, trimestre_num or 1)
+            if report_type == "trimestral"
+            else self.academic_summary_service.obtener_reporte_anual(asignacion_id)
+        )
+        normalized_rows = self._normalize_rows_for_report(rows, report_type)
+        return context, normalized_rows
+
+    @staticmethod
+    def _normalize_rows_for_report(rows: list[dict[str, Any]], report_type: str) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for row in rows:
+            updated = dict(row)
+            if report_type == "anual":
+                promedio = row.get("promedio_final")
+                try:
+                    if promedio is not None and str(promedio).strip() != "":
+                        updated["observacion"] = "APB" if float(promedio) >= 7 else "REP"
+                except Exception:  # noqa: BLE001
+                    pass
+            normalized.append(updated)
+        return normalized
+
     def _build_context(self, asignacion_id: str) -> dict[str, Any]:
         context = next(
             (c for c in self.academic_summary_service.listar_contextos_disponibles() if c.get("id_asignacion") == asignacion_id),
@@ -108,7 +149,7 @@ class ReportExportService:
         if not context:
             raise ValueError("Asignación no encontrada")
 
-        institucion = self.institution_service.obtener_actual() or {}
+        institucion = self._sanitize_institucion(self.institution_service.obtener_actual() or {})
         return {
             "contexto_display": context.get("display", asignacion_id),
             "institucion_nombre": institucion.get("nombre"),
@@ -122,10 +163,20 @@ class ReportExportService:
             "curso_nombre": context.get("curso_nombre") or context.get("curso_id"),
             "curso_nivel": context.get("curso_nivel"),
             "paralelo_nombre": context.get("paralelo_nombre") or context.get("paralelo_id"),
-            "logo_path": institucion.get("logo_path"),
-            "logo_ministerio_path": institucion.get("logo_ministerio_path"),
+            "logo_path": (institucion.get("logo_path") or institucion.get("logo_institucional_path") or ""),
+            "logo_ministerio_path": (institucion.get("logo_ministerio_path") or institucion.get("logo_mineduc_path") or ""),
             "institucion": institucion,
         }
+
+
+    @staticmethod
+    def _sanitize_institucion(institucion: dict[str, Any]) -> dict[str, Any]:
+        cleaned = dict(institucion)
+        for key in ("subtitulo", "parroquia", "ciudad"):
+            value = str(cleaned.get(key) or "")
+            if value:
+                cleaned[key] = value.replace("Isabale", "Isabel")
+        return cleaned
 
     @staticmethod
     def _normalize_output_path(output_path: str, export_kind: str) -> str:
