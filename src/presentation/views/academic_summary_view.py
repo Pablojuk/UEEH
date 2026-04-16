@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
@@ -286,7 +288,9 @@ class AcademicSummaryView(QWidget):
             QMessageBox.warning(self, "Validación", "Seleccione una asignación")
             return
 
-        default_name = f"reporte_{asignacion_id}.{ 'pdf' if kind == 'pdf' else 'xlsx' }"
+        assignment_text = self.assignment_combo.currentText() or str(asignacion_id)
+        safe_base = self._sanitize_filename(assignment_text)
+        default_name = f"{safe_base}.{ 'pdf' if kind == 'pdf' else 'xlsx' }"
         selected_path, _ = QFileDialog.getSaveFileName(
             self,
             "Guardar reporte",
@@ -408,3 +412,10 @@ class AcademicSummaryView(QWidget):
                 values.append(item.text() if item else "")
             lines.append("\t".join(values))
         QApplication.clipboard().setText("\n".join(lines))
+
+    @staticmethod
+    def _sanitize_filename(text: str) -> str:
+        normalized = re.sub(r"[|/\\\\:*?\"<>]", "_", str(text or "").strip())
+        normalized = normalized.replace(" ", "_")
+        normalized = re.sub(r"_+", "_", normalized).strip(" ._")
+        return normalized or "reporte"

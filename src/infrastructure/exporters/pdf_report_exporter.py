@@ -20,13 +20,14 @@ class PdfReportExporter:
         path = Path(output_path).expanduser().resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        if self._can_render_html_template():
-            rendered = self._render_report_html(context, rows)
-            if rendered:
-                self._render_html_to_pdf(rendered, path)
-                return str(path)
+        if not self._can_render_html_template():
+            raise RuntimeError("No se pudo inicializar el motor HTML para exportar PDF")
 
-        return self._exportar_con_reportlab(path, report_title, context, rows)
+        rendered = self._render_report_html(context, rows)
+        if not rendered:
+            raise RuntimeError("No se pudo renderizar la plantilla HTML del reporte")
+        self._render_html_to_pdf(rendered, path, context)
+        return str(path)
 
     def _render_report_html(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         return self.html_renderer.render(context, rows)
@@ -63,10 +64,19 @@ class PdfReportExporter:
     def _draw_header(self, c, width: float, height: float, context: dict[str, Any], report_title: str) -> None:
         from reportlab.lib.units import cm
 
-        for xpos, logo_key in ((1.5 * cm, "logo_ministerio_path"), (width - 5.5 * cm, "logo_path")):
-            logo_path = context.get(logo_key)
-            if logo_path and Path(logo_path).exists():
+        for xpos, logo_key, logo_label in (
+            (1.5 * cm, "logo_path", "institucional"),
+            (width - 5.5 * cm, "logo_ministerio_path", "ministerio"),
+        ):
+            logo_path = self._normalize_existing_logo_path(context.get(logo_key))
+            if logo_path is None:
+                if context.get(logo_key):
+                    print(f"[Reportes] Logo {logo_label} no encontrado o ruta inválida: {context.get(logo_key)}")
+                continue
+            try:
                 c.drawImage(str(logo_path), xpos, height - 3.2 * cm, width=4 * cm, height=2 * cm, preserveAspectRatio=True)
+            except Exception:  # noqa: BLE001
+                print(f"[Reportes] No se pudo dibujar logo {logo_label}: {logo_path}")
 
         c.setFont("Helvetica-Bold", 12)
         c.drawCentredString(width / 2, height - 1.2 * cm, context.get("institucion_nombre") or "Institución")
@@ -303,8 +313,8 @@ class PdfReportExporter:
         except Exception:  # noqa: BLE001
             return False
 
-    def _render_html_to_pdf(self, html_content: str, output_path: Path) -> None:
-        from PySide6.QtCore import QMarginsF, QSizeF
+    def _render_html_to_pdf(self, html_content: str, output_path: Path, context: dict[str, Any]) -> None:
+        from PySide6.QtCore import QMarginsF, QRectF, Qt
         from PySide6.QtGui import QPageLayout, QPageSize, QPainter
         from PySide6.QtGui import QTextDocument
         from PySide6.QtPrintSupport import QPrinter
@@ -312,17 +322,50 @@ class PdfReportExporter:
 
         app = QApplication.instance() or QApplication([])
         _ = app
-        printer = QPrinter(QPrinter.HighResolution)
+        printer = QPrinter(QPrinter.PrinterResolution)
+        printer.setResolution(300)
         printer.setOutputFormat(QPrinter.PdfFormat)
         printer.setOutputFileName(str(output_path))
-        printer.setPageOrientation(QPageLayout.Landscape)
+        orientation = QPageLayout.Portrait
+        if context.get("report_type") == "trimestral":
+            orientation = QPageLayout.Landscape
+        printer.setPageOrientation(orientation)
         printer.setPageSize(QPageSize(QPageSize.A4))
-        printer.setPageMargins(QMarginsF(10, 10, 10, 10))
+        printer.setPageMargins(QMarginsF(8, 8, 8, 8), QPageLayout.Millimeter)
         document = QTextDocument()
         document.setDocumentMargin(0)
         document.setHtml(html_content)
-        page_rect = printer.pageRect(QPrinter.DevicePixel)
-        document.setPageSize(QSizeF(float(page_rect.width()), float(page_rect.height())))
+        document.setTextWidth(document.idealWidth())
+
+        source_rect = QRectF(0, 0, document.size().width(), document.size().height())
+        target_rect = QRectF(printer.pageRect(QPrinter.Point))
+        if source_rect.width() <= 0 or source_rect.height() <= 0:
+            raise RuntimeError("No se pudo calcular el tamaño del documento HTML")
+
+        scale = min(target_rect.width() / source_rect.width(), target_rect.height() / source_rect.height())
+        draw_width = source_rect.width() * scale
+        draw_height = source_rect.height() * scale
+        offset_x = target_rect.x() + (target_rect.width() - draw_width) / 2
+        offset_y = target_rect.y() + (target_rect.height() - draw_height) / 2
+
         painter = QPainter(printer)
-        document.drawContents(painter)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.TextAntialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        painter.setViewport(int(offset_x), int(offset_y), int(draw_width), int(draw_height))
+        painter.setWindow(source_rect.toRect())
+        painter.setLayoutDirection(Qt.LeftToRight)
+        document.drawContents(painter, source_rect)
         painter.end()
+
+    @staticmethod
+    def _normalize_existing_logo_path(path_value: Any) -> Path | None:
+        raw = str(path_value or "").strip().strip('"').strip("'")
+        if not raw:
+            return None
+        try:
+            path = Path(raw).expanduser()
+            normalized = path if path.is_absolute() else path.resolve()
+            return normalized if normalized.exists() else None
+        except Exception:  # noqa: BLE001
+            return None

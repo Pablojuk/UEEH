@@ -5,6 +5,8 @@ from __future__ import annotations
 import html
 import math
 import re
+import base64
+import mimetypes
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -30,8 +32,8 @@ class HtmlReportRenderer:
         values = {
             "institucion_nombre": context.get("institucion_nombre", "Institución"),
             "institucion_subtitulo": self._build_institucion_subtitulo(context),
-            "logo_inst_src": self._path_to_file_uri(context.get("logo_path")),
-            "logo_mineduc_src": self._path_to_file_uri(context.get("logo_ministerio_path")),
+            "logo_inst_src": self._build_logo_source(context.get("logo_path"), "institucional"),
+            "logo_mineduc_src": self._build_logo_source(context.get("logo_ministerio_path"), "ministerio"),
             "docente_nombre": context.get("docente_nombre", ""),
             "docente": context.get("docente_nombre", ""),
             "asignatura_nombre": context.get("asignatura_nombre", ""),
@@ -158,14 +160,31 @@ class HtmlReportRenderer:
         return "".join(parts)
 
     @staticmethod
-    def _path_to_file_uri(path_value: Any) -> str:
-        if not path_value:
+    def _build_logo_source(path_value: Any, logo_label: str) -> str:
+        path = HtmlReportRenderer._normalize_existing_path(path_value)
+        if path is None:
+            if path_value:
+                print(f"[Reportes] Logo {logo_label} no encontrado o ruta inválida: {path_value}")
             return ""
         try:
-            path = Path(str(path_value)).expanduser().resolve()
-            return path.as_uri() if path.exists() else ""
+            mime_type = mimetypes.guess_type(str(path))[0] or "image/png"
+            encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+            return f"data:{mime_type};base64,{encoded}"
         except Exception:  # noqa: BLE001
+            print(f"[Reportes] No se pudo cargar logo {logo_label}: {path}")
             return ""
+
+    @staticmethod
+    def _normalize_existing_path(path_value: Any) -> Path | None:
+        raw = str(path_value or "").strip().strip('"').strip("'")
+        if not raw:
+            return None
+        try:
+            path = Path(raw).expanduser()
+            normalized = path if path.is_absolute() else path.resolve()
+            return normalized if normalized.exists() else None
+        except Exception:  # noqa: BLE001
+            return None
 
     @staticmethod
     def _build_institucion_subtitulo(context: dict[str, Any]) -> str:
