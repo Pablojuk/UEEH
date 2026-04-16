@@ -38,12 +38,7 @@ class ExcelReportExporter:
         ws["A2"].alignment = Alignment(horizontal="center")
 
         ws.merge_cells("A3:N3")
-        ws["A3"] = " - ".join(
-            [
-                str(context.get("institucion", {}).get("parroquia") or "").strip(),
-                str(context.get("institucion", {}).get("ciudad") or "").strip(),
-            ]
-        ).strip(" -") or "Ubicación no registrada"
+        ws["A3"] = "San Salvador de Cañaribamba"
         ws["A3"].font = Font(bold=False, size=10)
         ws["A3"].alignment = Alignment(horizontal="center")
 
