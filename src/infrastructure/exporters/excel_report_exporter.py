@@ -29,17 +29,17 @@ class ExcelReportExporter:
 
         ws.merge_cells("A1:N1")
         ws["A1"] = (context.get("institucion_nombre") or "Institución").upper()
-        ws["A1"].font = Font(bold=True, size=20)
+        ws["A1"].font = Font(bold=True, size=16)
         ws["A1"].alignment = Alignment(horizontal="center")
 
         ws.merge_cells("A2:N2")
         ws["A2"] = report_title.upper()
-        ws["A2"].font = Font(bold=True, size=20)
+        ws["A2"].font = Font(bold=True, size=13)
         ws["A2"].alignment = Alignment(horizontal="center")
 
         ws.merge_cells("A3:N3")
         ws["A3"] = "San Salvador de Cañaribamba"
-        ws["A3"].font = Font(bold=True, size=11)
+        ws["A3"].font = Font(bold=False, size=10)
         ws["A3"].alignment = Alignment(horizontal="center")
 
         self._add_logos(ws, context)
@@ -147,12 +147,32 @@ class ExcelReportExporter:
             stats_start = max(last_student_row + 4, 39)
             signatures_row = self._draw_annual_statistics(ws, stats_start, border, rows, last_student_row)
 
+        ws.row_dimensions[1].height = 24
+        ws.row_dimensions[2].height = 22
+        ws.row_dimensions[3].height = 18
+
         for idx, w in enumerate(widths, start=1):
             ws.column_dimensions[chr(ord("A") + idx - 1)].width = w
 
+        signatures_row = signatures_row + 2
+        self._apply_print_settings(ws, len(widths), signatures_row)
         self._draw_signatures(ws, signatures_row, len(widths), context.get("firmantes", {}))
         wb.save(str(path))
         return str(path)
+
+    @staticmethod
+    def _apply_print_settings(ws, max_cols: int, max_rows: int) -> None:
+        from openpyxl.worksheet.page import PageMargins
+
+        ws.page_setup.paperSize = ws.PAPERSIZE_A4
+        ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 1
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.print_options.horizontalCentered = True
+        ws.print_options.verticalCentered = False
+        ws.page_margins = PageMargins(left=0.25, right=0.25, top=0.5, bottom=0.5, header=0.2, footer=0.2)
+        ws.print_area = f"A1:{chr(ord('A') + max_cols - 1)}{max_rows + 3}"
 
     def _add_logos(self, ws, context: dict[str, Any]) -> None:
         try:
@@ -260,112 +280,6 @@ class ExcelReportExporter:
         ws.add_chart(chart, f"H{chart_row}")
 
         return max(promedio_row + 3, chart_row + 6)
-
-    @staticmethod
-    def _count_observations(rows: list[dict[str, Any]]) -> tuple[int, int]:
-        aprobados = 0
-        reprobados = 0
-        for row in rows:
-            obs = str(row.get("observacion", "")).strip().lower()
-            has_final = row.get("promedio_final") is not None
-            if obs in {"aprobado", "apr", "apb"}:
-                aprobados += 1
-            elif obs or has_final:
-                reprobados += 1
-        return aprobados, reprobados
-
-    @staticmethod
-    def _average_promedio_final(rows: list[dict[str, Any]]) -> float | None:
-        values: list[float] = []
-        for row in rows:
-            value = row.get("promedio_final")
-            if value is None:
-                continue
-            try:
-                values.append(float(value))
-            except Exception:  # noqa: BLE001
-                continue
-        if not values:
-            return None
-        return round(sum(values) / len(values), 2)
-
-    @staticmethod
-    def _add_logos(ws, context: dict[str, Any]) -> None:
-        try:
-            from openpyxl.drawing.image import Image
-        except Exception:  # noqa: BLE001
-            return
-
-        logos = [
-            (context.get("logo_path"), "A1"),
-            (context.get("logo_ministerio_path"), "M1"),
-        ]
-        for logo_path, anchor in logos:
-            if not logo_path:
-                continue
-            path = Path(str(logo_path)).expanduser().resolve()
-            if not path.exists():
-                continue
-            try:
-                image = Image(str(path))
-                image.width = 70
-                image.height = 50
-                ws.add_image(image, anchor)
-            except Exception:  # noqa: BLE001
-                continue
-
-    def _draw_annual_statistics(self, ws, start_row: int, border, rows: list[dict[str, Any]]) -> int:
-        from openpyxl.chart import PieChart, Reference
-        from openpyxl.styles import Alignment, Font
-
-        aprobados, reprobados = self._count_observations(rows)
-        total = aprobados + reprobados
-        pct_aprobados = round((aprobados / total) * 100, 2) if total else 0
-        pct_reprobados = round((reprobados / total) * 100, 2) if total else 0
-        promedio = self._average_promedio_final(rows)
-
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=6)
-        title_cell = ws.cell(row=start_row, column=1, value="Cuadro de logros en la evaluación de los aprendizajes")
-        title_cell.font = Font(bold=True)
-        title_cell.alignment = Alignment(horizontal="center")
-        for col in range(1, 7):
-            ws.cell(row=start_row, column=col).border = border
-
-        labels = ["Total aprobados", "Total reprobados"]
-        values = [aprobados, reprobados]
-        percentages = [pct_aprobados, pct_reprobados]
-
-        for idx, label in enumerate(labels, start=1):
-            r = start_row + idx
-            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
-            ws.cell(row=r, column=1, value=label).alignment = Alignment(horizontal="left")
-            ws.cell(row=r, column=5, value=values[idx - 1]).alignment = Alignment(horizontal="center")
-            ws.cell(row=r, column=6, value=percentages[idx - 1] / 100).number_format = "0%"
-            ws.cell(row=r, column=6).alignment = Alignment(horizontal="center")
-            for col in range(1, 7):
-                ws.cell(row=r, column=col).border = border
-
-        promedio_row = start_row + 4
-        ws.merge_cells(start_row=promedio_row, start_column=1, end_row=promedio_row, end_column=5)
-        ws.cell(row=promedio_row, column=1, value="Promedio").alignment = Alignment(horizontal="center")
-        ws.cell(row=promedio_row, column=6, value=promedio if promedio is not None else "—")
-        if promedio is not None:
-            ws.cell(row=promedio_row, column=6).number_format = "0.00"
-        ws.cell(row=promedio_row, column=6).alignment = Alignment(horizontal="center")
-        for col in range(1, 7):
-            ws.cell(row=promedio_row, column=col).border = border
-
-        chart = PieChart()
-        chart.title = "Aprobados/Reprobados"
-        data = Reference(ws, min_col=5, min_row=start_row + 1, max_row=start_row + 2)
-        cats = Reference(ws, min_col=1, min_row=start_row + 1, max_row=start_row + 2)
-        chart.add_data(data, titles_from_data=False)
-        chart.set_categories(cats)
-        chart.height = 5
-        chart.width = 8
-        ws.add_chart(chart, f"H{start_row}")
-
-        return promedio_row + 3
 
     @staticmethod
     def _count_observations(rows: list[dict[str, Any]]) -> tuple[int, int]:
