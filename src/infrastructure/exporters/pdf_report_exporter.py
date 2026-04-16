@@ -26,7 +26,7 @@ class PdfReportExporter:
         rendered = self._render_report_html(context, rows)
         if not rendered:
             raise RuntimeError("No se pudo renderizar la plantilla HTML del reporte")
-        self._render_html_to_pdf(rendered, path)
+        self._render_html_to_pdf(rendered, path, context)
         return str(path)
 
     def _render_report_html(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
@@ -313,8 +313,8 @@ class PdfReportExporter:
         except Exception:  # noqa: BLE001
             return False
 
-    def _render_html_to_pdf(self, html_content: str, output_path: Path) -> None:
-        from PySide6.QtCore import QMarginsF, QSizeF
+    def _render_html_to_pdf(self, html_content: str, output_path: Path, context: dict[str, Any]) -> None:
+        from PySide6.QtCore import QMarginsF, QRectF, Qt
         from PySide6.QtGui import QPageLayout, QPageSize, QPainter
         from PySide6.QtGui import QTextDocument
         from PySide6.QtPrintSupport import QPrinter
@@ -322,19 +322,40 @@ class PdfReportExporter:
 
         app = QApplication.instance() or QApplication([])
         _ = app
-        printer = QPrinter(QPrinter.HighResolution)
+        printer = QPrinter(QPrinter.PrinterResolution)
+        printer.setResolution(300)
         printer.setOutputFormat(QPrinter.PdfFormat)
         printer.setOutputFileName(str(output_path))
-        printer.setPageOrientation(QPageLayout.Landscape)
+        orientation = QPageLayout.Portrait
+        if context.get("report_type") == "trimestral":
+            orientation = QPageLayout.Landscape
+        printer.setPageOrientation(orientation)
         printer.setPageSize(QPageSize(QPageSize.A4))
-        printer.setPageMargins(QMarginsF(10, 10, 10, 10))
+        printer.setPageMargins(QMarginsF(8, 8, 8, 8), QPageLayout.Millimeter)
         document = QTextDocument()
         document.setDocumentMargin(0)
         document.setHtml(html_content)
-        page_rect = printer.pageRect(QPrinter.DevicePixel)
-        document.setPageSize(QSizeF(float(page_rect.width()), float(page_rect.height())))
+        document.setTextWidth(document.idealWidth())
+
+        source_rect = QRectF(0, 0, document.size().width(), document.size().height())
+        target_rect = QRectF(printer.pageRect(QPrinter.Point))
+        if source_rect.width() <= 0 or source_rect.height() <= 0:
+            raise RuntimeError("No se pudo calcular el tamaño del documento HTML")
+
+        scale = min(target_rect.width() / source_rect.width(), target_rect.height() / source_rect.height())
+        draw_width = source_rect.width() * scale
+        draw_height = source_rect.height() * scale
+        offset_x = target_rect.x() + (target_rect.width() - draw_width) / 2
+        offset_y = target_rect.y() + (target_rect.height() - draw_height) / 2
+
         painter = QPainter(printer)
-        document.drawContents(painter)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.TextAntialiasing, True)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        painter.setViewport(int(offset_x), int(offset_y), int(draw_width), int(draw_height))
+        painter.setWindow(source_rect.toRect())
+        painter.setLayoutDirection(Qt.LeftToRight)
+        document.drawContents(painter, source_rect)
         painter.end()
 
     @staticmethod
