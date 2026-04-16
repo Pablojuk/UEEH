@@ -73,6 +73,7 @@ class TestAcademicSummaryView(unittest.TestCase):
 
         view = AcademicSummaryView(_FakeAcademicSummaryService())
         self.assertEqual(view.preview_button.text(), "Vista previa")
+        self.assertEqual(view.btn_toggle_filas.text(), "🙈 Ocultar Filas Vacías")
 
     def test_cargar_tabla_vacia_sin_romper(self) -> None:
         from src.presentation.views.academic_summary_view import AcademicSummaryView

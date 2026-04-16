@@ -154,6 +154,7 @@ class ExcelReportExporter:
         for idx, w in enumerate(widths, start=1):
             ws.column_dimensions[chr(ord("A") + idx - 1)].width = w
 
+        signatures_row = signatures_row + 2
         self._apply_print_settings(ws, len(widths), signatures_row)
         self._draw_signatures(ws, signatures_row, len(widths), context.get("firmantes", {}))
         wb.save(str(path))

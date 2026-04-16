@@ -112,7 +112,10 @@ class PdfReportExporter:
                     print(f"[Reportes] No se pudo conectar pdfPrintingFinished: {exc}")
                     loop.quit()
                     return
-                web_view.page().printToPdf(output_path, page_layout)
+                self._ocultar_filas_antes_de_pdf(
+                    web_view.page(),
+                    lambda: QTimer.singleShot(300, lambda: web_view.page().printToPdf(output_path, page_layout)),
+                )
 
             web_view.loadFinished.connect(on_load_finished)
             web_view.setHtml(html_content, QUrl("about:blank"))
@@ -134,3 +137,25 @@ class PdfReportExporter:
         except Exception as exc:  # noqa: BLE001
             print(f"[Reportes] Error inesperado al exportar PDF: {exc}")
             return False
+
+    @staticmethod
+    def _ocultar_filas_antes_de_pdf(page, callback) -> None:
+        js = """
+            (function() {
+                var rows = document.querySelectorAll('table.principal tbody tr');
+                rows.forEach(function(row) {
+                    var celda = row.cells[1];
+                    if (!celda) { return; }
+                    var text = (celda.textContent || '').trim();
+                    var raw = (celda.innerHTML || '').trim();
+                    if (text === '' || raw === '&nbsp;' || raw === ' ') {
+                        row.style.display = 'none';
+                    }
+                });
+                return true;
+            })();
+        """
+        try:
+            page.runJavaScript(js, lambda _result: callback())
+        except Exception:  # noqa: BLE001
+            callback()
