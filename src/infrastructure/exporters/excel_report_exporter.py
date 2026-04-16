@@ -7,12 +7,35 @@ from typing import Any
 
 
 class ExcelReportExporter:
-    def exportar(self, output_path: str, report_title: str, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
+    COLOR_HEADER_BG = "1F4E79"
+    COLOR_HEADER_FG = "FFFFFF"
+    COLOR_FILA_PAR = "DCE6F1"
+    COLOR_FILA_IMPAR = "FFFFFF"
+    COLOR_APROBADO = "C6EFCE"
+    COLOR_REPROBADO = "FFC7CE"
+    COLOR_SPL = "FFEB9C"
+    COLOR_BORDE = "B8CCE4"
+
+    def exportar(
+        self,
+        output_path: str,
+        report_title: str,
+        context: dict[str, Any],
+        rows: list[dict[str, Any]],
+        ocultar_filas_vacias: bool = False,
+    ) -> str:
         try:
             from openpyxl import Workbook
             from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("openpyxl no está instalado") from exc
+
+        filtered_rows = list(rows)
+        if ocultar_filas_vacias:
+            filtered_rows = [row for row in rows if str(row.get("estudiante", "")).strip()]
+
+        if not filtered_rows and ocultar_filas_vacias:
+            filtered_rows = []
 
         if not rows:
             raise ValueError("No hay datos para exportar")
@@ -24,7 +47,7 @@ class ExcelReportExporter:
         ws = wb.active
         ws.title = "Informe"
 
-        thin = Side(style="thin", color="000000")
+        thin = Side(style="thin", color=self.COLOR_BORDE)
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
         ws.merge_cells("A1:N1")
@@ -77,12 +100,12 @@ class ExcelReportExporter:
             ]
             for col, title in enumerate(headers, start=1):
                 cell = ws.cell(row=start_row, column=col, value=title)
-                cell.font = Font(bold=True)
+                cell.font = Font(bold=True, color=self.COLOR_HEADER_FG, size=9)
                 cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                cell.fill = PatternFill(start_color="D9E2F3", end_color="D9E2F3", fill_type="solid")
+                cell.fill = PatternFill(start_color=self.COLOR_HEADER_BG, end_color=self.COLOR_HEADER_BG, fill_type="solid")
                 cell.border = border
 
-            for idx, row in enumerate(rows, start=1):
+            for idx, row in enumerate(filtered_rows, start=1):
                 r = start_row + idx
                 values = [
                     idx,
@@ -100,10 +123,17 @@ class ExcelReportExporter:
                     cell = ws.cell(row=r, column=cidx, value=value)
                     cell.alignment = Alignment(horizontal="left" if cidx == 2 else "center", vertical="center")
                     cell.border = border
+                    base_color = self.COLOR_FILA_PAR if idx % 2 == 0 else self.COLOR_FILA_IMPAR
+                    cell.fill = PatternFill(start_color=base_color, end_color=base_color, fill_type="solid")
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
+                obs_text = str(row.get("observacion", "")).strip().upper()
+                obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
+                if obs_color:
+                    obs_cell = ws.cell(row=r, column=10)
+                    obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
             widths = [5, 34, 14, 12, 15, 12, 10, 10, 10, 12]
-            signatures_row = max(start_row + len(rows) + 3, 39)
+            signatures_row = max(start_row + len(filtered_rows) + 3, 39)
         else:
             headers = [
                 "N°", "Nómina",
@@ -114,11 +144,11 @@ class ExcelReportExporter:
             ]
             for col, title in enumerate(headers, start=1):
                 cell = ws.cell(row=start_row, column=col, value=title)
-                cell.font = Font(bold=True)
+                cell.font = Font(bold=True, color=self.COLOR_HEADER_FG, size=9)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-                cell.fill = PatternFill(start_color="D9E2F3", end_color="D9E2F3", fill_type="solid")
+                cell.fill = PatternFill(start_color=self.COLOR_HEADER_BG, end_color=self.COLOR_HEADER_BG, fill_type="solid")
                 cell.border = border
-            for idx, row in enumerate(rows, start=1):
+            for idx, row in enumerate(filtered_rows, start=1):
                 r = start_row + idx
                 values = [
                     idx,
@@ -140,12 +170,23 @@ class ExcelReportExporter:
                     cell = ws.cell(row=r, column=cidx, value=value)
                     cell.alignment = Alignment(horizontal="left" if cidx == 2 else "center", vertical="center")
                     cell.border = border
+                    base_color = self.COLOR_FILA_PAR if idx % 2 == 0 else self.COLOR_FILA_IMPAR
+                    cell.fill = PatternFill(start_color=base_color, end_color=base_color, fill_type="solid")
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
+                obs_text = str(row.get("observacion", "")).strip().upper()
+                obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
+                if obs_color:
+                    obs_cell = ws.cell(row=r, column=14)
+                    obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
             widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
-            last_student_row = start_row + len(rows)
+            last_student_row = start_row + len(filtered_rows)
             stats_start = max(last_student_row + 4, 39)
-            signatures_row = self._draw_annual_statistics(ws, stats_start, border, rows, last_student_row)
+            signatures_row = self._draw_annual_statistics(ws, stats_start, border, filtered_rows, last_student_row)
+
+        ws.row_dimensions[1].height = 24
+        ws.row_dimensions[2].height = 22
+        ws.row_dimensions[3].height = 18
 
         ws.row_dimensions[1].height = 24
         ws.row_dimensions[2].height = 22

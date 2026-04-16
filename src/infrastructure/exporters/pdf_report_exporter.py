@@ -14,7 +14,14 @@ class PdfReportExporter:
     def __init__(self, html_renderer: HtmlReportRenderer | None = None) -> None:
         self.html_renderer = html_renderer or HtmlReportRenderer()
 
-    def exportar(self, output_path: str, report_title: str, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
+    def exportar(
+        self,
+        output_path: str,
+        report_title: str,
+        context: dict[str, Any],
+        rows: list[dict[str, Any]],
+        ocultar_filas_vacias: bool = False,
+    ) -> str:
         _ = report_title
         if not rows:
             raise ValueError("No hay datos para exportar")
@@ -27,14 +34,25 @@ class PdfReportExporter:
             raise RuntimeError("No se pudo renderizar la plantilla HTML del reporte")
 
         orientation = "landscape" if context.get("report_type") == "trimestral" else "portrait"
-        if not self.export_to_pdf(rendered, str(path), orientation=orientation):
+        if not self.export_to_pdf(
+            rendered,
+            str(path),
+            orientation=orientation,
+            ocultar_filas_vacias=ocultar_filas_vacias,
+        ):
             raise RuntimeError("No se pudo exportar el reporte PDF")
         return str(path)
 
     def _render_report_html(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         return self.html_renderer.render(context, rows)
 
-    def export_to_pdf(self, html_content: str, output_path: str, orientation: str = "landscape") -> bool:
+    def export_to_pdf(
+        self,
+        html_content: str,
+        output_path: str,
+        orientation: str = "landscape",
+        ocultar_filas_vacias: bool = False,
+    ) -> bool:
         """Exporta HTML a PDF usando QWebEngineView offscreen."""
         try:
             from PySide6.QtCore import QEventLoop, QMarginsF, QTimer, QUrl
@@ -112,10 +130,13 @@ class PdfReportExporter:
                     print(f"[Reportes] No se pudo conectar pdfPrintingFinished: {exc}")
                     loop.quit()
                     return
-                self._ocultar_filas_antes_de_pdf(
-                    web_view.page(),
-                    lambda: QTimer.singleShot(300, lambda: web_view.page().printToPdf(output_path, page_layout)),
-                )
+                if ocultar_filas_vacias:
+                    self._ocultar_filas_antes_de_pdf(
+                        web_view.page(),
+                        lambda: QTimer.singleShot(300, lambda: web_view.page().printToPdf(output_path, page_layout)),
+                    )
+                else:
+                    web_view.page().printToPdf(output_path, page_layout)
 
             web_view.loadFinished.connect(on_load_finished)
             web_view.setHtml(html_content, QUrl("about:blank"))

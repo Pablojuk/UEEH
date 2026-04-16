@@ -326,6 +326,7 @@ class AcademicSummaryView(QWidget):
             return
 
         report_type, trimestre_num = self.report_type_combo.currentData()
+        ocultar_filas_vacias = self.btn_toggle_filas.isChecked()
         if kind == "pdf":
             ok, message = self.report_export_service.exportar_resumen_pdf(
                 asignacion_id,
@@ -333,6 +334,7 @@ class AcademicSummaryView(QWidget):
                 report_type=report_type,
                 trimestre_num=trimestre_num,
                 firmantes=self._firmantes,
+                ocultar_filas_vacias=ocultar_filas_vacias,
             )
         else:
             ok, message = self.report_export_service.exportar_resumen_excel(
@@ -341,6 +343,7 @@ class AcademicSummaryView(QWidget):
                 report_type=report_type,
                 trimestre_num=trimestre_num,
                 firmantes=self._firmantes,
+                ocultar_filas_vacias=ocultar_filas_vacias,
             )
 
         if ok:
