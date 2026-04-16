@@ -2,8 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cuadro de Calificación — Anual</title>
 <style>
+  @page { size: A4 landscape; margin: 10mm; }
+
   :root {
     --azul-oscuro:    #1F4E79;
     --azul-medio:     #2E75B6;
@@ -19,6 +22,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
+    width: 100%;
     background: #C8C8C8;
     font-family: 'Calibri', 'Trebuchet MS', sans-serif;
     font-size: 8.5pt;
@@ -126,7 +130,7 @@
   }
 
   table.principal {
-    width: 100%;
+    width: 100% !important;
     border-collapse: collapse;
     table-layout: fixed;
     font-size: 7pt;

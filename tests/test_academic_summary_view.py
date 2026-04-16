@@ -127,6 +127,12 @@ class TestAcademicSummaryView(unittest.TestCase):
         self.assertEqual(fake_report_service.calls[0]["asignacion_id"], "AS1")
         self.assertEqual(view.tabs.currentIndex(), 1)
 
+    def test_sanitiza_nombre_de_archivo_desde_asignacion(self) -> None:
+        from src.presentation.views.academic_summary_view import AcademicSummaryView
+
+        value = AcademicSummaryView._sanitize_filename("MATEMATICAS | SEGUNDO-A | Juca Farfan Pablo Hernan | PER-26-27")
+        self.assertEqual(value, "MATEMATICAS_SEGUNDO-A_Juca_Farfan_Pablo_Hernan_PER-26-27")
+
 
 if __name__ == "__main__":
     unittest.main()

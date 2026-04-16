@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from src.application.services.institution_service import InstitutionService
 
@@ -48,8 +51,36 @@ class DashboardView(QWidget):
 
         root.addWidget(card)
         root.addStretch(1)
+        root.addLayout(self._build_logo_panel())
 
         self.refresh_data()
+
+    def _build_logo_panel(self) -> QHBoxLayout:
+        panel = QHBoxLayout()
+        panel.setSpacing(16)
+
+        self.logo_ministerio_label = QLabel("Logo ministerial")
+        self.logo_ministerio_label.setAlignment(Qt.AlignCenter)
+        self.logo_ministerio_label.setFixedHeight(120)
+        self.logo_ministerio_label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")
+
+        self.logo_label = QLabel("Logo institucional")
+        self.logo_label.setAlignment(Qt.AlignCenter)
+        self.logo_label.setFixedHeight(120)
+        self.logo_label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")
+
+        ministerio_box = QVBoxLayout()
+        ministerio_box.addWidget(QLabel("Logo de: Ministerio de Educación, Deporte y Cultura"))
+        ministerio_box.addWidget(self.logo_ministerio_label)
+
+        institucional_box = QVBoxLayout()
+        institucional_box.addWidget(QLabel("Logo Institucional"))
+        institucional_box.addWidget(self.logo_label)
+
+        panel.addLayout(ministerio_box, 1)
+        panel.addLayout(institucional_box, 1)
+        panel.addStretch(2)
+        return panel
 
     def _add_field_row(self, grid: QGridLayout, row: int, label: str, key: str, span: int = 1) -> int:
         self._add_label_cell(grid, row, 0, label)
@@ -72,3 +103,17 @@ class DashboardView(QWidget):
         for key, label in self.value_labels.items():
             value = institution.get(key)
             label.setText(str(value).strip() if value else "No registrado")
+        self._apply_logo(self.logo_ministerio_label, institution.get("logo_ministerio_path"), "Logo ministerial")
+        self._apply_logo(self.logo_label, institution.get("logo_path"), "Logo institucional")
+
+    @staticmethod
+    def _apply_logo(label: QLabel, logo_path: str | None, placeholder: str) -> None:
+        if logo_path and Path(logo_path).exists():
+            pixmap = QPixmap(logo_path)
+            if not pixmap.isNull():
+                label.setPixmap(pixmap.scaled(300, 110, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                label.setStyleSheet("border: none;")
+                return
+        label.setPixmap(QPixmap())
+        label.setText(placeholder)
+        label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")

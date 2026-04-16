@@ -65,7 +65,7 @@ class TestPdfReportExporter(unittest.TestCase):
                 rendered = exporter._render_report_html(context, rows)
 
         self.assertIn("UEEH", rendered)
-        self.assertIn("file://", rendered)
+        self.assertIn("data:image/png;base64,", rendered)
         self.assertIn("Promedio General", rendered)
         self.assertIn("<svg", rendered)
         self.assertIn("class='nomina'", rendered)
