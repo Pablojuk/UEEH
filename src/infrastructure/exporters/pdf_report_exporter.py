@@ -46,6 +46,38 @@ class PdfReportExporter:
     def _render_report_html(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         return self.html_renderer.render(context, rows)
 
+    # ------------------------------------------------------------------
+    # Limpieza del HTML ANTES de renderizar (solución robusta sin JS)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _limpiar_filas_vacias_html(html_content: str) -> str:
+        """
+        Elimina del HTML las filas <tr> cuya segunda celda <td>
+        (columna Nómina) esté vacía o contenga solo espacios/nbsp.
+        Se hace sobre el string HTML antes de pasarlo al WebEngine,
+        así printToPdf() nunca ve esas filas y el PDF sale compacto.
+        """
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError:
+            # Si por alguna razón no está disponible, devolver sin cambios
+            print("[Reportes] beautifulsoup4 no disponible, se omite limpieza de filas")
+            return html_content
+
+        soup = BeautifulSoup(html_content, "html.parser")
+
+        for tbody in soup.find_all("tbody"):
+            for tr in tbody.find_all("tr"):
+                celdas = tr.find_all("td")
+                if len(celdas) >= 2:
+                    texto = celdas[1].get_text(strip=True)
+                    raw   = celdas[1].decode_contents().strip()
+                    # Eliminar fila si la celda Nómina está vacía o es nbsp
+                    if not texto or raw in ("&nbsp;", "\xa0", "&#160;", " ", ""):
+                        tr.decompose()
+
+        return str(soup)
+
     def export_to_pdf(
         self,
         html_content: str,
@@ -69,7 +101,18 @@ class PdfReportExporter:
             if app is None:
                 app = QApplication(sys.argv)
 
-            page_orientation = QPageLayout.Landscape if orientation == "landscape" else QPageLayout.Portrait
+            # -------------------------------------------------------
+            # PASO CLAVE: limpiar HTML ANTES de pasarlo al WebEngine.
+            # Así printToPdf() recibe un DOM ya sin filas vacías y el
+            # PDF queda compacto sin conflictos de timing ni de JS.
+            # -------------------------------------------------------
+            if ocultar_filas_vacias:
+                html_content = self._limpiar_filas_vacias_html(html_content)
+
+            page_orientation = (
+                QPageLayout.Landscape if orientation == "landscape"
+                else QPageLayout.Portrait
+            )
 
             printer = QPrinter(QPrinter.HighResolution)
             printer.setPageSize(QPageSize(QPageSize.A4))
@@ -106,11 +149,14 @@ class PdfReportExporter:
             def on_pdf_printed(path: str, pdf_ok: bool) -> None:
                 state["finished"] = True
                 timeout_timer.stop()
-                exists = os.path.exists(path)
+                exists  = os.path.exists(path)
                 size_ok = exists and os.path.getsize(path) > 0
                 state["success"] = bool(pdf_ok and size_ok)
                 if not state["success"]:
-                    print(f"[Reportes] Error al imprimir PDF. ok={pdf_ok}, existe={exists}, size_ok={size_ok}")
+                    print(
+                        f"[Reportes] Error al imprimir PDF. "
+                        f"ok={pdf_ok}, existe={exists}, size_ok={size_ok}"
+                    )
                 loop.quit()
 
             def on_load_finished(ok: bool) -> None:
@@ -130,13 +176,9 @@ class PdfReportExporter:
                     print(f"[Reportes] No se pudo conectar pdfPrintingFinished: {exc}")
                     loop.quit()
                     return
-                if ocultar_filas_vacias:
-                    self._ocultar_filas_antes_de_pdf(
-                        web_view.page(),
-                        lambda: QTimer.singleShot(300, lambda: web_view.page().printToPdf(output_path, page_layout)),
-                    )
-                else:
-                    web_view.page().printToPdf(output_path, page_layout)
+
+                # Sin JS, sin delays extra: el HTML ya llegó limpio
+                web_view.page().printToPdf(output_path, page_layout)
 
             web_view.loadFinished.connect(on_load_finished)
             web_view.setHtml(html_content, QUrl("about:blank"))
@@ -155,28 +197,7 @@ class PdfReportExporter:
             if state["timed_out"]:
                 return False
             return bool(state["success"])
+
         except Exception as exc:  # noqa: BLE001
             print(f"[Reportes] Error inesperado al exportar PDF: {exc}")
             return False
-
-    @staticmethod
-    def _ocultar_filas_antes_de_pdf(page, callback) -> None:
-        js = """
-            (function() {
-                var rows = document.querySelectorAll('table.principal tbody tr');
-                rows.forEach(function(row) {
-                    var celda = row.cells[1];
-                    if (!celda) { return; }
-                    var text = (celda.textContent || '').trim();
-                    var raw = (celda.innerHTML || '').trim();
-                    if (text === '' || raw === '&nbsp;' || raw === ' ') {
-                        row.style.display = 'none';
-                    }
-                });
-                return true;
-            })();
-        """
-        try:
-            page.runJavaScript(js, lambda _result: callback())
-        except Exception:  # noqa: BLE001
-            callback()
