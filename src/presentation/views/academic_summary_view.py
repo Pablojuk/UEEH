@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
@@ -173,6 +175,31 @@ class AcademicSummaryView(QWidget):
             self._preview_uses_webengine = False
         preview_layout.addWidget(self.preview_view)
         self.tabs.addTab(preview_tab, "Vista previa")
+        self.btn_toggle_filas = QPushButton("🙈 Ocultar Filas Vacías")
+        self.btn_toggle_filas.setCheckable(True)
+        self.btn_toggle_filas.setChecked(False)
+        self.btn_toggle_filas.setCursor(Qt.PointingHandCursor)
+        self.btn_toggle_filas.setFixedHeight(28)
+        self.btn_toggle_filas.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #5b7fa6;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 0 12px;
+                font-size: 12px;
+            }
+            QPushButton:checked {
+                background-color: #2e5f8a;
+            }
+            QPushButton:hover {
+                background-color: #4a6d94;
+            }
+            """
+        )
+        self.btn_toggle_filas.clicked.connect(self._toggle_filas_vacias)
+        self.tabs.setCornerWidget(self.btn_toggle_filas, Qt.TopRightCorner)
 
         root.addWidget(title)
         root.addWidget(subtitle)
@@ -286,7 +313,9 @@ class AcademicSummaryView(QWidget):
             QMessageBox.warning(self, "Validación", "Seleccione una asignación")
             return
 
-        default_name = f"reporte_{asignacion_id}.{ 'pdf' if kind == 'pdf' else 'xlsx' }"
+        assignment_text = self.assignment_combo.currentText() or str(asignacion_id)
+        safe_base = self._sanitize_filename(assignment_text)
+        default_name = f"{safe_base}.{ 'pdf' if kind == 'pdf' else 'xlsx' }"
         selected_path, _ = QFileDialog.getSaveFileName(
             self,
             "Guardar reporte",
@@ -297,6 +326,7 @@ class AcademicSummaryView(QWidget):
             return
 
         report_type, trimestre_num = self.report_type_combo.currentData()
+        ocultar_filas_vacias = self.btn_toggle_filas.isChecked()
         if kind == "pdf":
             ok, message = self.report_export_service.exportar_resumen_pdf(
                 asignacion_id,
@@ -304,6 +334,7 @@ class AcademicSummaryView(QWidget):
                 report_type=report_type,
                 trimestre_num=trimestre_num,
                 firmantes=self._firmantes,
+                ocultar_filas_vacias=ocultar_filas_vacias,
             )
         else:
             ok, message = self.report_export_service.exportar_resumen_excel(
@@ -312,6 +343,7 @@ class AcademicSummaryView(QWidget):
                 report_type=report_type,
                 trimestre_num=trimestre_num,
                 firmantes=self._firmantes,
+                ocultar_filas_vacias=ocultar_filas_vacias,
             )
 
         if ok:
@@ -360,10 +392,46 @@ class AcademicSummaryView(QWidget):
         self._rows_meta = []
 
     def _set_preview_html(self, html_content: str) -> None:
+        self.btn_toggle_filas.setChecked(False)
+        self.btn_toggle_filas.setText("🙈 Ocultar Filas Vacías")
         if self._preview_uses_webengine:
             self.preview_view.setHtml(html_content)
         else:
             self.preview_view.setHtml(html_content)
+
+    def _toggle_filas_vacias(self, checked: bool) -> None:
+        if checked:
+            self.btn_toggle_filas.setText("👁 Mostrar Filas Vacías")
+            js_code = """
+                (function() {
+                    function isEmptyCell(cell) {
+                        if (!cell) { return true; }
+                        var text = (cell.textContent || '').replace(/\\u00A0/g, '').trim();
+                        var raw = (cell.innerHTML || '').trim().toLowerCase();
+                        return text === '' || text === '—' || raw === '&nbsp;' || raw === '';
+                    }
+                    var rows = document.querySelectorAll('table.principal tbody tr');
+                    rows.forEach(function(row) {
+                        var celdaNombre = row.cells[1];
+                        if (isEmptyCell(celdaNombre)) {
+                            row.style.display = 'none';
+                        }
+                    });
+                })();
+            """
+        else:
+            self.btn_toggle_filas.setText("🙈 Ocultar Filas Vacías")
+            js_code = """
+                (function() {
+                    var rows = document.querySelectorAll('table.principal tbody tr');
+                    rows.forEach(function(row) {
+                        row.style.display = '';
+                    });
+                })();
+            """
+
+        if self._preview_uses_webengine and hasattr(self.preview_view, "page"):
+            self.preview_view.page().runJavaScript(js_code)
 
     def _load_signer_options(self) -> None:
         options = self.academic_summary_service.listar_firmantes_disponibles()
@@ -408,3 +476,10 @@ class AcademicSummaryView(QWidget):
                 values.append(item.text() if item else "")
             lines.append("\t".join(values))
         QApplication.clipboard().setText("\n".join(lines))
+
+    @staticmethod
+    def _sanitize_filename(text: str) -> str:
+        normalized = re.sub(r"[|/\\\\:*?\"<>]", "_", str(text or "").strip())
+        normalized = normalized.replace(" ", "_")
+        normalized = re.sub(r"_+", "_", normalized).strip(" ._")
+        return normalized or "reporte"

@@ -51,9 +51,10 @@ class EnrollmentsView(QWidget):
 
         self.student_combo = QComboBox()
         self.student_filter_input = QLineEdit()
-        self.student_filter_input.setPlaceholderText("🔍 Buscar estudiante por nombre o identificación")
+        self.student_filter_input.setPlaceholderText("🔍 Buscar estudiante por nombre, identificación o código")
         self.student_filter_input.textChanged.connect(self._filter_students)
         self.course_combo = QComboBox()
+        self.course_combo.currentIndexChanged.connect(self.load_enrollments)
         self.parallel_combo = QComboBox()
         self.period_combo = QComboBox()
 
@@ -74,8 +75,8 @@ class EnrollmentsView(QWidget):
         actions.addWidget(self.delete_button)
         actions.addStretch(1)
 
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["ID", "Estudiante", "Curso", "Paralelo", "Período"])
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["ID", "Estudiante", "Curso", "Nombre", "Paralelo", "Período"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.cellClicked.connect(self.select_enrollment)
 
@@ -135,6 +136,10 @@ class EnrollmentsView(QWidget):
     def load_enrollments(self) -> None:
         rows = self.enrollment_service.listar_matriculas()
         students = {s.get("id_estudiante"): s for s in self.student_service.listar_estudiantes()}
+        courses = {row.get("id_curso"): row.get("nombre", "") for row in self.catalog_service.listar_cursos()}
+        selected_course_id = self.course_combo.currentData()
+        if selected_course_id:
+            rows = [row for row in rows if row.get("curso_id") == selected_course_id]
         rows = sorted(
             rows,
             key=lambda row: (
@@ -147,13 +152,16 @@ class EnrollmentsView(QWidget):
         for row_data in rows:
             student = students.get(row_data.get("estudiante_id"), {})
             student_label = f"{student.get('apellidos', '')} {student.get('nombres', '')}".strip() or row_data.get("estudiante_id", "")
+            course_id = row_data.get("curso_id", "")
+            course_name = courses.get(course_id, "")
             row = self.table.rowCount()
             self.table.insertRow(row)
             self.table.setItem(row, 0, QTableWidgetItem(row_data.get("id_matricula", "")))
             self.table.setItem(row, 1, QTableWidgetItem(student_label))
-            self.table.setItem(row, 2, QTableWidgetItem(row_data.get("curso_id", "")))
-            self.table.setItem(row, 3, QTableWidgetItem(row_data.get("paralelo_id", "")))
-            self.table.setItem(row, 4, QTableWidgetItem(row_data.get("periodo_id", "")))
+            self.table.setItem(row, 2, QTableWidgetItem(course_id))
+            self.table.setItem(row, 3, QTableWidgetItem(course_name))
+            self.table.setItem(row, 4, QTableWidgetItem(row_data.get("paralelo_id", "")))
+            self.table.setItem(row, 5, QTableWidgetItem(row_data.get("periodo_id", "")))
 
     def _filter_students(self, selected_student: str | None = None) -> None:
         query = self.student_filter_input.text().strip().lower()
@@ -161,10 +169,11 @@ class EnrollmentsView(QWidget):
         for student in self._students_cache:
             label = f"{student.get('apellidos', '')} {student.get('nombres', '')}".strip()
             identification = student.get("identificacion") or ""
-            searchable = f"{label} {identification}".lower()
+            code = student.get("codigo") or ""
+            searchable = f"{label} {identification} {code}".lower()
             if query and query not in searchable:
                 continue
-            display = f"{label} - {identification}" if identification else label
+            display = f"{label} - {identification} - {code}".strip(" -") if identification or code else label
             self.student_combo.addItem(display, student.get("id_estudiante"))
         if selected_student:
             self._restore_combo_selection(self.student_combo, selected_student)

@@ -5,6 +5,8 @@ from __future__ import annotations
 import html
 import math
 import re
+import base64
+import mimetypes
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -30,8 +32,8 @@ class HtmlReportRenderer:
         values = {
             "institucion_nombre": context.get("institucion_nombre", "Institución"),
             "institucion_subtitulo": self._build_institucion_subtitulo(context),
-            "logo_inst_src": self._path_to_file_uri(context.get("logo_path")),
-            "logo_mineduc_src": self._path_to_file_uri(context.get("logo_ministerio_path")),
+            "logo_inst_src": self._build_logo_source(context.get("logo_path"), "institucional"),
+            "logo_mineduc_src": self._build_logo_source(context.get("logo_ministerio_path"), "ministerio"),
             "docente_nombre": context.get("docente_nombre", ""),
             "docente": context.get("docente_nombre", ""),
             "asignatura_nombre": context.get("asignatura_nombre", ""),
@@ -158,14 +160,31 @@ class HtmlReportRenderer:
         return "".join(parts)
 
     @staticmethod
-    def _path_to_file_uri(path_value: Any) -> str:
-        if not path_value:
+    def _build_logo_source(path_value: Any, logo_label: str) -> str:
+        path = HtmlReportRenderer._normalize_existing_path(path_value)
+        if path is None:
+            if path_value:
+                print(f"[Reportes] Logo {logo_label} no encontrado o ruta inválida: {path_value}")
             return ""
         try:
-            path = Path(str(path_value)).expanduser().resolve()
-            return path.as_uri() if path.exists() else ""
+            mime_type = mimetypes.guess_type(str(path))[0] or "image/png"
+            encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+            return f"data:{mime_type};base64,{encoded}"
         except Exception:  # noqa: BLE001
+            print(f"[Reportes] No se pudo cargar logo {logo_label}: {path}")
             return ""
+
+    @staticmethod
+    def _normalize_existing_path(path_value: Any) -> Path | None:
+        raw = str(path_value or "").strip().strip('"').strip("'")
+        if not raw:
+            return None
+        try:
+            path = Path(raw).expanduser()
+            normalized = path if path.is_absolute() else path.resolve()
+            return normalized if normalized.exists() else None
+        except Exception:  # noqa: BLE001
+            return None
 
     @staticmethod
     def _build_institucion_subtitulo(context: dict[str, Any]) -> str:
@@ -254,6 +273,18 @@ class HtmlReportRenderer:
                 "<svg width='220' height='220' viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'>"
                 "<rect width='220' height='220' fill='#F9FAFB'/>"
                 "<text x='110' y='115' text-anchor='middle' fill='#6B7280' font-size='16'>Sin datos</text>"
+                "</svg>"
+            )
+
+        positive_slices = [(label, value, color) for label, value, color in data if value > 0]
+        if len(positive_slices) == 1:
+            label, value, color = positive_slices[0]
+            return (
+                "<svg width='320' height='180' viewBox='0 0 320 180' xmlns='http://www.w3.org/2000/svg'>"
+                "<rect width='320' height='180' fill='white'/>"
+                f"<circle cx='80' cy='80' r='65' fill='{color}'/>"
+                f"<rect x='160' y='20' width='12' height='12' fill='{color}'/>"
+                f"<text x='178' y='30' font-size='11' fill='#111827'>{html.escape(label)} ({value})</text>"
                 "</svg>"
             )
 
