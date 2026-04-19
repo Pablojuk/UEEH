@@ -62,7 +62,7 @@ class GradesView(QWidget):
         filter_row = QHBoxLayout(filter_card)
 
         self.assignment_combo = QComboBox()
-        self.assignment_combo.setMinimumWidth(420)
+        self.assignment_combo.setMinimumWidth(350)
         self.trimester_combo = QComboBox()
         self.trimester_combo.addItem("Trimestre 1", 1)
         self.trimester_combo.addItem("Trimestre 2", 2)
@@ -71,6 +71,7 @@ class GradesView(QWidget):
         self.activities_count_input = QSpinBox()
         self.activities_count_input.setRange(1, 20)
         self.activities_count_input.setValue(3)
+        self.activities_count_input.setMinimumWidth(90)
 
         self.generate_activities_button = QPushButton("Generar actividades")
         self.generate_activities_button.clicked.connect(self.generate_activities)
