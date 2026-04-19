@@ -188,10 +188,6 @@ class ExcelReportExporter:
         ws.row_dimensions[2].height = 22
         ws.row_dimensions[3].height = 18
 
-        ws.row_dimensions[1].height = 24
-        ws.row_dimensions[2].height = 22
-        ws.row_dimensions[3].height = 18
-
         for idx, w in enumerate(widths, start=1):
             ws.column_dimensions[chr(ord("A") + idx - 1)].width = w
 
