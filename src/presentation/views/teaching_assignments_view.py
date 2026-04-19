@@ -68,8 +68,8 @@ class TeachingAssignmentsView(QWidget):
         actions.addWidget(self.delete_button)
         actions.addStretch(1)
 
-        self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["ID", "Docente", "Asignatura", "Curso", "Paralelo", "Período"])
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels(["ID", "Docente", "Asignatura", "Curso", "Nombre", "Paralelo", "Período"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.cellClicked.connect(self.select_assignment)
 
@@ -123,17 +123,21 @@ class TeachingAssignmentsView(QWidget):
 
     def load_assignments(self) -> None:
         rows = self.teaching_assignment_service.listar_asignaciones()
+        cursos = {row.get("id_curso"): row.get("nombre", "") for row in self.catalog_service.listar_cursos()}
 
         self.table.setRowCount(0)
         for row_data in rows:
             row = self.table.rowCount()
             self.table.insertRow(row)
+            course_id = row_data.get("curso_id", "")
+            course_name = cursos.get(course_id, "")
             self.table.setItem(row, 0, QTableWidgetItem(row_data.get("id_asignacion", "")))
             self.table.setItem(row, 1, QTableWidgetItem(row_data.get("docente_id", "")))
             self.table.setItem(row, 2, QTableWidgetItem(row_data.get("asignatura_id", "")))
-            self.table.setItem(row, 3, QTableWidgetItem(row_data.get("curso_id", "")))
-            self.table.setItem(row, 4, QTableWidgetItem(row_data.get("paralelo_id", "")))
-            self.table.setItem(row, 5, QTableWidgetItem(row_data.get("periodo_id", "")))
+            self.table.setItem(row, 3, QTableWidgetItem(course_id))
+            self.table.setItem(row, 4, QTableWidgetItem(course_name))
+            self.table.setItem(row, 5, QTableWidgetItem(row_data.get("paralelo_id", "")))
+            self.table.setItem(row, 6, QTableWidgetItem(row_data.get("periodo_id", "")))
 
     def select_assignment(self, row: int, _column: int) -> None:
         item = self.table.item(row, 0)

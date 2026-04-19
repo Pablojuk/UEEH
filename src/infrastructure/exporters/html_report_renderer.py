@@ -276,6 +276,18 @@ class HtmlReportRenderer:
                 "</svg>"
             )
 
+        positive_slices = [(label, value, color) for label, value, color in data if value > 0]
+        if len(positive_slices) == 1:
+            label, value, color = positive_slices[0]
+            return (
+                "<svg width='320' height='180' viewBox='0 0 320 180' xmlns='http://www.w3.org/2000/svg'>"
+                "<rect width='320' height='180' fill='white'/>"
+                f"<circle cx='80' cy='80' r='65' fill='{color}'/>"
+                f"<rect x='160' y='20' width='12' height='12' fill='{color}'/>"
+                f"<text x='178' y='30' font-size='11' fill='#111827'>{html.escape(label)} ({value})</text>"
+                "</svg>"
+            )
+
         cx, cy, radius = 80.0, 80.0, 65.0
         current_angle = -math.pi / 2
         segments: list[str] = []

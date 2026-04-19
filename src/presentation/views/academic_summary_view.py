@@ -404,13 +404,16 @@ class AcademicSummaryView(QWidget):
             self.btn_toggle_filas.setText("👁 Mostrar Filas Vacías")
             js_code = """
                 (function() {
+                    function isEmptyCell(cell) {
+                        if (!cell) { return true; }
+                        var text = (cell.textContent || '').replace(/\\u00A0/g, '').trim();
+                        var raw = (cell.innerHTML || '').trim().toLowerCase();
+                        return text === '' || text === '—' || raw === '&nbsp;' || raw === '';
+                    }
                     var rows = document.querySelectorAll('table.principal tbody tr');
                     rows.forEach(function(row) {
                         var celdaNombre = row.cells[1];
-                        if (!celdaNombre) { return; }
-                        var text = (celdaNombre.textContent || '').trim();
-                        var raw = (celdaNombre.innerHTML || '').trim();
-                        if (text === '' || raw === '&nbsp;' || raw === ' ') {
+                        if (isEmptyCell(celdaNombre)) {
                             row.style.display = 'none';
                         }
                     });

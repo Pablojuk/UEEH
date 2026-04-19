@@ -33,4 +33,6 @@ class TestTeachingAssignmentsView(unittest.TestCase):
         self.assertIsNotNone(view.delete_button)
         self.assertFalse(hasattr(view, "search_input"))
         self.assertEqual(view.table.rowCount(), 0)
+        headers = [view.table.horizontalHeaderItem(i).text() for i in range(view.table.columnCount())]
+        self.assertEqual(headers, ["ID", "Docente", "Asignatura", "Curso", "Nombre", "Paralelo", "Período"])
         conn.close()

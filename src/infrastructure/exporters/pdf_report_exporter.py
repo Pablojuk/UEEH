@@ -163,13 +163,16 @@ class PdfReportExporter:
     def _ocultar_filas_antes_de_pdf(page, callback) -> None:
         js = """
             (function() {
+                function isEmptyCell(cell) {
+                    if (!cell) { return true; }
+                    var text = (cell.textContent || '').replace(/\\u00A0/g, '').trim();
+                    var raw = (cell.innerHTML || '').trim().toLowerCase();
+                    return text === '' || text === '—' || raw === '&nbsp;' || raw === '';
+                }
                 var rows = document.querySelectorAll('table.principal tbody tr');
                 rows.forEach(function(row) {
-                    var celda = row.cells[1];
-                    if (!celda) { return; }
-                    var text = (celda.textContent || '').trim();
-                    var raw = (celda.innerHTML || '').trim();
-                    if (text === '' || raw === '&nbsp;' || raw === ' ') {
+                    var celdaNombre = row.cells[1];
+                    if (isEmptyCell(celdaNombre)) {
                         row.style.display = 'none';
                     }
                 });

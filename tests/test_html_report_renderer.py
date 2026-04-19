@@ -53,6 +53,15 @@ class TestHtmlReportRenderer(unittest.TestCase):
         self.assertIn(">1<", stats)
         self.assertIn("Total reprobados", stats)
 
+    def test_grafica_pastel_anual_muestra_100_por_ciento(self) -> None:
+        renderer = HtmlReportRenderer()
+        svg = renderer._build_anual_chart_svg([
+            {"observacion": "APB", "promedio_final": 9},
+            {"observacion": "Aprobado", "promedio_final": 8},
+        ])
+        self.assertIn("<svg", svg)
+        self.assertIn("<circle", svg)
+        self.assertIn("Aprobados (2)", svg)
 
 
 if __name__ == "__main__":
