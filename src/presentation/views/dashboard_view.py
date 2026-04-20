@@ -52,6 +52,7 @@ class DashboardView(QWidget):
         root.addWidget(card)
         root.addLayout(self._build_logo_panel())
         root.addStretch(1)
+        root.addLayout(self._build_logo_panel())
 
         self.refresh_data()
 
