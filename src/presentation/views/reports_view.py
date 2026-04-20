@@ -24,4 +24,4 @@ class ReportsView(QWidget):
         layout.addWidget(self.academic_summary_view)
 
     def refresh_data(self) -> None:
-        self.academic_summary_view.load_contexts()
+        self.academic_summary_view.refresh_data()

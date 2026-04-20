@@ -62,7 +62,7 @@ class GradesView(QWidget):
         filter_row = QHBoxLayout(filter_card)
 
         self.assignment_combo = QComboBox()
-        self.assignment_combo.setMinimumWidth(420)
+        self.assignment_combo.setMinimumWidth(350)
         self.trimester_combo = QComboBox()
         self.trimester_combo.addItem("Trimestre 1", 1)
         self.trimester_combo.addItem("Trimestre 2", 2)
@@ -71,6 +71,7 @@ class GradesView(QWidget):
         self.activities_count_input = QSpinBox()
         self.activities_count_input.setRange(1, 20)
         self.activities_count_input.setValue(3)
+        self.activities_count_input.setMinimumWidth(90)
 
         self.generate_activities_button = QPushButton("Generar actividades")
         self.generate_activities_button.clicked.connect(self.generate_activities)
@@ -118,7 +119,7 @@ class GradesView(QWidget):
 
         self.load_contexts()
 
-    def load_contexts(self) -> None:
+    def load_contexts(self, selected_assignment_id: str | None = None) -> None:
         self.assignment_combo.clear()
         self._contextos = self.grade_registration_service.listar_contextos_disponibles()
 
@@ -128,6 +129,10 @@ class GradesView(QWidget):
 
         for row in self._contextos:
             self.assignment_combo.addItem(row.get("display", row.get("id_asignacion", "")), row.get("id_asignacion"))
+        if selected_assignment_id:
+            idx = self.assignment_combo.findData(selected_assignment_id)
+            if idx >= 0:
+                self.assignment_combo.setCurrentIndex(idx)
 
     def generate_activities(self) -> None:
         asignacion_id = self.assignment_combo.currentData()
@@ -239,7 +244,8 @@ class GradesView(QWidget):
         self._fila_meta = []
 
     def refresh_data(self) -> None:
-        self.load_contexts()
+        selected_assignment_id = self.assignment_combo.currentData()
+        self.load_contexts(selected_assignment_id=selected_assignment_id)
 
     @staticmethod
     def _format_header_label(title: str) -> str:

@@ -12,6 +12,20 @@ from src.infrastructure.exporters.pdf_report_exporter import PdfReportExporter
 
 
 class TestPdfReportExporter(unittest.TestCase):
+    def test_ocultar_filas_js_incluye_regla_para_guion(self) -> None:
+        exporter = PdfReportExporter()
+        captured_js: dict[str, str] = {}
+        callback_called = {"value": False}
+
+        class _FakePage:
+            def runJavaScript(self, code, done):
+                captured_js["code"] = code
+                done(True)
+
+        exporter._ocultar_filas_antes_de_pdf(_FakePage(), lambda: callback_called.__setitem__("value", True))
+        self.assertIn("text === '—'", captured_js.get("code", ""))
+        self.assertTrue(callback_called["value"])
+
     def test_render_html_con_placeholders_nuevos(self) -> None:
         exporter = PdfReportExporter()
         rows = [
@@ -65,7 +79,7 @@ class TestPdfReportExporter(unittest.TestCase):
                 rendered = exporter._render_report_html(context, rows)
 
         self.assertIn("UEEH", rendered)
-        self.assertIn("file://", rendered)
+        self.assertIn("data:image/png;base64,", rendered)
         self.assertIn("Promedio General", rendered)
         self.assertIn("<svg", rendered)
         self.assertIn("class='nomina'", rendered)

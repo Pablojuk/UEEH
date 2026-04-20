@@ -10,12 +10,14 @@ from src.infrastructure.persistence.repositories import (
     ParalelosRepository,
     PeriodosLectivosRepository,
 )
+from src.infrastructure.persistence.seed import seed_catalogos_academicos
 
 
 class CatalogService:
     """Gestiona cursos, paralelos, asignaturas y períodos lectivos."""
 
     def __init__(self, connection: sqlite3.Connection) -> None:
+        seed_catalogos_academicos(connection)
         self.cursos_repo = CursosRepository(connection)
         self.paralelos_repo = ParalelosRepository(connection)
         self.asignaturas_repo = AsignaturasRepository(connection)

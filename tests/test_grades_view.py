@@ -14,11 +14,12 @@ except ImportError:  # pragma: no cover
 
 
 class _FakeGradeRegistrationService:
-    def __init__(self, rows: list[dict] | None = None) -> None:
+    def __init__(self, rows: list[dict] | None = None, contexts: list[dict] | None = None) -> None:
         self.rows = rows or []
+        self.contexts = contexts or [{"id_asignacion": "AS1", "display": "Contexto demo"}]
 
     def listar_contextos_disponibles(self) -> list[dict]:
-        return [{"id_asignacion": "AS1", "display": "Contexto demo"}]
+        return list(self.contexts)
 
     def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
         return list(self.rows)
@@ -135,6 +136,22 @@ class TestGradesView(unittest.TestCase):
         QApplication.clipboard().setText("8,75")
         view._paste_from_clipboard()
         self.assertEqual(view.table.item(0, 1).text(), "8.75")
+
+    def test_refresh_data_conserva_asignacion_seleccionada(self) -> None:
+        from src.presentation.views.grades_view import GradesView
+
+        service = _FakeGradeRegistrationService(
+            contexts=[
+                {"id_asignacion": "AS1", "display": "Contexto demo 1"},
+                {"id_asignacion": "AS2", "display": "Contexto demo 2"},
+            ]
+        )
+        view = GradesView(service)
+        idx = view.assignment_combo.findData("AS2")
+        view.assignment_combo.setCurrentIndex(idx)
+
+        view.refresh_data()
+        self.assertEqual(view.assignment_combo.currentData(), "AS2")
 
 
 if __name__ == "__main__":
