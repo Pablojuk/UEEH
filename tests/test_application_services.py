@@ -67,7 +67,7 @@ class TestApplicationServices(unittest.TestCase):
         self.catalog_service.crear_curso(
             {"id_curso": "C1", "nombre": "Primero", "nivel": "Basica"}
         )
-        self.catalog_service.crear_paralelo({"id_paralelo": "P1", "nombre": "A"})
+        self.catalog_service.crear_paralelo({"id_paralelo": "P1", "nombre": "Z"})
         self.catalog_service.crear_asignatura(
             {"id_asignatura": "A1", "nombre": "Matemática", "codigo": "MAT"}
         )
@@ -81,9 +81,12 @@ class TestApplicationServices(unittest.TestCase):
             }
         )
 
-        self.assertEqual(len(self.catalog_service.listar_cursos()), 1)
-        self.assertEqual(len(self.catalog_service.listar_paralelos()), 1)
-        self.assertEqual(len(self.catalog_service.listar_asignaturas()), 1)
+        cursos_ids = {row["id_curso"] for row in self.catalog_service.listar_cursos()}
+        paralelos_ids = {row["id_paralelo"] for row in self.catalog_service.listar_paralelos()}
+        asignaturas_ids = {row["id_asignatura"] for row in self.catalog_service.listar_asignaturas()}
+        self.assertIn("C1", cursos_ids)
+        self.assertIn("P1", paralelos_ids)
+        self.assertIn("A1", asignaturas_ids)
         self.assertEqual(len(self.catalog_service.listar_periodos_lectivos()), 1)
 
     def test_docentes_importa_id_y_identificacion_texto(self) -> None:

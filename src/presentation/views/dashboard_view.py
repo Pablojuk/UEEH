@@ -72,3 +72,11 @@ class DashboardView(QWidget):
         for key, label in self.value_labels.items():
             value = institution.get(key)
             label.setText(str(value).strip() if value else "No registrado")
+        self._hide_duplicate_logo_placeholders()
+
+    def _hide_duplicate_logo_placeholders(self) -> None:
+        """Oculta placeholders de logo repetidos si quedaron en layouts antiguos."""
+        duplicate_texts = {"Logo ministerial", "Logo institucional"}
+        for label in self.findChildren(QLabel):
+            if label.text().strip() in duplicate_texts:
+                label.hide()

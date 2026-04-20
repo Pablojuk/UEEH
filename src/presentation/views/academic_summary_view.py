@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
@@ -173,6 +175,31 @@ class AcademicSummaryView(QWidget):
             self._preview_uses_webengine = False
         preview_layout.addWidget(self.preview_view)
         self.tabs.addTab(preview_tab, "Vista previa")
+        self.btn_toggle_filas = QPushButton("🙈 Ocultar Filas Vacías")
+        self.btn_toggle_filas.setCheckable(True)
+        self.btn_toggle_filas.setChecked(False)
+        self.btn_toggle_filas.setCursor(Qt.PointingHandCursor)
+        self.btn_toggle_filas.setFixedHeight(28)
+        self.btn_toggle_filas.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #5b7fa6;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 0 12px;
+                font-size: 12px;
+            }
+            QPushButton:checked {
+                background-color: #2e5f8a;
+            }
+            QPushButton:hover {
+                background-color: #4a6d94;
+            }
+            """
+        )
+        self.btn_toggle_filas.clicked.connect(self._toggle_filas_vacias)
+        self.tabs.setCornerWidget(self.btn_toggle_filas, Qt.TopRightCorner)
 
         root.addWidget(title)
         root.addWidget(subtitle)
@@ -184,7 +211,7 @@ class AcademicSummaryView(QWidget):
         self._load_signer_options()
         self._on_report_type_changed()
 
-    def load_contexts(self) -> None:
+    def load_contexts(self, selected_assignment_id: str | None = None) -> None:
         self.assignment_combo.clear()
         contexts = self.academic_summary_service.listar_contextos_disponibles()
         self._contexts_by_id = {str(row.get("id_asignacion")): row for row in contexts if row.get("id_asignacion")}
@@ -194,6 +221,10 @@ class AcademicSummaryView(QWidget):
 
         for row in contexts:
             self.assignment_combo.addItem(row.get("display", row.get("id_asignacion", "")), row.get("id_asignacion"))
+        if selected_assignment_id:
+            idx = self.assignment_combo.findData(selected_assignment_id)
+            if idx >= 0:
+                self.assignment_combo.setCurrentIndex(idx)
 
     def load_summary(self) -> None:
         asignacion_id = self.assignment_combo.currentData()
@@ -286,7 +317,9 @@ class AcademicSummaryView(QWidget):
             QMessageBox.warning(self, "Validación", "Seleccione una asignación")
             return
 
-        default_name = f"reporte_{asignacion_id}.{ 'pdf' if kind == 'pdf' else 'xlsx' }"
+        assignment_text = self.assignment_combo.currentText() or str(asignacion_id)
+        safe_base = self._sanitize_filename(assignment_text)
+        default_name = f"{safe_base}.{ 'pdf' if kind == 'pdf' else 'xlsx' }"
         selected_path, _ = QFileDialog.getSaveFileName(
             self,
             "Guardar reporte",
@@ -297,6 +330,7 @@ class AcademicSummaryView(QWidget):
             return
 
         report_type, trimestre_num = self.report_type_combo.currentData()
+        ocultar_filas_vacias = self.btn_toggle_filas.isChecked()
         if kind == "pdf":
             ok, message = self.report_export_service.exportar_resumen_pdf(
                 asignacion_id,
@@ -304,6 +338,7 @@ class AcademicSummaryView(QWidget):
                 report_type=report_type,
                 trimestre_num=trimestre_num,
                 firmantes=self._firmantes,
+                ocultar_filas_vacias=ocultar_filas_vacias,
             )
         else:
             ok, message = self.report_export_service.exportar_resumen_excel(
@@ -312,6 +347,7 @@ class AcademicSummaryView(QWidget):
                 report_type=report_type,
                 trimestre_num=trimestre_num,
                 firmantes=self._firmantes,
+                ocultar_filas_vacias=ocultar_filas_vacias,
             )
 
         if ok:
@@ -360,12 +396,48 @@ class AcademicSummaryView(QWidget):
         self._rows_meta = []
 
     def _set_preview_html(self, html_content: str) -> None:
+        self.btn_toggle_filas.setChecked(False)
+        self.btn_toggle_filas.setText("🙈 Ocultar Filas Vacías")
         if self._preview_uses_webengine:
             self.preview_view.setHtml(html_content)
         else:
             self.preview_view.setHtml(html_content)
 
-    def _load_signer_options(self) -> None:
+    def _toggle_filas_vacias(self, checked: bool) -> None:
+        if checked:
+            self.btn_toggle_filas.setText("👁 Mostrar Filas Vacías")
+            js_code = """
+                (function() {
+                    function isEmptyCell(cell) {
+                        if (!cell) { return true; }
+                        var text = (cell.textContent || '').replace(/\\u00A0/g, '').trim();
+                        var raw = (cell.innerHTML || '').trim().toLowerCase();
+                        return text === '' || text === '—' || raw === '&nbsp;' || raw === '';
+                    }
+                    var rows = document.querySelectorAll('table.principal tbody tr');
+                    rows.forEach(function(row) {
+                        var celdaNombre = row.cells[1];
+                        if (isEmptyCell(celdaNombre)) {
+                            row.style.display = 'none';
+                        }
+                    });
+                })();
+            """
+        else:
+            self.btn_toggle_filas.setText("🙈 Ocultar Filas Vacías")
+            js_code = """
+                (function() {
+                    var rows = document.querySelectorAll('table.principal tbody tr');
+                    rows.forEach(function(row) {
+                        row.style.display = '';
+                    });
+                })();
+            """
+
+        if self._preview_uses_webengine and hasattr(self.preview_view, "page"):
+            self.preview_view.page().runJavaScript(js_code)
+
+    def _load_signer_options(self, selected_signers: dict[str, str] | None = None) -> None:
         options = self.academic_summary_service.listar_firmantes_disponibles()
         combos = [
             self.signer_docente_combo,
@@ -378,7 +450,29 @@ class AcademicSummaryView(QWidget):
             combo.addItem("Seleccione", "")
             for row in options:
                 combo.addItem(row.get("firma", ""), row.get("firma", ""))
+        if selected_signers:
+            mapping = [
+                (self.signer_docente_combo, selected_signers.get("docente", "")),
+                (self.signer_coordinador_combo, selected_signers.get("coordinador_area", "")),
+                (self.signer_rector_combo, selected_signers.get("rector", "")),
+                (self.signer_tutor_combo, selected_signers.get("tutor_curso", "")),
+            ]
+            for combo, value in mapping:
+                idx = combo.findData(value)
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
         self._update_signers()
+
+    def refresh_data(self) -> None:
+        selected_assignment_id = self.assignment_combo.currentData()
+        selected_signers = {
+            "docente": self.signer_docente_combo.currentData() or "",
+            "coordinador_area": self.signer_coordinador_combo.currentData() or "",
+            "rector": self.signer_rector_combo.currentData() or "",
+            "tutor_curso": self.signer_tutor_combo.currentData() or "",
+        }
+        self.load_contexts(selected_assignment_id=selected_assignment_id)
+        self._load_signer_options(selected_signers=selected_signers)
 
     def _update_signers(self) -> None:
         self._firmantes = {
@@ -408,3 +502,10 @@ class AcademicSummaryView(QWidget):
                 values.append(item.text() if item else "")
             lines.append("\t".join(values))
         QApplication.clipboard().setText("\n".join(lines))
+
+    @staticmethod
+    def _sanitize_filename(text: str) -> str:
+        normalized = re.sub(r"[|/\\\\:*?\"<>]", "_", str(text or "").strip())
+        normalized = normalized.replace(" ", "_")
+        normalized = re.sub(r"_+", "_", normalized).strip(" ._")
+        return normalized or "reporte"

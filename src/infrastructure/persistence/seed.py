@@ -7,6 +7,46 @@ import sqlite3
 from .repositories import ConfiguracionSistemaRepository
 
 
+CATALOG_COURSES: tuple[dict[str, str], ...] = (
+    {"id_curso": "CUR-001", "nombre": "5to EGB", "nivel": "EGB"},
+    {"id_curso": "CUR-002", "nombre": "6to EGB", "nivel": "EGB"},
+    {"id_curso": "CUR-003", "nombre": "7mo EGB", "nivel": "EGB"},
+    {"id_curso": "CUR-004", "nombre": "8vo EGB", "nivel": "EGB"},
+    {"id_curso": "CUR-005", "nombre": "9no EGB", "nivel": "EGB"},
+    {"id_curso": "CUR-006", "nombre": "10mo EGB", "nivel": "EGB"},
+    {"id_curso": "CUR-007", "nombre": "1ro BGU", "nivel": "BGU"},
+    {"id_curso": "CUR-008", "nombre": "2do BGU", "nivel": "BGU"},
+    {"id_curso": "CUR-009", "nombre": "3ro BGU", "nivel": "BGU"},
+)
+
+CATALOG_PARALLELS: tuple[dict[str, str], ...] = (
+    {"id_paralelo": "PAR-001", "nombre": "A"},
+    {"id_paralelo": "PAR-002", "nombre": "B"},
+    {"id_paralelo": "PAR-003", "nombre": "C"},
+    {"id_paralelo": "PAR-004", "nombre": "D"},
+    {"id_paralelo": "PAR-005", "nombre": "E"},
+    {"id_paralelo": "PAR-006", "nombre": "F"},
+    {"id_paralelo": "PAR-007", "nombre": "G"},
+    {"id_paralelo": "PAR-008", "nombre": "H"},
+)
+
+CATALOG_SUBJECTS: tuple[dict[str, str], ...] = (
+    {"id_asignatura": "ASIG-001", "nombre": "Matemática", "codigo": "MAT"},
+    {"id_asignatura": "ASIG-002", "nombre": "Lengua y Literatura", "codigo": "LYL"},
+    {"id_asignatura": "ASIG-003", "nombre": "Ciencias Naturales", "codigo": "CN"},
+    {"id_asignatura": "ASIG-004", "nombre": "Estudios Sociales", "codigo": "ES"},
+    {"id_asignatura": "ASIG-005", "nombre": "Inglés", "codigo": "ING"},
+    {"id_asignatura": "ASIG-006", "nombre": "Educación Cultural y Artística", "codigo": "ECA"},
+    {"id_asignatura": "ASIG-007", "nombre": "Educación Física", "codigo": "EF"},
+    {"id_asignatura": "ASIG-008", "nombre": "Emprendimiento y Gestión", "codigo": "EYG"},
+    {"id_asignatura": "ASIG-009", "nombre": "Filosofía", "codigo": "FIL"},
+    {"id_asignatura": "ASIG-010", "nombre": "Historia", "codigo": "HIS"},
+    {"id_asignatura": "ASIG-011", "nombre": "Biología", "codigo": "BIO"},
+    {"id_asignatura": "ASIG-012", "nombre": "Física", "codigo": "FIS"},
+    {"id_asignatura": "ASIG-013", "nombre": "Química", "codigo": "QUI"},
+)
+
+
 def seed_configuracion_base(
     connection: sqlite3.Connection,
     clave_inicial_hash: str,
@@ -44,6 +84,52 @@ def seed_trimestres(connection: sqlite3.Connection, periodo_id: str) -> None:
                 """,
                 seed,
             )
+
+
+def seed_catalogos_academicos(connection: sqlite3.Connection) -> None:
+    """Inserta catálogos base de cursos, paralelos y asignaturas sin duplicar."""
+    with connection:
+        for course in CATALOG_COURSES:
+            exists = connection.execute(
+                "SELECT 1 FROM cursos WHERE id_curso = ? OR nombre = ? LIMIT 1",
+                (course["id_curso"], course["nombre"]),
+            ).fetchone()
+            if exists is None:
+                connection.execute(
+                    """
+                    INSERT INTO cursos (id_curso, nombre, nivel)
+                    VALUES (:id_curso, :nombre, :nivel)
+                    """,
+                    course,
+                )
+
+        for parallel in CATALOG_PARALLELS:
+            exists = connection.execute(
+                "SELECT 1 FROM paralelos WHERE id_paralelo = ? OR nombre = ? LIMIT 1",
+                (parallel["id_paralelo"], parallel["nombre"]),
+            ).fetchone()
+            if exists is None:
+                connection.execute(
+                    """
+                    INSERT INTO paralelos (id_paralelo, nombre)
+                    VALUES (:id_paralelo, :nombre)
+                    """,
+                    parallel,
+                )
+
+        for subject in CATALOG_SUBJECTS:
+            exists = connection.execute(
+                "SELECT 1 FROM asignaturas WHERE id_asignatura = ? OR nombre = ? LIMIT 1",
+                (subject["id_asignatura"], subject["nombre"]),
+            ).fetchone()
+            if exists is None:
+                connection.execute(
+                    """
+                    INSERT INTO asignaturas (id_asignatura, nombre, codigo)
+                    VALUES (:id_asignatura, :nombre, :codigo)
+                    """,
+                    subject,
+                )
 
 
 def run_safe_seeds(
