@@ -39,6 +39,7 @@ class ReportExportService:
         report_type: str = "anual",
         trimestre_num: int | None = None,
         firmantes: dict[str, str] | None = None,
+        ocultar_filas_vacias: bool = False,
     ) -> tuple[bool, str]:
         return self._exportar(
             asignacion_id,
@@ -47,6 +48,7 @@ class ReportExportService:
             report_type=report_type,
             trimestre_num=trimestre_num,
             firmantes=firmantes,
+            ocultar_filas_vacias=ocultar_filas_vacias,
         )
 
     def exportar_resumen_excel(
@@ -56,6 +58,7 @@ class ReportExportService:
         report_type: str = "anual",
         trimestre_num: int | None = None,
         firmantes: dict[str, str] | None = None,
+        ocultar_filas_vacias: bool = False,
     ) -> tuple[bool, str]:
         return self._exportar(
             asignacion_id,
@@ -64,6 +67,7 @@ class ReportExportService:
             report_type=report_type,
             trimestre_num=trimestre_num,
             firmantes=firmantes,
+            ocultar_filas_vacias=ocultar_filas_vacias,
         )
 
     def generar_resumen_html(
@@ -86,6 +90,7 @@ class ReportExportService:
         report_type: str,
         trimestre_num: int | None,
         firmantes: dict[str, str] | None,
+        ocultar_filas_vacias: bool = False,
     ) -> tuple[bool, str]:
         if not str(asignacion_id or "").strip():
             return False, "Debe seleccionar una asignación"
@@ -98,10 +103,20 @@ class ReportExportService:
             normalized_path = self._normalize_output_path(output_path, export_kind)
             if export_kind == "pdf":
                 title = "Cuadro de Calificación Trimestral" if report_type == "trimestral" else "Cuadro de Calificación Anual"
-                result_path = self.pdf_exporter.exportar(normalized_path, title, context, rows)
+                try:
+                    result_path = self.pdf_exporter.exportar(
+                        normalized_path, title, context, rows, ocultar_filas_vacias=ocultar_filas_vacias
+                    )
+                except TypeError:
+                    result_path = self.pdf_exporter.exportar(normalized_path, title, context, rows)
             else:
                 title = "Cuadro de Calificación Trimestral" if report_type == "trimestral" else "Cuadro de Calificación Anual"
-                result_path = self.excel_exporter.exportar(normalized_path, title, context, rows)
+                try:
+                    result_path = self.excel_exporter.exportar(
+                        normalized_path, title, context, rows, ocultar_filas_vacias=ocultar_filas_vacias
+                    )
+                except TypeError:
+                    result_path = self.excel_exporter.exportar(normalized_path, title, context, rows)
             return True, f"Archivo generado: {result_path}"
         except Exception as exc:
             return False, f"Error al exportar: {exc}"

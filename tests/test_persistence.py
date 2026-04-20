@@ -113,6 +113,26 @@ class TestPersistenceSQLite(unittest.TestCase):
         self.assertEqual(conf_count, 1)
         self.assertEqual(trim_count, 3)
 
+    def test_seed_catalogos_desde_catalog_service_es_idempotente(self) -> None:
+        from src.application.services.catalog_service import CatalogService
+
+        CatalogService(self.connection)
+        CatalogService(self.connection)
+
+        cursos_count = self.connection.execute(
+            "SELECT COUNT(*) AS c FROM cursos"
+        ).fetchone()["c"]
+        paralelos_count = self.connection.execute(
+            "SELECT COUNT(*) AS c FROM paralelos"
+        ).fetchone()["c"]
+        asignaturas_count = self.connection.execute(
+            "SELECT COUNT(*) AS c FROM asignaturas"
+        ).fetchone()["c"]
+
+        self.assertEqual(cursos_count, 9)
+        self.assertEqual(paralelos_count, 8)
+        self.assertEqual(asignaturas_count, 13)
+
     def test_registro_basico_con_relaciones_validas(self) -> None:
         self.connection.execute(
             "INSERT INTO paralelos (id_paralelo, nombre) VALUES ('P1', 'A')"
