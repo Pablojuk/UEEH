@@ -50,7 +50,6 @@ class DashboardView(QWidget):
         self._add_field_row(grid, row, "Inspector(a)", "inspector", span=5)
 
         root.addWidget(card)
-        root.addLayout(self._build_logo_panel())
         root.addStretch(1)
         root.addLayout(self._build_logo_panel())
 
