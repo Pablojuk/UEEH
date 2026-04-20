@@ -13,6 +13,7 @@ from src.infrastructure.persistence.repositories import (
 )
 
 RESPONSE_OPTIONS = ("Siempre", "Frecuentemente", "Ocasionalmente", "Nunca")
+MAX_ACTIVE_SKILLS = 9
 
 SKILL_CATEGORIES: tuple[dict[str, Any], ...] = (
     {
@@ -107,10 +108,11 @@ class ClassroomAccompanimentService:
         if not asignacion:
             return {
                 "students": [],
-                "skill_categories": self._skill_categories_with_visibility({}, []),
+                "skill_categories": self._skill_categories_with_visibility({}, [], []),
                 "active_skills": [],
                 "responses": {},
                 "results": {},
+                "validation_message": "",
             }
 
         estudiantes = self.connection.execute(
@@ -135,7 +137,12 @@ class ClassroomAccompanimentService:
 
         skills = self.listar_habilidades_base()
         configured_visibility = self._load_visibility(asignacion_id, trimestre_num)
-        active_skills = [s["key"] for s in skills if configured_visibility.get(s["key"], True)]
+        if configured_visibility:
+            active_skills = [s["key"] for s in skills if configured_visibility.get(s["key"], False)]
+            active_skills, exceeded = self._limit_active_skills(active_skills)
+        else:
+            active_skills = [s["key"] for s in skills[:MAX_ACTIVE_SKILLS]]
+            exceeded = False
 
         saved_rows = self.connection.execute(
             """
@@ -166,10 +173,15 @@ class ClassroomAccompanimentService:
         results = self._build_results(students_out, active_skills, responses)
         return {
             "students": students_out,
-            "skill_categories": self._skill_categories_with_visibility(configured_visibility, skills),
+            "skill_categories": self._skill_categories_with_visibility(configured_visibility, skills, active_skills),
             "active_skills": active_skills,
             "responses": responses,
             "results": results,
+            "validation_message": (
+                f"Solo se pueden seleccionar hasta {MAX_ACTIVE_SKILLS} habilidades activas para esta evaluación."
+                if exceeded
+                else ""
+            ),
         }
 
     def guardar_evaluacion(
@@ -181,6 +193,8 @@ class ClassroomAccompanimentService:
     ) -> tuple[bool, str]:
         if trimestre_num not in (1, 2, 3):
             return False, "Trimestre inválido"
+        if len(active_skills) > MAX_ACTIVE_SKILLS:
+            return False, f"Solo se pueden seleccionar hasta {MAX_ACTIVE_SKILLS} habilidades activas para esta evaluación."
 
         all_skills = [skill["key"] for skill in self.listar_habilidades_base()]
         visible_map = {key: key in set(active_skills) for key in all_skills}
@@ -227,12 +241,28 @@ class ClassroomAccompanimentService:
         return True, f"Evaluaciones guardadas: {guardados}"
 
     def calcular_resultado_estudiante(self, skill_values: dict[str, str], active_skills: list[str]) -> dict[str, Any]:
+        if len(active_skills) > MAX_ACTIVE_SKILLS:
+            return {
+                "total_siempre": 0,
+                "total_frecuentemente": 0,
+                "total_ocasionalmente": 0,
+                "total_nunca": 0,
+                "puntaje_total_ponderado": None,
+                "valoracion_final": "",
+                "validation_message": f"Solo se pueden seleccionar hasta {MAX_ACTIVE_SKILLS} habilidades activas para esta evaluación.",
+            }
         counts = {option: 0 for option in RESPONSE_OPTIONS}
         for skill_key in active_skills:
             value = (skill_values or {}).get(skill_key)
             if value in counts:
                 counts[value] += 1
 
+        puntaje_total = (
+            (counts["Siempre"] * 4)
+            + (counts["Frecuentemente"] * 3)
+            + (counts["Ocasionalmente"] * 2)
+            + (counts["Nunca"] * 1)
+        )
         final = calcular_valoracion_acompanamiento(
             total_siempre=counts["Siempre"],
             total_frecuentemente=counts["Frecuentemente"],
@@ -244,7 +274,9 @@ class ClassroomAccompanimentService:
             "total_frecuentemente": counts["Frecuentemente"],
             "total_ocasionalmente": counts["Ocasionalmente"],
             "total_nunca": counts["Nunca"],
+            "puntaje_total_ponderado": puntaje_total,
             "valoracion_final": final,
+            "validation_message": "",
         }
 
     def _build_results(
@@ -271,14 +303,19 @@ class ClassroomAccompanimentService:
         return {row["habilidad_clave"]: bool(row["visible"]) for row in rows}
 
     @staticmethod
-    def _skill_categories_with_visibility(visibility: dict[str, bool], skills: list[dict[str, str]]) -> list[dict[str, Any]]:
+    def _skill_categories_with_visibility(
+        visibility: dict[str, bool],
+        skills: list[dict[str, str]],
+        active_skills: list[str],
+    ) -> list[dict[str, Any]]:
+        active_set = set(active_skills)
         by_category: dict[str, list[dict[str, Any]]] = {}
         for skill in skills:
             by_category.setdefault(skill["category"], []).append(
                 {
                     "key": skill["key"],
                     "label": skill["label"],
-                    "visible": visibility.get(skill["key"], True),
+                    "visible": skill["key"] in active_set,
                 }
             )
 
@@ -286,3 +323,10 @@ class ClassroomAccompanimentService:
         for category_name, category_skills in by_category.items():
             categories.append({"category": category_name, "skills": category_skills})
         return categories
+
+    @staticmethod
+    def _limit_active_skills(active_skills: list[str]) -> tuple[list[str], bool]:
+        normalized = list(dict.fromkeys(active_skills))
+        if len(normalized) <= MAX_ACTIVE_SKILLS:
+            return normalized, False
+        return normalized[:MAX_ACTIVE_SKILLS], True

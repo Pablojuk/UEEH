@@ -99,18 +99,18 @@ class TestSupletorio(unittest.TestCase):
 
 class TestValoracionAcompanamiento(unittest.TestCase):
     def test_tramos_altos(self) -> None:
-        self.assertEqual(calcular_valoracion_acompanamiento(30, 5, 0, 0), "A+")
-        self.assertEqual(calcular_valoracion_acompanamiento(32, 1, 0, 0), "A-")
-        self.assertEqual(calcular_valoracion_acompanamiento(28, 2, 0, 0), "B+")
-        self.assertEqual(calcular_valoracion_acompanamiento(26, 1, 0, 0), "B-")
+        self.assertEqual(calcular_valoracion_acompanamiento(9, 0, 0, 0), "A+")
+        self.assertEqual(calcular_valoracion_acompanamiento(8, 0, 1, 0), "A-")
+        self.assertEqual(calcular_valoracion_acompanamiento(6, 2, 1, 0), "B+")
+        self.assertEqual(calcular_valoracion_acompanamiento(5, 2, 1, 1), "B-")
 
     def test_tramos_medios_bajos(self) -> None:
-        self.assertEqual(calcular_valoracion_acompanamiento(16, 4, 0, 0), "C+")
-        self.assertEqual(calcular_valoracion_acompanamiento(10, 8, 0, 0), "C-")
-        self.assertEqual(calcular_valoracion_acompanamiento(8, 7, 0, 0), "D+")
-        self.assertEqual(calcular_valoracion_acompanamiento(7, 6, 0, 0), "D-")
-        self.assertEqual(calcular_valoracion_acompanamiento(6, 5, 0, 0), "E+")
-        self.assertEqual(calcular_valoracion_acompanamiento(5, 4, 0, 0), "E-")
+        self.assertEqual(calcular_valoracion_acompanamiento(5, 0, 0, 0), "C+")
+        self.assertEqual(calcular_valoracion_acompanamiento(4, 1, 0, 0), "C-")
+        self.assertEqual(calcular_valoracion_acompanamiento(3, 1, 1, 0), "D+")
+        self.assertEqual(calcular_valoracion_acompanamiento(2, 1, 1, 1), "D-")
+        self.assertEqual(calcular_valoracion_acompanamiento(2, 1, 0, 0), "E+")
+        self.assertEqual(calcular_valoracion_acompanamiento(1, 1, 1, 0), "E-")
 
 
 if __name__ == "__main__":

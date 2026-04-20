@@ -94,7 +94,14 @@ class TestClassroomAccompanimentService(unittest.TestCase):
         self.assertEqual(result["total_siempre"], 1)
         self.assertEqual(result["total_frecuentemente"], 1)
         self.assertEqual(result["total_nunca"], 1)
+        self.assertEqual(result["puntaje_total_ponderado"], 8)
         self.assertIsInstance(result["valoracion_final"], str)
+
+    def test_no_permite_guardar_mas_de_nueve_habilidades_activas(self) -> None:
+        active_skills = [f"skill_{i}" for i in range(10)]
+        ok, message = self.service.guardar_evaluacion("AS1", 1, active_skills, {})
+        self.assertFalse(ok)
+        self.assertIn("hasta 9 habilidades", message)
 
 
 if __name__ == "__main__":

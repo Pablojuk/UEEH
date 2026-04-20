@@ -32,6 +32,7 @@ class _FakeAccompanimentService:
             "active_skills": ["autoconocimiento"],
             "responses": {"E1": {"autoconocimiento": "Siempre"}},
             "results": {},
+            "validation_message": "",
         }
 
     def guardar_evaluacion(self, asignacion_id: str, trimestre_num: int, active_skills: list[str], responses: dict) -> tuple[bool, str]:
@@ -43,7 +44,9 @@ class _FakeAccompanimentService:
             "total_frecuentemente": 0,
             "total_ocasionalmente": 0,
             "total_nunca": 0,
+            "puntaje_total_ponderado": 4,
             "valoracion_final": "",
+            "validation_message": "",
         }
 
 

@@ -24,7 +24,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.application.services.classroom_accompaniment_service import ClassroomAccompanimentService, RESPONSE_OPTIONS
+from src.application.services.classroom_accompaniment_service import (
+    MAX_ACTIVE_SKILLS,
+    ClassroomAccompanimentService,
+    RESPONSE_OPTIONS,
+)
 from src.presentation.app_signals import AppSignals
 
 
@@ -36,6 +40,7 @@ class SkillConfigDialog(QDialog):
         self.setWindowTitle("Configurar habilidades")
         self.resize(560, 540)
         self._checkboxes: dict[str, QCheckBox] = {}
+        self._max_skills = MAX_ACTIVE_SKILLS
 
         layout = QVBoxLayout(self)
         info = QLabel("Seleccione las habilidades activas para esta asignación y trimestre.")
@@ -60,6 +65,7 @@ class SkillConfigDialog(QDialog):
             for skill in category["skills"]:
                 checkbox = QCheckBox(skill["label"])
                 checkbox.setChecked(bool(skill.get("visible", True)))
+                checkbox.toggled.connect(self._on_checkbox_toggled)
                 self._checkboxes[skill["key"]] = checkbox
                 grid.addWidget(checkbox, row, col)
                 col += 1
@@ -80,6 +86,23 @@ class SkillConfigDialog(QDialog):
 
     def selected_skills(self) -> list[str]:
         return [key for key, checkbox in self._checkboxes.items() if checkbox.isChecked()]
+
+    def _on_checkbox_toggled(self, checked: bool) -> None:
+        if not checked:
+            return
+        selected_count = len(self.selected_skills())
+        if selected_count <= self._max_skills:
+            return
+        checkbox = self.sender()
+        if isinstance(checkbox, QCheckBox):
+            checkbox.blockSignals(True)
+            checkbox.setChecked(False)
+            checkbox.blockSignals(False)
+        QMessageBox.warning(
+            self,
+            "Validación",
+            f"Solo se pueden seleccionar hasta {self._max_skills} habilidades activas para esta evaluación.",
+        )
 
 
 class ClassroomAccompanimentView(QWidget):
@@ -192,6 +215,9 @@ class ClassroomAccompanimentView(QWidget):
         self._active_skills = list(payload.get("active_skills", []))
         self._students = list(payload.get("students", []))
         self._responses = dict(payload.get("responses", {}))
+        validation_message = payload.get("validation_message", "")
+        if validation_message:
+            QMessageBox.warning(self, "Validación", validation_message)
 
         self._refresh_skills_reference()
         self._fill_table()
@@ -235,6 +261,13 @@ class ClassroomAccompanimentView(QWidget):
         if not selected:
             QMessageBox.warning(self, "Validación", "Debe dejar al menos una habilidad visible")
             return
+        if len(selected) > MAX_ACTIVE_SKILLS:
+            QMessageBox.warning(
+                self,
+                "Validación",
+                f"Solo se pueden seleccionar hasta {MAX_ACTIVE_SKILLS} habilidades activas para esta evaluación.",
+            )
+            return
 
         selected_set = set(selected)
         for category in self._skill_categories:
@@ -260,6 +293,7 @@ class ClassroomAccompanimentView(QWidget):
             "Total Frecuentemente",
             "Total Ocasionalmente",
             "Total Nunca",
+            "Puntaje total",
             "Valoración final",
         ]
 
@@ -299,9 +333,14 @@ class ClassroomAccompanimentView(QWidget):
         self.table.setItem(row_idx, base_col + 1, QTableWidgetItem(str(result["total_frecuentemente"])))
         self.table.setItem(row_idx, base_col + 2, QTableWidgetItem(str(result["total_ocasionalmente"])))
         self.table.setItem(row_idx, base_col + 3, QTableWidgetItem(str(result["total_nunca"])))
-        self.table.setItem(row_idx, base_col + 4, QTableWidgetItem(result["valoracion_final"]))
+        self.table.setItem(
+            row_idx,
+            base_col + 4,
+            QTableWidgetItem("" if result.get("puntaje_total_ponderado") is None else str(result.get("puntaje_total_ponderado"))),
+        )
+        self.table.setItem(row_idx, base_col + 5, QTableWidgetItem(result["valoracion_final"]))
 
-        for col in range(base_col, base_col + 5):
+        for col in range(base_col, base_col + 6):
             item = self.table.item(row_idx, col)
             if item:
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)

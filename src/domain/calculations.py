@@ -153,29 +153,51 @@ def calcular_valoracion_acompanamiento(
     total_ocasionalmente: int,
     total_nunca: int,
 ) -> str:
-    """Calcula valoración cualitativa para acompañamiento (adaptación de fórmula Excel)."""
-    sf = int(total_siempre) + int(total_frecuentemente)
-    sfo = sf + int(total_ocasionalmente)
-    sfno = sfo + int(total_nunca)
+    """Calcula valoración cualitativa para acompañamiento usando puntaje ponderado (1..36)."""
+    puntaje_total = calcular_puntaje_ponderado_acompanamiento(
+        total_siempre=total_siempre,
+        total_frecuentemente=total_frecuentemente,
+        total_ocasionalmente=total_ocasionalmente,
+        total_nunca=total_nunca,
+    )
+    return calcular_valoracion_acompanamiento_desde_puntaje(puntaje_total)
 
-    if sf >= 35:
+
+def calcular_puntaje_ponderado_acompanamiento(
+    total_siempre: int,
+    total_frecuentemente: int,
+    total_ocasionalmente: int,
+    total_nunca: int,
+) -> int:
+    """Convierte conteos de respuestas en puntaje ponderado."""
+    return (
+        (int(total_siempre) * 4)
+        + (int(total_frecuentemente) * 3)
+        + (int(total_ocasionalmente) * 2)
+        + (int(total_nunca) * 1)
+    )
+
+
+def calcular_valoracion_acompanamiento_desde_puntaje(puntaje_total: int) -> str:
+    """Evalúa la escala cualitativa institucional con base en puntaje total ponderado."""
+    if 35 <= puntaje_total <= 36:
         return "A+"
-    if sf >= 33:
+    if 33 <= puntaje_total <= 34:
         return "A-"
-    if sf >= 30:
+    if 30 <= puntaje_total <= 32:
         return "B+"
-    if sf >= 27:
+    if 27 <= puntaje_total <= 29:
         return "B-"
-    if 20 <= sfo <= 34 and int(total_nunca) == 0:
+    if 20 <= puntaje_total <= 26:
         return "C+"
-    if 18 <= sfno <= 33:
+    if 18 <= puntaje_total <= 19:
         return "C-"
-    if 15 <= sfno <= 17:
+    if 15 <= puntaje_total <= 17:
         return "D+"
-    if 13 <= sfno <= 14:
+    if 13 <= puntaje_total <= 14:
         return "D-"
-    if 11 <= sfno <= 12:
+    if 11 <= puntaje_total <= 12:
         return "E+"
-    if 9 <= sfno <= 10:
+    if 9 <= puntaje_total <= 10:
         return "E-"
     return ""
