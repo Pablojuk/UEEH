@@ -211,7 +211,7 @@ class AcademicSummaryView(QWidget):
         self._load_signer_options()
         self._on_report_type_changed()
 
-    def load_contexts(self) -> None:
+    def load_contexts(self, selected_assignment_id: str | None = None) -> None:
         self.assignment_combo.clear()
         contexts = self.academic_summary_service.listar_contextos_disponibles()
         self._contexts_by_id = {str(row.get("id_asignacion")): row for row in contexts if row.get("id_asignacion")}
@@ -221,6 +221,10 @@ class AcademicSummaryView(QWidget):
 
         for row in contexts:
             self.assignment_combo.addItem(row.get("display", row.get("id_asignacion", "")), row.get("id_asignacion"))
+        if selected_assignment_id:
+            idx = self.assignment_combo.findData(selected_assignment_id)
+            if idx >= 0:
+                self.assignment_combo.setCurrentIndex(idx)
 
     def load_summary(self) -> None:
         asignacion_id = self.assignment_combo.currentData()
@@ -433,7 +437,7 @@ class AcademicSummaryView(QWidget):
         if self._preview_uses_webengine and hasattr(self.preview_view, "page"):
             self.preview_view.page().runJavaScript(js_code)
 
-    def _load_signer_options(self) -> None:
+    def _load_signer_options(self, selected_signers: dict[str, str] | None = None) -> None:
         options = self.academic_summary_service.listar_firmantes_disponibles()
         combos = [
             self.signer_docente_combo,
@@ -446,7 +450,29 @@ class AcademicSummaryView(QWidget):
             combo.addItem("Seleccione", "")
             for row in options:
                 combo.addItem(row.get("firma", ""), row.get("firma", ""))
+        if selected_signers:
+            mapping = [
+                (self.signer_docente_combo, selected_signers.get("docente", "")),
+                (self.signer_coordinador_combo, selected_signers.get("coordinador_area", "")),
+                (self.signer_rector_combo, selected_signers.get("rector", "")),
+                (self.signer_tutor_combo, selected_signers.get("tutor_curso", "")),
+            ]
+            for combo, value in mapping:
+                idx = combo.findData(value)
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
         self._update_signers()
+
+    def refresh_data(self) -> None:
+        selected_assignment_id = self.assignment_combo.currentData()
+        selected_signers = {
+            "docente": self.signer_docente_combo.currentData() or "",
+            "coordinador_area": self.signer_coordinador_combo.currentData() or "",
+            "rector": self.signer_rector_combo.currentData() or "",
+            "tutor_curso": self.signer_tutor_combo.currentData() or "",
+        }
+        self.load_contexts(selected_assignment_id=selected_assignment_id)
+        self._load_signer_options(selected_signers=selected_signers)
 
     def _update_signers(self) -> None:
         self._firmantes = {

@@ -50,6 +50,7 @@ class DashboardView(QWidget):
         self._add_field_row(grid, row, "Inspector(a)", "inspector", span=5)
 
         root.addWidget(card)
+        root.addLayout(self._build_logo_panel())
         root.addStretch(1)
         root.addLayout(self._build_logo_panel())
 
@@ -57,29 +58,39 @@ class DashboardView(QWidget):
 
     def _build_logo_panel(self) -> QHBoxLayout:
         panel = QHBoxLayout()
-        panel.setSpacing(16)
+        panel.setSpacing(24)
+        panel.setContentsMargins(0, 14, 0, 0)
 
         self.logo_ministerio_label = QLabel("Logo ministerial")
         self.logo_ministerio_label.setAlignment(Qt.AlignCenter)
-        self.logo_ministerio_label.setFixedHeight(120)
+        self.logo_ministerio_label.setFixedSize(320, 120)
         self.logo_ministerio_label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")
 
         self.logo_label = QLabel("Logo institucional")
         self.logo_label.setAlignment(Qt.AlignCenter)
-        self.logo_label.setFixedHeight(120)
+        self.logo_label.setFixedSize(320, 120)
         self.logo_label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")
 
+        ministerio_title = QLabel("MINISTERIO DE EDUCACIÓN, DEPORTE Y CULTURA")
+        ministerio_title.setAlignment(Qt.AlignCenter)
+        ministerio_title.setStyleSheet("font-weight: 700; color: #0f172a;")
         ministerio_box = QVBoxLayout()
-        ministerio_box.addWidget(QLabel("Logo de: Ministerio de Educación, Deporte y Cultura"))
+        ministerio_box.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        ministerio_box.addWidget(ministerio_title)
         ministerio_box.addWidget(self.logo_ministerio_label)
 
+        institucional_title = QLabel("LOGO INSTITUCIONAL")
+        institucional_title.setAlignment(Qt.AlignCenter)
+        institucional_title.setStyleSheet("font-weight: 700; color: #0f172a;")
         institucional_box = QVBoxLayout()
-        institucional_box.addWidget(QLabel("Logo Institucional"))
+        institucional_box.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        institucional_box.addWidget(institucional_title)
         institucional_box.addWidget(self.logo_label)
 
+        panel.addStretch(1)
         panel.addLayout(ministerio_box, 1)
         panel.addLayout(institucional_box, 1)
-        panel.addStretch(2)
+        panel.addStretch(1)
         return panel
 
     def _add_field_row(self, grid: QGridLayout, row: int, label: str, key: str, span: int = 1) -> int:

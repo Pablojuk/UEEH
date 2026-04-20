@@ -16,6 +16,7 @@ except ImportError:  # pragma: no cover
 class _FakeAcademicSummaryService:
     def __init__(self, rows: list[dict] | None = None) -> None:
         self.rows = rows or []
+        self.signers = [{"id_docente": "D1", "firma": "Econ. Pablo Juca"}]
 
     def listar_contextos_disponibles(self) -> list[dict]:
         return [{"id_asignacion": "AS1", "display": "Contexto demo"}]
@@ -36,7 +37,7 @@ class _FakeAcademicSummaryService:
         return True, f"Supletorios procesados: {len(rows)}"
 
     def listar_firmantes_disponibles(self) -> list[dict]:
-        return [{"id_docente": "D1", "firma": "Econ. Pablo Juca"}]
+        return list(self.signers)
 
 
 class _FakeReportExportService:
@@ -133,6 +134,16 @@ class TestAcademicSummaryView(unittest.TestCase):
 
         value = AcademicSummaryView._sanitize_filename("MATEMATICAS | SEGUNDO-A | Juca Farfan Pablo Hernan | PER-26-27")
         self.assertEqual(value, "MATEMATICAS_SEGUNDO-A_Juca_Farfan_Pablo_Hernan_PER-26-27")
+
+    def test_refresh_data_actualiza_lista_firmantes(self) -> None:
+        from src.presentation.views.academic_summary_view import AcademicSummaryView
+
+        service = _FakeAcademicSummaryService(rows=[])
+        view = AcademicSummaryView(service)
+        initial_count = view.signer_docente_combo.count()
+        service.signers.append({"id_docente": "D2", "firma": "Msc. Ana Perez"})
+        view.refresh_data()
+        self.assertGreater(view.signer_docente_combo.count(), initial_count)
 
 
 if __name__ == "__main__":
