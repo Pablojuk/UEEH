@@ -145,3 +145,37 @@ def calcular_resultado_con_supletorio(nota_final: float, nota_supletorio: Option
         return 7.0
 
     return truncar_2_decimales(nota_final)
+
+
+def calcular_valoracion_acompanamiento(
+    total_siempre: int,
+    total_frecuentemente: int,
+    total_ocasionalmente: int,
+    total_nunca: int,
+) -> str:
+    """Calcula valoración cualitativa para acompañamiento (adaptación de fórmula Excel)."""
+    sf = int(total_siempre) + int(total_frecuentemente)
+    sfo = sf + int(total_ocasionalmente)
+    sfno = sfo + int(total_nunca)
+
+    if sf >= 35:
+        return "A+"
+    if sf >= 33:
+        return "A-"
+    if sf >= 30:
+        return "B+"
+    if sf >= 27:
+        return "B-"
+    if 20 <= sfo <= 34 and int(total_nunca) == 0:
+        return "C+"
+    if 18 <= sfno <= 33:
+        return "C-"
+    if 15 <= sfno <= 17:
+        return "D+"
+    if 13 <= sfno <= 14:
+        return "D-"
+    if 11 <= sfno <= 12:
+        return "E+"
+    if 9 <= sfno <= 10:
+        return "E-"
+    return ""
