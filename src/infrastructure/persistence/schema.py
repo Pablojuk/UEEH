@@ -170,6 +170,34 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         FOREIGN KEY (asignacion_id) REFERENCES asignaciones_docente(id_asignacion)
     );
     """,
+    """
+    CREATE TABLE IF NOT EXISTS acompanamiento_evaluaciones (
+        id_evaluacion TEXT PRIMARY KEY,
+        asignacion_id TEXT NOT NULL,
+        trimestre_num INTEGER NOT NULL CHECK (trimestre_num IN (1,2,3)),
+        estudiante_id TEXT NOT NULL,
+        habilidad_clave TEXT NOT NULL,
+        valor TEXT NOT NULL CHECK (valor IN ('Siempre', 'Frecuentemente', 'Ocasionalmente', 'Nunca')),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (asignacion_id, trimestre_num, estudiante_id, habilidad_clave),
+        FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id_estudiante),
+        FOREIGN KEY (asignacion_id) REFERENCES asignaciones_docente(id_asignacion)
+    );
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS acompanamiento_habilidades_config (
+        id_config TEXT PRIMARY KEY,
+        asignacion_id TEXT NOT NULL,
+        trimestre_num INTEGER NOT NULL CHECK (trimestre_num IN (1,2,3)),
+        habilidad_clave TEXT NOT NULL,
+        visible INTEGER NOT NULL DEFAULT 1 CHECK (visible IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (asignacion_id, trimestre_num, habilidad_clave),
+        FOREIGN KEY (asignacion_id) REFERENCES asignaciones_docente(id_asignacion)
+    );
+    """,
 )
 
 INDEX_STATEMENTS: tuple[str, ...] = (
@@ -183,6 +211,9 @@ INDEX_STATEMENTS: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_grade_records_assignment_trimestre ON grade_records(asignacion_id, trimestre_num);",
     "CREATE INDEX IF NOT EXISTS idx_final_supp_assignment ON final_supplementary(asignacion_id);",
     "CREATE INDEX IF NOT EXISTS idx_grade_activity_config_assignment ON grade_activity_config(asignacion_id, trimestre_num);",
+    "CREATE INDEX IF NOT EXISTS idx_acompanamiento_eval_asig_trim ON acompanamiento_evaluaciones(asignacion_id, trimestre_num);",
+    "CREATE INDEX IF NOT EXISTS idx_acompanamiento_eval_estudiante ON acompanamiento_evaluaciones(estudiante_id);",
+    "CREATE INDEX IF NOT EXISTS idx_acompanamiento_cfg_asig_trim ON acompanamiento_habilidades_config(asignacion_id, trimestre_num);",
 )
 
 
