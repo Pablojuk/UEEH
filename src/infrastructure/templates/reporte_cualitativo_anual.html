@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reporte Cualitativo Anual</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 18px; color: #111; }
+    .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .head img { max-height: 70px; max-width: 180px; }
+    h1 { text-align: center; font-size: 18px; margin: 8px 0 2px; }
+    .meta { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+    .meta td { border: 1px solid #d1d5db; padding: 6px; font-size: 12px; }
+    .meta td.label { background: #eef2ff; font-weight: 700; width: 150px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #cbd5e1; padding: 5px; font-size: 11px; }
+    th { background: #f1f5f9; }
+    .stats { margin-top: 14px; }
+    .sign { margin-top: 28px; display: flex; justify-content: space-between; }
+    .sign-box { width: 45%; text-align: center; font-size: 12px; }
+    .line { margin-top: 30px; border-top: 1px solid #111; padding-top: 4px; }
+    .chart-wrap { margin-top: 12px; }
+    #chart { width: 100%; height: 260px; border: 1px solid #d1d5db; }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <img src="{{ logo_ministerio }}" alt="Ministerio" />
+    <img src="{{ logo_institucion }}" alt="Institución" />
+  </div>
+
+  <h1>REPORTE CUALITATIVO ANUAL - ACOMPAÑAMIENTO INTEGRAL EN EL AULA</h1>
+
+  <table class="meta">
+    <tr>
+      <td class="label">Docente</td><td>{{ docente }}</td>
+      <td class="label">Asignatura</td><td>{{ asignatura }}</td>
+    </tr>
+    <tr>
+      <td class="label">Curso</td><td>{{ curso }}</td>
+      <td class="label">Paralelo</td><td>{{ paralelo }}</td>
+    </tr>
+    <tr>
+      <td class="label">Nivel</td><td>{{ nivel }}</td>
+      <td class="label">Año lectivo</td><td>{{ anio_lectivo }}</td>
+    </tr>
+    <tr>
+      <td class="label">Fecha</td><td>{{ fecha }}</td>
+      <td class="label">Rector</td><td>{{ rector }}</td>
+    </tr>
+  </table>
+
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2">Nómina</th>
+        <th colspan="2">Trimestre 1</th>
+        <th colspan="2">Trimestre 2</th>
+        <th colspan="2">Trimestre 3</th>
+      </tr>
+      <tr>
+        <th>Cual</th><th>Descripción</th>
+        <th>Cual</th><th>Descripción</th>
+        <th>Cual</th><th>Descripción</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in estudiantes %}
+      <tr>
+        <td>{{ row.nombre }}</td>
+        <td>{{ row.t1_cual }}</td>
+        <td>{{ row.t1_desc }}</td>
+        <td>{{ row.t2_cual }}</td>
+        <td>{{ row.t2_desc }}</td>
+        <td>{{ row.t3_cual }}</td>
+        <td>{{ row.t3_desc }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="stats">
+    <thead>
+      <tr><th>Escala</th><th>N°</th><th>%</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>A+</td><td>{{ stats.a_plus_n }}</td><td>{{ stats.a_plus_p }}</td></tr>
+      <tr><td>A-</td><td>{{ stats.a_minus_n }}</td><td>{{ stats.a_minus_p }}</td></tr>
+      <tr><td>B+</td><td>{{ stats.b_plus_n }}</td><td>{{ stats.b_plus_p }}</td></tr>
+      <tr><td>B-</td><td>{{ stats.b_minus_n }}</td><td>{{ stats.b_minus_p }}</td></tr>
+      <tr><td>C+</td><td>{{ stats.c_plus_n }}</td><td>{{ stats.c_plus_p }}</td></tr>
+      <tr><td>C-</td><td>{{ stats.c_minus_n }}</td><td>{{ stats.c_minus_p }}</td></tr>
+      <tr><td>D+</td><td>{{ stats.d_plus_n }}</td><td>{{ stats.d_plus_p }}</td></tr>
+      <tr><td>D-</td><td>{{ stats.d_minus_n }}</td><td>{{ stats.d_minus_p }}</td></tr>
+      <tr><td>E+</td><td>{{ stats.e_plus_n }}</td><td>{{ stats.e_plus_p }}</td></tr>
+      <tr><td>E-</td><td>{{ stats.e_minus_n }}</td><td>{{ stats.e_minus_p }}</td></tr>
+      <tr><td><b>Total</b></td><td><b>{{ stats.total_n }}</b></td><td><b>{{ stats.total_p }}</b></td></tr>
+    </tbody>
+  </table>
+
+  <div class="chart-wrap">
+    <canvas id="chart"></canvas>
+  </div>
+
+  <div class="sign">
+    <div class="sign-box">
+      <div class="line">{{ docente }}</div>
+      <div>Docente</div>
+    </div>
+    <div class="sign-box">
+      <div class="line">{{ rector }}</div>
+      <div>Rector</div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const c = document.getElementById('chart');
+      if (!c || !c.getContext) return;
+      const ctx = c.getContext('2d');
+      const labels = ['A+','A-','B+','B-','C+','C-','D+','D-','E+','E-'];
+      const values = [
+        Number('{{ stats.a_plus_n }}'), Number('{{ stats.a_minus_n }}'),
+        Number('{{ stats.b_plus_n }}'), Number('{{ stats.b_minus_n }}'),
+        Number('{{ stats.c_plus_n }}'), Number('{{ stats.c_minus_n }}'),
+        Number('{{ stats.d_plus_n }}'), Number('{{ stats.d_minus_n }}'),
+        Number('{{ stats.e_plus_n }}'), Number('{{ stats.e_minus_n }}')
+      ];
+      const W = c.width = c.clientWidth || 900;
+      const H = c.height = 260;
+      const max = Math.max(...values, 1);
+      const step = W / (labels.length + 1);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#1F4E79';
+      ctx.font = '11px Arial';
+      values.forEach((v, i) => {
+        const x = (i + 1) * step;
+        const h = (v / max) * 170;
+        const y = H - h - 35;
+        ctx.fillRect(x - 14, y, 28, h);
+        ctx.fillText(String(v), x - 4, y - 6);
+        ctx.fillText(labels[i], x - 8, H - 12);
+      });
+    })();
+  </script>
+</body>
+</html>
