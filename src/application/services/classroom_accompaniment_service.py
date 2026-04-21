@@ -70,6 +70,7 @@ class ClassroomAccompanimentService:
                 d.apellidos AS docente_apellidos,
                 s.nombre AS asignatura_nombre,
                 c.nombre AS curso_nombre,
+                c.nivel AS curso_nivel,
                 p.nombre AS paralelo_nombre
             FROM asignaciones_docente a
             LEFT JOIN docentes d ON d.id_docente = a.docente_id
@@ -90,6 +91,23 @@ class ClassroomAccompanimentService:
             row_data["display"] = f"{asignatura} | {curso}-{paralelo} | {docente} | {periodo}"
             contextos.append(row_data)
         return contextos
+
+    def obtener_contexto(self, asignacion_id: str) -> dict[str, Any] | None:
+        for contexto in self.listar_contextos_disponibles():
+            if contexto.get("id_asignacion") == asignacion_id:
+                return contexto
+        return None
+
+    def obtener_datos_institucion(self) -> dict[str, Any]:
+        row = self.connection.execute(
+            """
+            SELECT nombre, rector, logo_path, logo_ministerio_path
+            FROM institucion
+            ORDER BY id_institucion
+            LIMIT 1
+            """
+        ).fetchone()
+        return dict(row) if row else {}
 
     def listar_habilidades_base(self) -> list[dict[str, str]]:
         habilidades: list[dict[str, str]] = []

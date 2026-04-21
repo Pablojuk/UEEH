@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+from datetime import datetime
 from typing import Any
 
 from PySide6.QtCore import Qt
@@ -23,6 +25,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from jinja2 import Environment, FileSystemLoader
+
+try:
+    from PySide6.QtCore import QUrl
+    from PySide6.QtWebEngineWidgets import QWebEngineView
+except ImportError:  # pragma: no cover
+    QUrl = None
+    QWebEngineView = None
 
 from src.application.services.classroom_accompaniment_service import (
     MAX_ACTIVE_SKILLS,
@@ -150,6 +160,24 @@ class ClassroomAccompanimentView(QWidget):
         self.save_button.clicked.connect(self.save_rows)
         self.configure_skills_button = QPushButton("Configurar habilidades")
         self.configure_skills_button.clicked.connect(self.open_skill_config)
+        self.btn_vista_previa_cual = QPushButton("Vista Previa")
+        self.btn_vista_previa_cual.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #1F4E79;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 14px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #2E75B6; }
+            QPushButton:disabled { background-color: #999; }
+            """
+        )
+        self.btn_vista_previa_cual.setEnabled(False)
+        self.btn_vista_previa_cual.clicked.connect(self._mostrar_vista_previa_cualitativa)
 
         filter_row.addWidget(QLabel("Asignación"))
         filter_row.addWidget(self.assignment_combo, 1)
@@ -158,6 +186,7 @@ class ClassroomAccompanimentView(QWidget):
         filter_row.addWidget(self.load_button)
         filter_row.addWidget(self.save_button)
         filter_row.addWidget(self.configure_skills_button)
+        filter_row.addWidget(self.btn_vista_previa_cual)
 
         self.skills_reference_card = QFrame()
         self.skills_reference_card.setObjectName("Card")
@@ -197,6 +226,7 @@ class ClassroomAccompanimentView(QWidget):
         trimester_num = self.trimester_combo.currentData()
         if not assignment_id:
             self._clear_table()
+            self.btn_vista_previa_cual.setEnabled(False)
             return
 
         try:
@@ -204,6 +234,7 @@ class ClassroomAccompanimentView(QWidget):
         except ValueError as exc:
             QMessageBox.warning(self, "Validación", str(exc))
             self._clear_table()
+            self.btn_vista_previa_cual.setEnabled(False)
             return
 
         self._skill_categories = payload.get("skill_categories", [])
@@ -221,6 +252,7 @@ class ClassroomAccompanimentView(QWidget):
 
         self._refresh_skills_reference()
         self._fill_table()
+        self.btn_vista_previa_cual.setEnabled(True)
 
     def save_rows(self) -> None:
         assignment_id = self.assignment_combo.currentData()
@@ -371,6 +403,7 @@ class ClassroomAccompanimentView(QWidget):
     def _clear_table(self) -> None:
         self.table.setRowCount(0)
         self.table.setColumnCount(0)
+        self.btn_vista_previa_cual.setEnabled(False)
 
     def _refresh_skills_reference(self) -> None:
         while self.skills_reference_layout.count():
@@ -389,3 +422,202 @@ class ClassroomAccompanimentView(QWidget):
             label = QLabel(f"{category['category']}: {text}")
             label.setWordWrap(True)
             self.skills_reference_layout.addWidget(label)
+
+    def _mostrar_vista_previa_cualitativa(self) -> None:
+        try:
+            assignment_id = self.assignment_combo.currentData()
+            if not assignment_id:
+                QMessageBox.warning(self, "Validación", "Seleccione una asignación y cargue el listado.")
+                return
+
+            contexto = self.accompaniment_service.obtener_contexto(str(assignment_id)) or {}
+            if not contexto:
+                raise ValueError("No se encontró contexto de la asignación seleccionada.")
+
+            estudiantes_t1 = self._get_datos_trimestre(1)
+            estudiantes_t2 = self._get_datos_trimestre(2)
+            estudiantes_t3 = self._get_datos_trimestre(3)
+            estudiantes = self._construir_estudiantes_consolidados(estudiantes_t1, estudiantes_t2, estudiantes_t3)
+
+            trimestre_actual = int(self.trimester_combo.currentData() or 1)
+            datos_trim_actual = {1: estudiantes_t1, 2: estudiantes_t2, 3: estudiantes_t3}.get(trimestre_actual, [])
+            stats = self._calcular_stats_cualitativas(datos_trim_actual)
+
+            institucion = self.accompaniment_service.obtener_datos_institucion()
+            context = {
+                "docente": f"{contexto.get('docente_apellidos', '')} {contexto.get('docente_nombres', '')}".strip(),
+                "asignatura": contexto.get("asignatura_nombre") or contexto.get("asignatura_id", ""),
+                "curso": contexto.get("curso_nombre") or contexto.get("curso_id", ""),
+                "paralelo": contexto.get("paralelo_nombre") or contexto.get("paralelo_id", ""),
+                "nivel": contexto.get("curso_nivel") or "",
+                "fecha": datetime.now().strftime("%Y-%m-%d"),
+                "anio_lectivo": contexto.get("periodo_id", ""),
+                "rector": institucion.get("rector", ""),
+                "logo_institucion": institucion.get("logo_path", ""),
+                "logo_ministerio": institucion.get("logo_ministerio_path", ""),
+                "estudiantes": estudiantes,
+                "stats": stats,
+            }
+
+            html = self._renderizar_plantilla_cualitativa(context)
+            dlg = VistaPreviaCualitativaDialog(html, parent=self)
+            dlg.exec()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Error", f"No se pudo generar la vista previa:\n{exc}")
+
+    def _get_datos_trimestre(self, trimestre: int) -> list[dict[str, str]]:
+        assignment_id = self.assignment_combo.currentData()
+        if not assignment_id:
+            return []
+        trimestre_actual = int(self.trimester_combo.currentData() or 1)
+        if trimestre == trimestre_actual and self.table.rowCount() > 0:
+            return self._leer_datos_desde_tabla_actual()
+
+        payload = self.accompaniment_service.cargar_evaluacion(str(assignment_id), trimestre)
+        rows: list[dict[str, str]] = []
+        students = payload.get("students", [])
+        responses = payload.get("responses", {})
+        active_skills = payload.get("active_skills", [])
+        for student in students:
+            sid = student.get("student_id", "")
+            result = self.accompaniment_service.calcular_resultado_estudiante(responses.get(sid, {}), active_skills)
+            rows.append(
+                {
+                    "nombre": student.get("name", ""),
+                    "valoracion_final": result.get("valoracion_final", ""),
+                }
+            )
+        return rows
+
+    def _leer_datos_desde_tabla_actual(self) -> list[dict[str, str]]:
+        rows: list[dict[str, str]] = []
+        valoracion_col = self._find_column_index("Valoración final")
+        if valoracion_col < 0:
+            return rows
+        for row_idx in range(self.table.rowCount()):
+            name_item = self.table.item(row_idx, 1)
+            val_item = self.table.item(row_idx, valoracion_col)
+            rows.append(
+                {
+                    "nombre": name_item.text().strip() if name_item else "",
+                    "valoracion_final": val_item.text().strip() if val_item else "",
+                }
+            )
+        return rows
+
+    def _construir_estudiantes_consolidados(
+        self,
+        estudiantes_t1: list[dict[str, str]],
+        estudiantes_t2: list[dict[str, str]],
+        estudiantes_t3: list[dict[str, str]],
+    ) -> list[dict[str, str]]:
+        todos_nombres = sorted(
+            {
+                e.get("nombre", "").strip()
+                for e in [*estudiantes_t1, *estudiantes_t2, *estudiantes_t3]
+                if e.get("nombre", "").strip()
+            }
+        )
+
+        def buscar_cual(lista: list[dict[str, str]], nombre: str) -> str:
+            for item in lista:
+                if item.get("nombre", "").strip() == nombre:
+                    return str(item.get("valoracion_final", "")).strip()
+            return ""
+
+        estudiantes: list[dict[str, str]] = []
+        for nombre in todos_nombres:
+            t1 = buscar_cual(estudiantes_t1, nombre)
+            t2 = buscar_cual(estudiantes_t2, nombre)
+            t3 = buscar_cual(estudiantes_t3, nombre)
+            estudiantes.append(
+                {
+                    "nombre": nombre,
+                    "t1_cual": t1,
+                    "t1_desc": self._obtener_descripcion_cualitativa(t1),
+                    "t2_cual": t2,
+                    "t2_desc": self._obtener_descripcion_cualitativa(t2),
+                    "t3_cual": t3,
+                    "t3_desc": self._obtener_descripcion_cualitativa(t3),
+                }
+            )
+        return estudiantes
+
+    @staticmethod
+    def _obtener_descripcion_cualitativa(cual: str) -> str:
+        descripciones = {
+            "A+": "Demuestra un nivel sobresaliente en todas las habilidades evaluadas, siendo modelo positivo para sus compañeros.",
+            "A-": "Evidencia un alto desarrollo en las habilidades cognitivas, sociales y emocionales con resultados muy satisfactorios.",
+            "B+": "Alcanza satisfactoriamente los aprendizajes en la mayoría de las habilidades evaluadas, mostrando buen desempeño integral.",
+            "B-": "Alcanza los aprendizajes en las habilidades evaluadas aunque con algunas áreas de mejora identificadas.",
+            "C+": "Se encuentra próximo a alcanzar el nivel esperado, requiere refuerzo en algunas habilidades cognitivas y sociales.",
+            "C-": "Está próximo a alcanzar los aprendizajes, necesita acompañamiento continuo para fortalecer sus habilidades.",
+            "D+": "No alcanza el nivel esperado en varias habilidades, requiere apoyo personalizado y seguimiento permanente.",
+            "D-": "Presenta dificultades significativas en el desarrollo de habilidades, necesita intervención pedagógica inmediata.",
+            "E+": "Evidencia serias dificultades en todas las áreas evaluadas, requiere plan de mejora urgente con participación familiar.",
+            "E-": "No demuestra desarrollo en las habilidades evaluadas, requiere intervención multidisciplinaria e involucramiento familiar urgente.",
+        }
+        return descripciones.get(str(cual).strip(), "")
+
+    def _calcular_stats_cualitativas(self, estudiantes_trimestre: list[dict[str, str]]) -> dict[str, Any]:
+        labels = [("A+", "a_plus"), ("A-", "a_minus"), ("B+", "b_plus"), ("B-", "b_minus"), ("C+", "c_plus"), ("C-", "c_minus"), ("D+", "d_plus"), ("D-", "d_minus"), ("E+", "e_plus"), ("E-", "e_minus")]
+        total = len(estudiantes_trimestre)
+        counts = {label: 0 for label, _ in labels}
+        for row in estudiantes_trimestre:
+            cual = str(row.get("valoracion_final", "")).strip()
+            if cual in counts:
+                counts[cual] += 1
+
+        def pct(value: int) -> str:
+            if total == 0:
+                return "0,00%"
+            return f"{(value * 100 / total):.2f}%".replace(".", ",")
+
+        stats: dict[str, Any] = {}
+        for label, key in labels:
+            stats[f"{key}_n"] = counts[label]
+            stats[f"{key}_p"] = pct(counts[label])
+        stats["total_n"] = total
+        stats["total_p"] = "100,00%" if total > 0 else "0,00%"
+        return stats
+
+    def _find_column_index(self, header_text: str) -> int:
+        for col in range(self.table.columnCount()):
+            item = self.table.horizontalHeaderItem(col)
+            if item and item.text().strip() == header_text:
+                return col
+        return -1
+
+    def _renderizar_plantilla_cualitativa(self, context: dict[str, Any]) -> str:
+        templates_dir = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "infrastructure",
+                "templates",
+            )
+        )
+        env = Environment(loader=FileSystemLoader(templates_dir), autoescape=False)
+        template = env.get_template("reporte_cualitativo_anual.html")
+        return template.render(**context)
+
+
+class VistaPreviaCualitativaDialog(QDialog):
+    def __init__(self, html_content: str, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Vista Previa - Reporte Cualitativo Anual")
+        self.setMinimumSize(860, 700)
+        self.resize(900, 750)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        if QWebEngineView is not None and QUrl is not None:
+            self.web_view = QWebEngineView()
+            self.web_view.setHtml(html_content, QUrl("about:blank"))
+            layout.addWidget(self.web_view)
+            return
+
+        fallback = QLabel("Vista previa HTML no disponible (QWebEngine no está instalado).")
+        fallback.setWordWrap(True)
+        layout.addWidget(fallback)
