@@ -8,6 +8,7 @@ from src.domain.calculations import (
     calcular_observacion_final,
     calcular_promedio_anual,
     calcular_promedio_formativo,
+    calcular_valoracion_acompanamiento,
     calcular_promedio_sumativo,
     calcular_resultado_con_supletorio,
     resolver_mejora,
@@ -94,6 +95,22 @@ class TestSupletorio(unittest.TestCase):
 
     def test_sin_nota_supletorio(self) -> None:
         self.assertEqual(calcular_resultado_con_supletorio(5.25, None), 5.25)
+
+
+class TestValoracionAcompanamiento(unittest.TestCase):
+    def test_tramos_altos(self) -> None:
+        self.assertEqual(calcular_valoracion_acompanamiento(9, 0, 0, 0), "A+")
+        self.assertEqual(calcular_valoracion_acompanamiento(8, 0, 1, 0), "A-")
+        self.assertEqual(calcular_valoracion_acompanamiento(6, 2, 1, 0), "B+")
+        self.assertEqual(calcular_valoracion_acompanamiento(5, 2, 1, 1), "B-")
+
+    def test_tramos_medios_bajos(self) -> None:
+        self.assertEqual(calcular_valoracion_acompanamiento(5, 0, 0, 0), "C+")
+        self.assertEqual(calcular_valoracion_acompanamiento(4, 1, 0, 0), "C-")
+        self.assertEqual(calcular_valoracion_acompanamiento(3, 1, 1, 0), "D+")
+        self.assertEqual(calcular_valoracion_acompanamiento(2, 1, 1, 1), "D-")
+        self.assertEqual(calcular_valoracion_acompanamiento(2, 1, 0, 0), "E+")
+        self.assertEqual(calcular_valoracion_acompanamiento(1, 1, 1, 0), "E-")
 
 
 if __name__ == "__main__":
