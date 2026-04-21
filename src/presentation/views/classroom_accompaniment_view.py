@@ -6,7 +6,8 @@ import os
 from datetime import datetime
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QMarginsF, Qt
+from PySide6.QtGui import QPageLayout, QPageSize
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -24,14 +25,18 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QFileDialog,
 )
 from jinja2 import Environment, FileSystemLoader
 
 try:
-    from PySide6.QtCore import QUrl
+    from PySide6.QtCore import QEventLoop, QUrl
+    from PySide6.QtWebEngineCore import QWebEnginePage
     from PySide6.QtWebEngineWidgets import QWebEngineView
 except ImportError:  # pragma: no cover
     QUrl = None
+    QEventLoop = None
+    QWebEnginePage = None
     QWebEngineView = None
 
 from src.application.services.classroom_accompaniment_service import (
@@ -39,6 +44,7 @@ from src.application.services.classroom_accompaniment_service import (
     ClassroomAccompanimentService,
     RESPONSE_OPTIONS,
 )
+from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
 from src.presentation.app_signals import AppSignals
 
 
@@ -135,6 +141,7 @@ class ClassroomAccompanimentView(QWidget):
         self._skills_by_key: dict[str, dict[str, Any]] = {}
         self._students: list[dict[str, Any]] = []
         self._responses: dict[str, dict[str, str]] = {}
+        self._ultimo_html_vista_previa = ""
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -178,6 +185,9 @@ class ClassroomAccompanimentView(QWidget):
         )
         self.btn_vista_previa_cual.setEnabled(False)
         self.btn_vista_previa_cual.clicked.connect(self._mostrar_vista_previa_cualitativa)
+        self.btn_exportar_pdf_cual = QPushButton("Exportar PDF")
+        self.btn_exportar_pdf_cual.setEnabled(False)
+        self.btn_exportar_pdf_cual.clicked.connect(self._exportar_vista_previa_pdf)
 
         filter_row.addWidget(QLabel("Asignación"))
         filter_row.addWidget(self.assignment_combo, 1)
@@ -187,6 +197,7 @@ class ClassroomAccompanimentView(QWidget):
         filter_row.addWidget(self.save_button)
         filter_row.addWidget(self.configure_skills_button)
         filter_row.addWidget(self.btn_vista_previa_cual)
+        filter_row.addWidget(self.btn_exportar_pdf_cual)
 
         self.skills_reference_card = QFrame()
         self.skills_reference_card.setObjectName("Card")
@@ -227,6 +238,7 @@ class ClassroomAccompanimentView(QWidget):
         if not assignment_id:
             self._clear_table()
             self.btn_vista_previa_cual.setEnabled(False)
+            self.btn_exportar_pdf_cual.setEnabled(False)
             return
 
         try:
@@ -235,6 +247,7 @@ class ClassroomAccompanimentView(QWidget):
             QMessageBox.warning(self, "Validación", str(exc))
             self._clear_table()
             self.btn_vista_previa_cual.setEnabled(False)
+            self.btn_exportar_pdf_cual.setEnabled(False)
             return
 
         self._skill_categories = payload.get("skill_categories", [])
@@ -253,6 +266,7 @@ class ClassroomAccompanimentView(QWidget):
         self._refresh_skills_reference()
         self._fill_table()
         self.btn_vista_previa_cual.setEnabled(True)
+        self.btn_exportar_pdf_cual.setEnabled(True)
 
     def save_rows(self) -> None:
         assignment_id = self.assignment_combo.currentData()
@@ -404,6 +418,7 @@ class ClassroomAccompanimentView(QWidget):
         self.table.setRowCount(0)
         self.table.setColumnCount(0)
         self.btn_vista_previa_cual.setEnabled(False)
+        self.btn_exportar_pdf_cual.setEnabled(False)
 
     def _refresh_skills_reference(self) -> None:
         while self.skills_reference_layout.count():
@@ -425,45 +440,53 @@ class ClassroomAccompanimentView(QWidget):
 
     def _mostrar_vista_previa_cualitativa(self) -> None:
         try:
-            assignment_id = self.assignment_combo.currentData()
-            if not assignment_id:
-                QMessageBox.warning(self, "Validación", "Seleccione una asignación y cargue el listado.")
-                return
-
-            contexto = self.accompaniment_service.obtener_contexto(str(assignment_id)) or {}
-            if not contexto:
-                raise ValueError("No se encontró contexto de la asignación seleccionada.")
-
-            estudiantes_t1 = self._get_datos_trimestre(1)
-            estudiantes_t2 = self._get_datos_trimestre(2)
-            estudiantes_t3 = self._get_datos_trimestre(3)
-            estudiantes = self._construir_estudiantes_consolidados(estudiantes_t1, estudiantes_t2, estudiantes_t3)
-
-            trimestre_actual = int(self.trimester_combo.currentData() or 1)
-            datos_trim_actual = {1: estudiantes_t1, 2: estudiantes_t2, 3: estudiantes_t3}.get(trimestre_actual, [])
-            stats = self._calcular_stats_cualitativas(datos_trim_actual)
-
-            institucion = self.accompaniment_service.obtener_datos_institucion()
-            context = {
-                "docente": f"{contexto.get('docente_apellidos', '')} {contexto.get('docente_nombres', '')}".strip(),
-                "asignatura": contexto.get("asignatura_nombre") or contexto.get("asignatura_id", ""),
-                "curso": contexto.get("curso_nombre") or contexto.get("curso_id", ""),
-                "paralelo": contexto.get("paralelo_nombre") or contexto.get("paralelo_id", ""),
-                "nivel": contexto.get("curso_nivel") or "",
-                "fecha": datetime.now().strftime("%Y-%m-%d"),
-                "anio_lectivo": contexto.get("periodo_id", ""),
-                "rector": institucion.get("rector", ""),
-                "logo_institucion": institucion.get("logo_path", ""),
-                "logo_ministerio": institucion.get("logo_ministerio_path", ""),
-                "estudiantes": estudiantes,
-                "stats": stats,
-            }
-
-            html = self._renderizar_plantilla_cualitativa(context)
+            html = self._generar_html_vista_previa()
+            self._ultimo_html_vista_previa = html
             dlg = VistaPreviaCualitativaDialog(html, parent=self)
             dlg.exec()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Error", f"No se pudo generar la vista previa:\n{exc}")
+
+    def _generar_html_vista_previa(self) -> str:
+        context = self._construir_contexto_vista_previa()
+        return self._renderizar_plantilla_cualitativa(context)
+
+    def _construir_contexto_vista_previa(self) -> dict[str, Any]:
+        assignment_id = self.assignment_combo.currentData()
+        if not assignment_id:
+            raise ValueError("Seleccione una asignación y cargue el listado.")
+
+        contexto = self.accompaniment_service.obtener_contexto(str(assignment_id)) or {}
+        if not contexto:
+            raise ValueError("No se encontró contexto de la asignación seleccionada.")
+
+        estudiantes_t1 = self._get_datos_trimestre(1)
+        estudiantes_t2 = self._get_datos_trimestre(2)
+        estudiantes_t3 = self._get_datos_trimestre(3)
+        estudiantes = self._construir_estudiantes_consolidados(estudiantes_t1, estudiantes_t2, estudiantes_t3)
+
+        trimestre_actual = int(self.trimester_combo.currentData() or 1)
+        datos_trim_actual = {1: estudiantes_t1, 2: estudiantes_t2, 3: estudiantes_t3}.get(trimestre_actual, [])
+        stats = self._calcular_stats_cualitativas(datos_trim_actual)
+
+        institucion = self.accompaniment_service.obtener_datos_institucion()
+        logo_institucional = HtmlReportRenderer._build_logo_source(institucion.get("logo_path"), "institucional")
+        logo_mineduc = HtmlReportRenderer._build_logo_source(institucion.get("logo_ministerio_path"), "ministerio")
+
+        return {
+            "docente": f"{contexto.get('docente_apellidos', '')} {contexto.get('docente_nombres', '')}".strip(),
+            "asignatura": contexto.get("asignatura_nombre") or contexto.get("asignatura_id", ""),
+            "curso": contexto.get("curso_nombre") or contexto.get("curso_id", ""),
+            "paralelo": contexto.get("paralelo_nombre") or contexto.get("paralelo_id", ""),
+            "nivel": contexto.get("curso_nivel") or "",
+            "fecha": datetime.now().strftime("%Y-%m-%d"),
+            "anio_lectivo": contexto.get("periodo_id", ""),
+            "rector": institucion.get("rector", ""),
+            "logo_institucion": logo_institucional,
+            "logo_ministerio": logo_mineduc,
+            "estudiantes": estudiantes,
+            "stats": stats,
+        }
 
     def _get_datos_trimestre(self, trimestre: int) -> list[dict[str, str]]:
         assignment_id = self.assignment_combo.currentData()
@@ -546,16 +569,16 @@ class ClassroomAccompanimentView(QWidget):
     @staticmethod
     def _obtener_descripcion_cualitativa(cual: str) -> str:
         descripciones = {
-            "A+": "Demuestra un nivel sobresaliente en todas las habilidades evaluadas, siendo modelo positivo para sus compañeros.",
-            "A-": "Evidencia un alto desarrollo en las habilidades cognitivas, sociales y emocionales con resultados muy satisfactorios.",
-            "B+": "Alcanza satisfactoriamente los aprendizajes en la mayoría de las habilidades evaluadas, mostrando buen desempeño integral.",
-            "B-": "Alcanza los aprendizajes en las habilidades evaluadas aunque con algunas áreas de mejora identificadas.",
-            "C+": "Se encuentra próximo a alcanzar el nivel esperado, requiere refuerzo en algunas habilidades cognitivas y sociales.",
-            "C-": "Está próximo a alcanzar los aprendizajes, necesita acompañamiento continuo para fortalecer sus habilidades.",
-            "D+": "No alcanza el nivel esperado en varias habilidades, requiere apoyo personalizado y seguimiento permanente.",
-            "D-": "Presenta dificultades significativas en el desarrollo de habilidades, necesita intervención pedagógica inmediata.",
-            "E+": "Evidencia serias dificultades en todas las áreas evaluadas, requiere plan de mejora urgente con participación familiar.",
-            "E-": "No demuestra desarrollo en las habilidades evaluadas, requiere intervención multidisciplinaria e involucramiento familiar urgente.",
+            "A+": "Supera con excelencia las metas propuestas para las habilidades socioemocionales",
+            "A-": "Es excelente el alcance de las metas propuestas para las habilidades socioemocionales",
+            "B+": "Es destacado el alcance de las metas propuestas para las habilidades socioemocionales",
+            "B-": "Alcanza de las metas propuestas para las habilidades socioemocionales",
+            "C+": "En algunas de las habilidades socioemocionales el alcance de las metas propuestas está en progreso",
+            "C-": "En la mayoría de las habilidades socioemocionales el alcance de las metas propuestas está en progreso",
+            "D+": "En algunas de las habilidades socioemocionales el alcance de las metas propuestas está en inicio",
+            "D-": "En la mayoría de las habilidades socioemocionales el alcance de las metas propuestas está en inicio",
+            "E+": "Sólo en una de las habilidades socioemocionales se alcanza las metas propuestas",
+            "E-": "Requiere acompañamiento individualizado para el desarrollo y fortalecimiento de habilidades socioemocionales.",
         }
         return descripciones.get(str(cual).strip(), "")
 
@@ -601,6 +624,51 @@ class ClassroomAccompanimentView(QWidget):
         env = Environment(loader=FileSystemLoader(templates_dir), autoescape=False)
         template = env.get_template("reporte_cualitativo_anual.html")
         return template.render(**context)
+
+    def _exportar_vista_previa_pdf(self) -> None:
+        if QWebEnginePage is None or QEventLoop is None:
+            QMessageBox.warning(self, "Exportar PDF", "QWebEngine no está disponible en este entorno.")
+            return
+        try:
+            html = self._generar_html_vista_previa()
+            suggested = f"reporte_cualitativo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            file_path, _ = QFileDialog.getSaveFileName(self, "Guardar PDF", suggested, "PDF (*.pdf)")
+            if not file_path:
+                return
+            if not file_path.lower().endswith(".pdf"):
+                file_path = f"{file_path}.pdf"
+
+            page = QWebEnginePage(self)
+            loop = QEventLoop(self)
+            result = {"ok": False}
+
+            def on_load_finished(ok: bool) -> None:
+                if not ok:
+                    result["ok"] = False
+                    loop.quit()
+                    return
+                page_layout = QPageLayout(
+                    QPageSize(QPageSize.A4),
+                    QPageLayout.Portrait,
+                    QMarginsF(12, 12, 12, 12),
+                    QPageLayout.Millimeter,
+                )
+                page.printToPdf(file_path, page_layout)
+
+            def on_pdf_done(path: str, success: bool) -> None:
+                result["ok"] = success and bool(path)
+                loop.quit()
+
+            page.loadFinished.connect(on_load_finished)
+            page.pdfPrintingFinished.connect(on_pdf_done)
+            page.setHtml(html, QUrl("about:blank"))
+            loop.exec()
+            if result["ok"]:
+                QMessageBox.information(self, "Exportar PDF", f"PDF generado correctamente:\n{file_path}")
+            else:
+                QMessageBox.warning(self, "Exportar PDF", "No se pudo generar el PDF.")
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Exportar PDF", f"Error al exportar PDF:\n{exc}")
 
 
 class VistaPreviaCualitativaDialog(QDialog):
