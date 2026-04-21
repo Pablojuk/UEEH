@@ -21,13 +21,17 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTextBrowser,
     QVBoxLayout,
     QWidget,
     QFileDialog,
+    QGroupBox,
 )
 from jinja2 import Environment, FileSystemLoader
+from openpyxl import Workbook
 
 try:
     from PySide6.QtCore import QEventLoop, QUrl
@@ -142,6 +146,7 @@ class ClassroomAccompanimentView(QWidget):
         self._students: list[dict[str, Any]] = []
         self._responses: dict[str, dict[str, str]] = {}
         self._ultimo_html_vista_previa = ""
+        self._firmantes: dict[str, str] = {"docente": "", "rector": ""}
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -156,7 +161,7 @@ class ClassroomAccompanimentView(QWidget):
         filter_row = QHBoxLayout(filter_card)
 
         self.assignment_combo = QComboBox()
-        self.assignment_combo.setMinimumWidth(360)
+        self.assignment_combo.setMinimumWidth(300)
         self.trimester_combo = QComboBox()
         for label, value in self.TRIMESTERS:
             self.trimester_combo.addItem(label, value)
@@ -188,6 +193,9 @@ class ClassroomAccompanimentView(QWidget):
         self.btn_exportar_pdf_cual = QPushButton("Exportar PDF")
         self.btn_exportar_pdf_cual.setEnabled(False)
         self.btn_exportar_pdf_cual.clicked.connect(self._exportar_vista_previa_pdf)
+        self.btn_exportar_excel_cual = QPushButton("Exportar Excel")
+        self.btn_exportar_excel_cual.setEnabled(False)
+        self.btn_exportar_excel_cual.clicked.connect(self._exportar_excel)
 
         filter_row.addWidget(QLabel("Asignación"))
         filter_row.addWidget(self.assignment_combo, 1)
@@ -198,6 +206,18 @@ class ClassroomAccompanimentView(QWidget):
         filter_row.addWidget(self.configure_skills_button)
         filter_row.addWidget(self.btn_vista_previa_cual)
         filter_row.addWidget(self.btn_exportar_pdf_cual)
+        filter_row.addWidget(self.btn_exportar_excel_cual)
+
+        sign_card = QGroupBox("Firmantes del reporte")
+        sign_layout = QHBoxLayout(sign_card)
+        self.signer_docente_combo = QComboBox()
+        self.signer_rector_combo = QComboBox()
+        self.signer_docente_combo.currentIndexChanged.connect(self._update_signers)
+        self.signer_rector_combo.currentIndexChanged.connect(self._update_signers)
+        sign_layout.addWidget(QLabel("Docente"))
+        sign_layout.addWidget(self.signer_docente_combo, 1)
+        sign_layout.addWidget(QLabel("Rector"))
+        sign_layout.addWidget(self.signer_rector_combo, 1)
 
         self.skills_reference_card = QFrame()
         self.skills_reference_card.setObjectName("Card")
@@ -209,13 +229,35 @@ class ClassroomAccompanimentView(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setAlternatingRowColors(True)
 
+        self.tabs = QTabWidget()
+        eval_tab = QWidget()
+        eval_layout = QVBoxLayout(eval_tab)
+        eval_layout.setContentsMargins(0, 0, 0, 0)
+        eval_layout.addWidget(self.skills_reference_card)
+        eval_layout.addWidget(self.table, 1)
+        self.tabs.addTab(eval_tab, "Evaluación")
+
+        preview_tab = QWidget()
+        preview_layout = QVBoxLayout(preview_tab)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        if QWebEngineView is not None:
+            self.preview_view = QWebEngineView()
+            self._preview_uses_webengine = True
+        else:
+            self.preview_view = QTextBrowser()
+            self.preview_view.setOpenExternalLinks(True)
+            self._preview_uses_webengine = False
+        preview_layout.addWidget(self.preview_view)
+        self.tabs.addTab(preview_tab, "Vista previa")
+
         root.addWidget(title)
         root.addWidget(subtitle)
         root.addWidget(filter_card)
-        root.addWidget(self.skills_reference_card)
-        root.addWidget(self.table, 1)
+        root.addWidget(sign_card)
+        root.addWidget(self.tabs, 1)
 
         self.load_contexts()
+        self._load_signer_options()
 
     def load_contexts(self, selected_assignment_id: str | None = None) -> None:
         self.assignment_combo.clear()
@@ -239,6 +281,7 @@ class ClassroomAccompanimentView(QWidget):
             self._clear_table()
             self.btn_vista_previa_cual.setEnabled(False)
             self.btn_exportar_pdf_cual.setEnabled(False)
+            self.btn_exportar_excel_cual.setEnabled(False)
             return
 
         try:
@@ -248,6 +291,7 @@ class ClassroomAccompanimentView(QWidget):
             self._clear_table()
             self.btn_vista_previa_cual.setEnabled(False)
             self.btn_exportar_pdf_cual.setEnabled(False)
+            self.btn_exportar_excel_cual.setEnabled(False)
             return
 
         self._skill_categories = payload.get("skill_categories", [])
@@ -267,6 +311,7 @@ class ClassroomAccompanimentView(QWidget):
         self._fill_table()
         self.btn_vista_previa_cual.setEnabled(True)
         self.btn_exportar_pdf_cual.setEnabled(True)
+        self.btn_exportar_excel_cual.setEnabled(True)
 
     def save_rows(self) -> None:
         assignment_id = self.assignment_combo.currentData()
@@ -419,6 +464,7 @@ class ClassroomAccompanimentView(QWidget):
         self.table.setColumnCount(0)
         self.btn_vista_previa_cual.setEnabled(False)
         self.btn_exportar_pdf_cual.setEnabled(False)
+        self.btn_exportar_excel_cual.setEnabled(False)
 
     def _refresh_skills_reference(self) -> None:
         while self.skills_reference_layout.count():
@@ -442,8 +488,8 @@ class ClassroomAccompanimentView(QWidget):
         try:
             html = self._generar_html_vista_previa()
             self._ultimo_html_vista_previa = html
-            dlg = VistaPreviaCualitativaDialog(html, parent=self)
-            dlg.exec()
+            self._set_preview_html(html)
+            self.tabs.setCurrentIndex(1)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Error", f"No se pudo generar la vista previa:\n{exc}")
 
@@ -474,14 +520,15 @@ class ClassroomAccompanimentView(QWidget):
         logo_mineduc = HtmlReportRenderer._build_logo_source(institucion.get("logo_ministerio_path"), "ministerio")
 
         return {
-            "docente": f"{contexto.get('docente_apellidos', '')} {contexto.get('docente_nombres', '')}".strip(),
+            "docente": self._firmantes.get("docente")
+            or f"{contexto.get('docente_apellidos', '')} {contexto.get('docente_nombres', '')}".strip(),
             "asignatura": contexto.get("asignatura_nombre") or contexto.get("asignatura_id", ""),
             "curso": contexto.get("curso_nombre") or contexto.get("curso_id", ""),
             "paralelo": contexto.get("paralelo_nombre") or contexto.get("paralelo_id", ""),
             "nivel": contexto.get("curso_nivel") or "",
             "fecha": datetime.now().strftime("%Y-%m-%d"),
             "anio_lectivo": contexto.get("periodo_id", ""),
-            "rector": institucion.get("rector", ""),
+            "rector": self._firmantes.get("rector") or institucion.get("rector", ""),
             "logo_institucion": logo_institucional,
             "logo_ministerio": logo_mineduc,
             "estudiantes": estudiantes,
@@ -669,6 +716,57 @@ class ClassroomAccompanimentView(QWidget):
                 QMessageBox.warning(self, "Exportar PDF", "No se pudo generar el PDF.")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Exportar PDF", f"Error al exportar PDF:\n{exc}")
+
+    def _exportar_excel(self) -> None:
+        assignment_id = self.assignment_combo.currentData()
+        if not assignment_id:
+            QMessageBox.warning(self, "Exportar Excel", "Seleccione una asignación y cargue el listado.")
+            return
+        self._collect_responses_from_table()
+        suggested = f"acompanamiento_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        file_path, _ = QFileDialog.getSaveFileName(self, "Guardar Excel", suggested, "Excel (*.xlsx)")
+        if not file_path:
+            return
+        if not file_path.lower().endswith(".xlsx"):
+            file_path = f"{file_path}.xlsx"
+
+        headers = ["Nómina"] + [self._skills_by_key[key]["label"] for key in self._active_skills if key in self._skills_by_key]
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Acom. Inte. Aula."
+        ws.append(headers)
+        for student in self._students:
+            sid = student.get("student_id", "")
+            row = [student.get("name", "")]
+            skill_values = self._responses.get(sid, {})
+            for skill_key in self._active_skills:
+                row.append(skill_values.get(skill_key, ""))
+            ws.append(row)
+        wb.save(file_path)
+        QMessageBox.information(self, "Exportar Excel", f"Excel generado correctamente:\n{file_path}")
+
+    def _load_signer_options(self) -> None:
+        options = self.accompaniment_service.listar_firmantes_disponibles()
+        self.signer_docente_combo.clear()
+        self.signer_rector_combo.clear()
+        self.signer_docente_combo.addItem("Seleccione", "")
+        self.signer_rector_combo.addItem("Seleccione", "")
+        for name in options:
+            self.signer_docente_combo.addItem(name, name)
+            self.signer_rector_combo.addItem(name, name)
+        self._update_signers()
+
+    def _update_signers(self) -> None:
+        self._firmantes = {
+            "docente": self.signer_docente_combo.currentData() or "",
+            "rector": self.signer_rector_combo.currentData() or "",
+        }
+
+    def _set_preview_html(self, html_content: str) -> None:
+        if self._preview_uses_webengine:
+            self.preview_view.setHtml(html_content)
+        else:
+            self.preview_view.setHtml(html_content)
 
 
 class VistaPreviaCualitativaDialog(QDialog):

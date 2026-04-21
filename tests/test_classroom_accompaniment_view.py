@@ -49,6 +49,9 @@ class _FakeAccompanimentService:
             "validation_message": "",
         }
 
+    def listar_firmantes_disponibles(self) -> list[str]:
+        return ["Prof. Demo", "Rector Demo"]
+
 
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
 class TestClassroomAccompanimentView(unittest.TestCase):

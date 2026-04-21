@@ -109,6 +109,32 @@ class ClassroomAccompanimentService:
         ).fetchone()
         return dict(row) if row else {}
 
+    def listar_firmantes_disponibles(self) -> list[str]:
+        rows = self.connection.execute(
+            """
+            SELECT titulo, nombres, apellidos
+            FROM docentes
+            WHERE activo = 1
+            ORDER BY apellidos, nombres
+            """
+        ).fetchall()
+        firmantes: list[str] = []
+        for row in rows:
+            nombres = str(row["nombres"] or "").strip().split()
+            apellidos = str(row["apellidos"] or "").strip().split()
+            primer_nombre = nombres[0] if nombres else ""
+            primer_apellido = apellidos[0] if apellidos else ""
+            titulo = str(row["titulo"] or "").strip()
+            firma = " ".join(part for part in [titulo, primer_nombre, primer_apellido] if part).strip()
+            if firma:
+                firmantes.append(firma)
+
+        institucion = self.obtener_datos_institucion()
+        rector = str(institucion.get("rector") or "").strip()
+        if rector and rector not in firmantes:
+            firmantes.insert(0, rector)
+        return firmantes
+
     def listar_habilidades_base(self) -> list[dict[str, str]]:
         habilidades: list[dict[str, str]] = []
         for group in SKILL_CATEGORIES:
