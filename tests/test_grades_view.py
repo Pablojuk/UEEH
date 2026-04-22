@@ -79,6 +79,13 @@ class TestGradesView(unittest.TestCase):
         view.load_rows()
         self.assertIn("Actividad", view.table.item(0, 1).text())
 
+    def test_metodo_compatibilidad_save_activity_metadata_existe(self) -> None:
+        from src.presentation.views.grades_view import GradesView
+
+        view = GradesView(_FakeGradeRegistrationService(rows=[]))
+        view.load_rows()
+        view._save_activity_metadata()
+
     def test_poblar_tabla_con_estudiantes(self) -> None:
         from src.presentation.views.grades_view import GradesView
 

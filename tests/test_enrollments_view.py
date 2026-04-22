@@ -83,3 +83,35 @@ class TestEnrollmentsView(unittest.TestCase):
         self.assertEqual(view.student_combo.count(), 1)
         self.assertEqual(view.student_combo.currentData(), "E2")
         conn.close()
+
+    def test_modal_conserva_checks_al_cambiar_filtro(self) -> None:
+        from src.application.services.enrollment_service import EnrollmentService
+        from src.infrastructure.persistence.db import initialize_database
+        from src.presentation.views.enrollments_view import BulkEnrollmentDialog
+
+        conn = initialize_database(":memory:")
+        service = EnrollmentService(conn)
+        students = [
+            {"id_estudiante": "E1", "codigo": "EST-129", "apellidos": "Lopez", "nombres": "Ana", "identificacion": "0101"},
+            {"id_estudiante": "E2", "codigo": "EST-130", "apellidos": "Perez", "nombres": "Luis", "identificacion": "0202"},
+        ]
+        dialog = BulkEnrollmentDialog(
+            enrollment_service=service,
+            students=students,
+            courses=[{"id_curso": "CUR-007", "nombre": "1ro BGU"}],
+            parallels=[{"id_paralelo": "PAR-001", "nombre": "A"}],
+            periods=[{"id_periodo": "2025-2026"}],
+            selected_course="CUR-007",
+            selected_parallel="PAR-001",
+            selected_period="2025-2026",
+        )
+        dialog.search_input.setText("EST-129")
+        dialog._render_students()
+        dialog.table.item(0, 0).setCheckState(2)
+        dialog.search_input.setText("EST-130")
+        dialog._render_students()
+        dialog.table.item(0, 0).setCheckState(2)
+        dialog.search_input.clear()
+        dialog._render_students()
+        self.assertEqual(set(dialog._selected_students()), {"E1", "E2"})
+        conn.close()

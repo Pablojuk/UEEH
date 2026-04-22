@@ -255,6 +255,8 @@ class BulkEnrollmentDialog(QDialog):
         super().__init__(parent)
         self.enrollment_service = enrollment_service
         self._students = students
+        self._selected_student_ids: set[str] = set()
+        self._is_rendering = False
         self.setWindowTitle("Selección masiva de estudiantes")
         self.resize(860, 560)
 
@@ -286,6 +288,7 @@ class BulkEnrollmentDialog(QDialog):
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Sel.", "Código", "Estudiante", "Identificación"])
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.table.itemChanged.connect(self._on_item_changed)
         self.table.horizontalHeader().setStretchLastSection(True)
         root.addWidget(self.table, 1)
 
@@ -312,6 +315,7 @@ class BulkEnrollmentDialog(QDialog):
             combo.setCurrentIndex(index)
 
     def _render_students(self) -> None:
+        self._is_rendering = True
         query = self.search_input.text().strip().lower()
         filtered = []
         for student in self._students:
@@ -329,8 +333,9 @@ class BulkEnrollmentDialog(QDialog):
             self.table.insertRow(row)
             check_item = QTableWidgetItem("")
             check_item.setFlags(check_item.flags() | Qt.ItemIsUserCheckable)
-            check_item.setCheckState(Qt.Unchecked)
-            check_item.setData(Qt.UserRole, student.get("id_estudiante"))
+            student_id = str(student.get("id_estudiante") or "")
+            check_item.setCheckState(Qt.Checked if student_id in self._selected_student_ids else Qt.Unchecked)
+            check_item.setData(Qt.UserRole, student_id)
             self.table.setItem(row, 0, check_item)
             self.table.setItem(row, 1, QTableWidgetItem(str(student.get("codigo", ""))))
             self.table.setItem(
@@ -340,16 +345,21 @@ class BulkEnrollmentDialog(QDialog):
             )
             self.table.setItem(row, 3, QTableWidgetItem(str(student.get("identificacion", ""))))
         self.table.resizeColumnsToContents()
+        self._is_rendering = False
+
+    def _on_item_changed(self, item: QTableWidgetItem) -> None:
+        if self._is_rendering or item.column() != 0:
+            return
+        student_id = str(item.data(Qt.UserRole) or "").strip()
+        if not student_id:
+            return
+        if item.checkState() == Qt.Checked:
+            self._selected_student_ids.add(student_id)
+        else:
+            self._selected_student_ids.discard(student_id)
 
     def _selected_students(self) -> list[str]:
-        selected: list[str] = []
-        for row in range(self.table.rowCount()):
-            item = self.table.item(row, 0)
-            if item and item.checkState() == Qt.Checked:
-                student_id = str(item.data(Qt.UserRole) or "").strip()
-                if student_id:
-                    selected.append(student_id)
-        return selected
+        return sorted(self._selected_student_ids)
 
     def _save_bulk(self) -> None:
         student_ids = self._selected_students()
@@ -369,6 +379,7 @@ class BulkEnrollmentDialog(QDialog):
             QMessageBox.warning(self, "Validación", message)
 
     def _clear_selection(self) -> None:
+        self._selected_student_ids.clear()
         self.search_input.clear()
         for row in range(self.table.rowCount()):
             item = self.table.item(row, 0)
