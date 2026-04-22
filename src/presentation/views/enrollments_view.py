@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -67,10 +71,13 @@ class EnrollmentsView(QWidget):
         form.addRow("Período", self.period_combo)
 
         actions = QHBoxLayout()
+        self.bulk_select_button = QPushButton("Selec. Estu.")
+        self.bulk_select_button.clicked.connect(self.open_bulk_enrollment_dialog)
         self.save_button = QPushButton("Guardar matrícula")
         self.save_button.clicked.connect(self.save_enrollment)
         self.delete_button = QPushButton("Borrar")
         self.delete_button.clicked.connect(self.delete_enrollment)
+        actions.addWidget(self.bulk_select_button)
         actions.addWidget(self.save_button)
         actions.addWidget(self.delete_button)
         actions.addStretch(1)
@@ -209,3 +216,161 @@ class EnrollmentsView(QWidget):
     def refresh_data(self) -> None:
         self.load_combos()
         self.load_enrollments()
+
+    def open_bulk_enrollment_dialog(self) -> None:
+        students = self.student_service.listar_estudiantes()
+        courses = self.catalog_service.listar_cursos()
+        parallels = self.catalog_service.listar_paralelos()
+        periods = self.catalog_service.listar_periodos_lectivos()
+        dialog = BulkEnrollmentDialog(
+            enrollment_service=self.enrollment_service,
+            students=students,
+            courses=courses,
+            parallels=parallels,
+            periods=periods,
+            selected_course=self.course_combo.currentData(),
+            selected_parallel=self.parallel_combo.currentData(),
+            selected_period=self.period_combo.currentData(),
+            parent=self,
+        )
+        if dialog.exec() == QDialog.Accepted:
+            self.load_enrollments()
+            if self.app_signals:
+                self.app_signals.data_changed.emit("enrollments")
+
+
+class BulkEnrollmentDialog(QDialog):
+    def __init__(
+        self,
+        enrollment_service: EnrollmentService,
+        students: list[dict],
+        courses: list[dict],
+        parallels: list[dict],
+        periods: list[dict],
+        selected_course: str | None,
+        selected_parallel: str | None,
+        selected_period: str | None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.enrollment_service = enrollment_service
+        self._students = students
+        self.setWindowTitle("Selección masiva de estudiantes")
+        self.resize(860, 560)
+
+        root = QVBoxLayout(self)
+        form = QFormLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 Buscar estudiante por nombre, identificación o código")
+        self.search_input.textChanged.connect(self._render_students)
+        self.course_combo = QComboBox()
+        self.parallel_combo = QComboBox()
+        self.period_combo = QComboBox()
+
+        for row in courses:
+            self.course_combo.addItem(row.get("nombre", row.get("id_curso", "")), row.get("id_curso"))
+        for row in parallels:
+            self.parallel_combo.addItem(row.get("nombre", row.get("id_paralelo", "")), row.get("id_paralelo"))
+        for row in periods:
+            self.period_combo.addItem(row.get("id_periodo", ""), row.get("id_periodo"))
+        self._restore_combo_selection(self.course_combo, selected_course)
+        self._restore_combo_selection(self.parallel_combo, selected_parallel)
+        self._restore_combo_selection(self.period_combo, selected_period)
+
+        form.addRow("Estudiante", self.search_input)
+        form.addRow("Curso", self.course_combo)
+        form.addRow("Paralelo", self.parallel_combo)
+        form.addRow("Período", self.period_combo)
+        root.addLayout(form)
+
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Sel.", "Código", "Estudiante", "Identificación"])
+        self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        root.addWidget(self.table, 1)
+
+        buttons = QDialogButtonBox()
+        self.save_button = QPushButton("Guardar matrícula")
+        self.clear_button = QPushButton("Borrar")
+        self.cancel_button = QPushButton("Cerrar")
+        self.save_button.clicked.connect(self._save_bulk)
+        self.clear_button.clicked.connect(self._clear_selection)
+        self.cancel_button.clicked.connect(self.reject)
+        buttons.addButton(self.save_button, QDialogButtonBox.AcceptRole)
+        buttons.addButton(self.clear_button, QDialogButtonBox.ResetRole)
+        buttons.addButton(self.cancel_button, QDialogButtonBox.RejectRole)
+        root.addWidget(buttons)
+
+        self._render_students()
+
+    @staticmethod
+    def _restore_combo_selection(combo: QComboBox, selected_value: str | None) -> None:
+        if not selected_value:
+            return
+        index = combo.findData(selected_value)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+
+    def _render_students(self) -> None:
+        query = self.search_input.text().strip().lower()
+        filtered = []
+        for student in self._students:
+            label = f"{student.get('apellidos', '')} {student.get('nombres', '')}".strip()
+            identification = student.get("identificacion") or ""
+            code = student.get("codigo") or ""
+            searchable = f"{label} {identification} {code}".lower()
+            if query and query not in searchable:
+                continue
+            filtered.append(student)
+
+        self.table.setRowCount(0)
+        for student in filtered:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            check_item = QTableWidgetItem("")
+            check_item.setFlags(check_item.flags() | Qt.ItemIsUserCheckable)
+            check_item.setCheckState(Qt.Unchecked)
+            check_item.setData(Qt.UserRole, student.get("id_estudiante"))
+            self.table.setItem(row, 0, check_item)
+            self.table.setItem(row, 1, QTableWidgetItem(str(student.get("codigo", ""))))
+            self.table.setItem(
+                row,
+                2,
+                QTableWidgetItem(f"{student.get('apellidos', '')} {student.get('nombres', '')}".strip()),
+            )
+            self.table.setItem(row, 3, QTableWidgetItem(str(student.get("identificacion", ""))))
+        self.table.resizeColumnsToContents()
+
+    def _selected_students(self) -> list[str]:
+        selected: list[str] = []
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item and item.checkState() == Qt.Checked:
+                student_id = str(item.data(Qt.UserRole) or "").strip()
+                if student_id:
+                    selected.append(student_id)
+        return selected
+
+    def _save_bulk(self) -> None:
+        student_ids = self._selected_students()
+        if not student_ids:
+            QMessageBox.warning(self, "Validación", "Seleccione al menos un estudiante.")
+            return
+        payload = {
+            "curso_id": self.course_combo.currentData(),
+            "paralelo_id": self.parallel_combo.currentData(),
+            "periodo_id": self.period_combo.currentData(),
+        }
+        ok, message = self.enrollment_service.crear_matriculas_masivas(student_ids, payload)
+        if ok:
+            QMessageBox.information(self, "Éxito", message)
+            self.accept()
+        else:
+            QMessageBox.warning(self, "Validación", message)
+
+    def _clear_selection(self) -> None:
+        self.search_input.clear()
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item:
+                item.setCheckState(Qt.Unchecked)
