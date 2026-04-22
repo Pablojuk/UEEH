@@ -24,8 +24,6 @@ class TestEnrollmentService(unittest.TestCase):
         self.enrollment_service = EnrollmentService(self.connection)
 
         self.student_service.crear_estudiante({"nombres": "Ana", "apellidos": "Perez", "identificacion": "1"})
-        self.catalog_service.crear_curso({"id_curso": "C1", "nombre": "Primero", "nivel": "Basica"})
-        self.catalog_service.crear_paralelo({"id_paralelo": "P1", "nombre": "A"})
         self.catalog_service.crear_periodo_lectivo({
             "id_periodo": "2025-2026",
             "anio_inicio": 2025,
@@ -44,8 +42,8 @@ class TestEnrollmentService(unittest.TestCase):
     def test_crear_y_listar_matricula(self) -> None:
         ok, _ = self.enrollment_service.crear_matricula({
             "estudiante_id": self.student_id,
-            "curso_id": "C1",
-            "paralelo_id": "P1",
+            "curso_id": "CUR-007",
+            "paralelo_id": "PAR-001",
             "periodo_id": "2025-2026",
         })
         self.assertTrue(ok)
@@ -54,8 +52,8 @@ class TestEnrollmentService(unittest.TestCase):
     def test_evitar_duplicados(self) -> None:
         payload = {
             "estudiante_id": self.student_id,
-            "curso_id": "C1",
-            "paralelo_id": "P1",
+            "curso_id": "CUR-007",
+            "paralelo_id": "PAR-001",
             "periodo_id": "2025-2026",
         }
         self.enrollment_service.crear_matricula(payload)
@@ -66,21 +64,39 @@ class TestEnrollmentService(unittest.TestCase):
     def test_listar_por_grupo(self) -> None:
         self.enrollment_service.crear_matricula({
             "estudiante_id": self.student_id,
-            "curso_id": "C1",
-            "paralelo_id": "P1",
+            "curso_id": "CUR-007",
+            "paralelo_id": "PAR-001",
             "periodo_id": "2025-2026",
         })
-        rows = self.enrollment_service.listar_por_grupo("C1", "P1", "2025-2026")
+        rows = self.enrollment_service.listar_por_grupo("CUR-007", "PAR-001", "2025-2026")
         self.assertEqual(len(rows), 1)
 
     def test_eliminar_matricula(self) -> None:
         self.enrollment_service.crear_matricula({
             "estudiante_id": self.student_id,
-            "curso_id": "C1",
-            "paralelo_id": "P1",
+            "curso_id": "CUR-007",
+            "paralelo_id": "PAR-001",
             "periodo_id": "2025-2026",
         })
         enrollment_id = self.enrollment_service.listar_matriculas()[0]["id_matricula"]
         ok, _ = self.enrollment_service.eliminar_matricula(enrollment_id)
         self.assertTrue(ok)
         self.assertEqual(len(self.enrollment_service.listar_matriculas()), 0)
+
+    def test_crear_matriculas_masivas_omite_duplicados(self) -> None:
+        self.student_service.crear_estudiante({"nombres": "Luis", "apellidos": "Gomez", "identificacion": "2"})
+        second_id = [s for s in self.student_service.listar_estudiantes() if s["identificacion"] == "2"][0]["id_estudiante"]
+        self.enrollment_service.crear_matricula(
+            {
+                "estudiante_id": self.student_id,
+                "curso_id": "CUR-007",
+                "paralelo_id": "PAR-001",
+                "periodo_id": "2025-2026",
+            }
+        )
+        ok, message = self.enrollment_service.crear_matriculas_masivas(
+            [self.student_id, second_id],
+            {"curso_id": "CUR-007", "paralelo_id": "PAR-001", "periodo_id": "2025-2026"},
+        )
+        self.assertTrue(ok)
+        self.assertIn("Omitidas por duplicado: 1", message)
