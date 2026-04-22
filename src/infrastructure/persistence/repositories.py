@@ -184,7 +184,7 @@ class GradeRecordsRepository(SQLiteRepository):
 class GradeActivityConfigRepository(SQLiteRepository):
     table_name = "grade_activity_config"
     id_field = "id_config"
-    fields = ("id_config", "asignacion_id", "trimestre_num", "numero_actividades")
+    fields = ("id_config", "asignacion_id", "trimestre_num", "numero_actividades", "metadata_json")
 
 
 class FinalSupplementaryRepository(SQLiteRepository):

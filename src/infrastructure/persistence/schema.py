@@ -166,6 +166,7 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         asignacion_id TEXT NOT NULL,
         trimestre_num INTEGER NOT NULL CHECK (trimestre_num IN (1,2,3)),
         numero_actividades INTEGER NOT NULL CHECK (numero_actividades >= 1 AND numero_actividades <= 20),
+        metadata_json TEXT,
         UNIQUE (asignacion_id, trimestre_num),
         FOREIGN KEY (asignacion_id) REFERENCES asignaciones_docente(id_asignacion)
     );

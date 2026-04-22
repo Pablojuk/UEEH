@@ -14,10 +14,14 @@ except ImportError:  # pragma: no cover
 
 
 class _FakeAccompanimentService:
+    def __init__(self) -> None:
+        self.load_calls = 0
+
     def listar_contextos_disponibles(self) -> list[dict]:
         return [{"id_asignacion": "AS1", "display": "Demo"}]
 
     def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
+        self.load_calls += 1
         return {
             "students": [{"student_id": "E1", "code": "001", "name": "López María"}],
             "skill_categories": [
@@ -66,6 +70,15 @@ class TestClassroomAccompanimentView(unittest.TestCase):
         view.load_rows()
         self.assertEqual(view.table.rowCount(), 1)
         self.assertGreaterEqual(view.table.columnCount(), 8)
+
+    def test_cambio_trimestre_carga_automaticamente(self) -> None:
+        from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
+
+        service = _FakeAccompanimentService()
+        view = ClassroomAccompanimentView(service)
+        before = service.load_calls
+        view.trimester_combo.setCurrentIndex(1)
+        self.assertGreater(service.load_calls, before)
 
 
 if __name__ == "__main__":

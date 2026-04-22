@@ -162,9 +162,11 @@ class ClassroomAccompanimentView(QWidget):
 
         self.assignment_combo = QComboBox()
         self.assignment_combo.setMinimumWidth(300)
+        self.assignment_combo.currentIndexChanged.connect(self._on_context_filters_changed)
         self.trimester_combo = QComboBox()
         for label, value in self.TRIMESTERS:
             self.trimester_combo.addItem(label, value)
+        self.trimester_combo.currentIndexChanged.connect(self._on_context_filters_changed)
 
         self.load_button = QPushButton("Cargar listado")
         self.load_button.clicked.connect(self.load_rows)
@@ -312,6 +314,7 @@ class ClassroomAccompanimentView(QWidget):
         self.btn_vista_previa_cual.setEnabled(True)
         self.btn_exportar_pdf_cual.setEnabled(True)
         self.btn_exportar_excel_cual.setEnabled(True)
+        self._refresh_preview_silent()
 
     def save_rows(self) -> None:
         assignment_id = self.assignment_combo.currentData()
@@ -372,6 +375,7 @@ class ClassroomAccompanimentView(QWidget):
     def refresh_data(self) -> None:
         selected_assignment = self.assignment_combo.currentData()
         self.load_contexts(selected_assignment_id=selected_assignment)
+        self._refresh_preview_silent()
 
     def _fill_table(self) -> None:
         self._clear_table()
@@ -748,6 +752,22 @@ class ClassroomAccompanimentView(QWidget):
             "docente": self.signer_docente_combo.currentData() or "",
             "rector": self.signer_rector_combo.currentData() or "",
         }
+        self._refresh_preview_silent()
+
+    def _on_context_filters_changed(self) -> None:
+        self.load_rows()
+
+    def _refresh_preview_silent(self) -> None:
+        assignment_id = self.assignment_combo.currentData()
+        if not assignment_id:
+            self._set_preview_html("")
+            return
+        try:
+            html = self._generar_html_vista_previa()
+        except Exception:  # noqa: BLE001
+            return
+        self._ultimo_html_vista_previa = html
+        self._set_preview_html(html)
 
     def _set_preview_html(self, html_content: str) -> None:
         if self._preview_uses_webengine:

@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QDate, QEvent, Qt
 from PySide6.QtGui import QColor, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
     QComboBox,
+    QDateEdit,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -48,6 +52,7 @@ class GradesView(QWidget):
         self._fila_meta: list[dict] = []
         self._numero_actividades = 3
         self._table_columns: list[tuple[str, str]] = []
+        self._activity_meta_inputs: list[dict[str, QWidget]] = []
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -115,6 +120,19 @@ class GradesView(QWidget):
         root.addWidget(title)
         root.addWidget(subtitle)
         root.addWidget(filter_card)
+        self.activities_meta_card = QFrame()
+        self.activities_meta_card.setObjectName("Card")
+        meta_card_layout = QVBoxLayout(self.activities_meta_card)
+        meta_card_layout.addWidget(QLabel("Metadatos por actividad (nombre y fechas)"))
+        self.activities_meta_scroll = QScrollArea()
+        self.activities_meta_scroll.setWidgetResizable(True)
+        self.activities_meta_content = QWidget()
+        self.activities_meta_grid = QGridLayout(self.activities_meta_content)
+        self.activities_meta_grid.setContentsMargins(0, 0, 0, 0)
+        self.activities_meta_grid.setSpacing(8)
+        self.activities_meta_scroll.setWidget(self.activities_meta_content)
+        meta_card_layout.addWidget(self.activities_meta_scroll)
+        root.addWidget(self.activities_meta_card)
         root.addWidget(self.table, 1)
 
         self.load_contexts()
@@ -145,6 +163,8 @@ class GradesView(QWidget):
         if ok:
             QMessageBox.information(self, "Éxito", message)
             self._numero_actividades = numero
+            self._build_activity_metadata_inputs()
+            self._save_activity_metadata()
             self._setup_columns()
         else:
             QMessageBox.warning(self, "Validación", message)
@@ -156,8 +176,10 @@ class GradesView(QWidget):
             self._clear_table()
             return
 
-        self._numero_actividades = self.grade_registration_service.obtener_numero_actividades(asignacion_id, int(trimestre))
+        config = self.grade_registration_service.obtener_configuracion_actividades(asignacion_id, int(trimestre))
+        self._numero_actividades = int(config.get("numero_actividades", 3))
         self.activities_count_input.setValue(self._numero_actividades)
+        self._build_activity_metadata_inputs(config.get("metadata", []))
         try:
             filas = self.grade_registration_service.cargar_registro(asignacion_id, int(trimestre))
         except ValueError as exc:
@@ -187,6 +209,7 @@ class GradesView(QWidget):
             return
 
         filas = self._collect_rows_from_table()
+        self._save_activity_metadata()
         try:
             ok, message = self.grade_registration_service.guardar_registros(asignacion_id, int(trimestre), filas)
         except ValueError as exc:
@@ -242,6 +265,7 @@ class GradesView(QWidget):
     def _clear_table(self) -> None:
         self.table.setRowCount(0)
         self._fila_meta = []
+        self._build_activity_metadata_inputs()
 
     def refresh_data(self) -> None:
         selected_assignment_id = self.assignment_combo.currentData()
@@ -344,3 +368,96 @@ class GradesView(QWidget):
             return text
         formatted = f"{number:.2f}".rstrip("0").rstrip(".")
         return formatted
+
+    def _build_activity_metadata_inputs(self, metadata: list[dict[str, str]] | None = None) -> None:
+        while self.activities_meta_grid.count():
+            item = self.activities_meta_grid.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        self._activity_meta_inputs = []
+        metadata = metadata or []
+        for idx in range(1, self._numero_actividades + 1):
+            row = idx - 1
+            block = QFrame()
+            block.setObjectName("Card")
+            block_layout = QGridLayout(block)
+            block_layout.setContentsMargins(8, 8, 8, 8)
+            block_layout.setHorizontalSpacing(8)
+            block_layout.setVerticalSpacing(4)
+            nombre_input = QLineEdit()
+            nombre_input.setPlaceholderText(f"Nombre de la actividad {idx}")
+            fecha_actividad_input = QDateEdit()
+            fecha_actividad_input.setCalendarPopup(True)
+            fecha_actividad_input.setDisplayFormat("yyyy-MM-dd")
+            fecha_actividad_input.setSpecialValueText("")
+            fecha_actividad_input.setDate(QDate(2000, 1, 1))
+            fecha_actividad_input.setMinimumDate(QDate(2000, 1, 1))
+            fecha_refuerzo_input = QDateEdit()
+            fecha_refuerzo_input.setCalendarPopup(True)
+            fecha_refuerzo_input.setDisplayFormat("yyyy-MM-dd")
+            fecha_refuerzo_input.setSpecialValueText("")
+            fecha_refuerzo_input.setDate(QDate(2000, 1, 1))
+            fecha_refuerzo_input.setMinimumDate(QDate(2000, 1, 1))
+
+            current = metadata[row] if row < len(metadata) else {}
+            nombre_input.setText(str(current.get("nombre", "")))
+            self._set_date_or_empty(fecha_actividad_input, str(current.get("fecha_actividad", "")))
+            self._set_date_or_empty(fecha_refuerzo_input, str(current.get("fecha_refuerzo", "")))
+
+            block_layout.addWidget(QLabel(f"Actividad {idx} + Refuerzo {idx}"), 0, 0, 1, 3)
+            block_layout.addWidget(QLabel("Nombre"), 1, 0)
+            block_layout.addWidget(nombre_input, 1, 1, 1, 2)
+            block_layout.addWidget(QLabel("Fecha actividad"), 2, 0)
+            block_layout.addWidget(fecha_actividad_input, 2, 1)
+            block_layout.addWidget(QLabel("Fecha refuerzo"), 2, 2)
+            block_layout.addWidget(fecha_refuerzo_input, 2, 3)
+            self.activities_meta_grid.addWidget(block, row, 0)
+            self._activity_meta_inputs.append(
+                {
+                    "nombre": nombre_input,
+                    "fecha_actividad": fecha_actividad_input,
+                    "fecha_refuerzo": fecha_refuerzo_input,
+                }
+            )
+
+    @staticmethod
+    def _set_date_or_empty(date_input: QDateEdit, iso_date: str) -> None:
+        parsed = QDate.fromString(iso_date, "yyyy-MM-dd")
+        if parsed.isValid():
+            date_input.setDate(parsed)
+        else:
+            date_input.clear()
+
+    def _collect_activity_metadata(self) -> list[dict[str, str]]:
+        out: list[dict[str, str]] = []
+        for item in self._activity_meta_inputs:
+            nombre_widget = item["nombre"]
+            fecha_act_widget = item["fecha_actividad"]
+            fecha_ref_widget = item["fecha_refuerzo"]
+            nombre = nombre_widget.text().strip() if isinstance(nombre_widget, QLineEdit) else ""
+            fecha_actividad = ""
+            fecha_refuerzo = ""
+            if isinstance(fecha_act_widget, QDateEdit):
+                fecha_actividad = fecha_act_widget.date().toString("yyyy-MM-dd") if fecha_act_widget.text().strip() else ""
+            if isinstance(fecha_ref_widget, QDateEdit):
+                fecha_refuerzo = fecha_ref_widget.date().toString("yyyy-MM-dd") if fecha_ref_widget.text().strip() else ""
+            out.append(
+                {
+                    "nombre": nombre,
+                    "fecha_actividad": fecha_actividad,
+                    "fecha_refuerzo": fecha_refuerzo,
+                }
+            )
+        return out
+
+    def _save_activity_metadata(self) -> None:
+        asignacion_id = self.assignment_combo.currentData()
+        trimestre = self.trimester_combo.currentData()
+        if not asignacion_id or not trimestre:
+            return
+        self.grade_registration_service.guardar_configuracion_actividades(
+            str(asignacion_id),
+            int(trimestre),
+            self._collect_activity_metadata(),
+        )
