@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
     QFrame,
-    QGridLayout,
     QHeaderView,
     QHBoxLayout,
     QLabel,
@@ -457,10 +456,6 @@ class GradesView(QWidget):
             int(trimestre),
             metadata,
         )
-
-    def _save_activity_metadata(self) -> None:
-        """Compatibilidad con llamadas antiguas; redirige al guardado vigente."""
-        self._save_activity_names()
 
     def _apply_column_resize_policy(self) -> None:
         self.table.resizeColumnToContents(0)
