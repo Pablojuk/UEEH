@@ -63,6 +63,7 @@ class TestGradesView(unittest.TestCase):
         self.assertIsNotNone(view.assignment_combo)
         self.assertIsNotNone(view.trimester_combo)
         self.assertIsNotNone(view.table)
+        self.assertIsNotNone(view.activities_meta_card)
 
     def test_cargar_tabla_vacia_sin_romper(self) -> None:
         from src.presentation.views.grades_view import GradesView
