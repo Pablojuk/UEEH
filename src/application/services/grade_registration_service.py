@@ -84,12 +84,49 @@ class GradeRegistrationService:
             "asignacion_id": asignacion_id,
             "trimestre_num": trimestre_num,
             "numero_actividades": numero_actividades,
+            "metadata_json": row["metadata_json"] if row and "metadata_json" in row.keys() else None,
         }
         if row:
             self.activity_config_repo.actualizar(row["id_config"], payload)
         else:
             self.activity_config_repo.crear({"id_config": str(uuid.uuid4()), **payload})
         return True, "Configuración de actividades actualizada"
+
+    def obtener_configuracion_actividades(self, asignacion_id: str, trimestre_num: int) -> dict[str, Any]:
+        row = self.connection.execute(
+            "SELECT numero_actividades, metadata_json FROM grade_activity_config WHERE asignacion_id = ? AND trimestre_num = ?",
+            (asignacion_id, trimestre_num),
+        ).fetchone()
+        numero_actividades = int(row["numero_actividades"]) if row else 3
+        metadata = self._parse_metadata_json(row["metadata_json"] if row else None, numero_actividades)
+        return {
+            "numero_actividades": numero_actividades,
+            "metadata": metadata,
+        }
+
+    def guardar_configuracion_actividades(
+        self,
+        asignacion_id: str,
+        trimestre_num: int,
+        metadata: list[dict[str, str]],
+    ) -> tuple[bool, str]:
+        row = self.connection.execute(
+            "SELECT * FROM grade_activity_config WHERE asignacion_id = ? AND trimestre_num = ?",
+            (asignacion_id, trimestre_num),
+        ).fetchone()
+        numero_actividades = int(row["numero_actividades"]) if row else max(len(metadata), 1)
+        metadata_normalizada = self._normalize_activity_metadata(metadata, numero_actividades)
+        payload = {
+            "asignacion_id": asignacion_id,
+            "trimestre_num": trimestre_num,
+            "numero_actividades": numero_actividades,
+            "metadata_json": json.dumps(metadata_normalizada, ensure_ascii=False),
+        }
+        if row:
+            self.activity_config_repo.actualizar(row["id_config"], payload)
+        else:
+            self.activity_config_repo.crear({"id_config": str(uuid.uuid4()), **payload})
+        return True, "Configuración de actividades guardada"
 
     def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict[str, Any]]:
         if trimestre_num not in (1, 2, 3):
@@ -333,3 +370,29 @@ class GradeRegistrationService:
         if nota_trimestral >= 5:
             return "PA"
         return "NA"
+
+    @staticmethod
+    def _parse_metadata_json(raw_value: Any, numero_actividades: int) -> list[dict[str, str]]:
+        if not raw_value:
+            return GradeRegistrationService._normalize_activity_metadata([], numero_actividades)
+        try:
+            data = json.loads(raw_value)
+        except Exception:  # noqa: BLE001
+            data = []
+        if not isinstance(data, list):
+            data = []
+        return GradeRegistrationService._normalize_activity_metadata(data, numero_actividades)
+
+    @staticmethod
+    def _normalize_activity_metadata(data: list[Any], numero_actividades: int) -> list[dict[str, str]]:
+        out: list[dict[str, str]] = []
+        for idx in range(numero_actividades):
+            item = data[idx] if idx < len(data) and isinstance(data[idx], dict) else {}
+            out.append(
+                {
+                    "nombre": str(item.get("nombre", "")).strip(),
+                    "fecha_actividad": str(item.get("fecha_actividad", "")).strip(),
+                    "fecha_refuerzo": str(item.get("fecha_refuerzo", "")).strip(),
+                }
+            )
+        return out

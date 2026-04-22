@@ -145,3 +145,59 @@ def calcular_resultado_con_supletorio(nota_final: float, nota_supletorio: Option
         return 7.0
 
     return truncar_2_decimales(nota_final)
+
+
+def calcular_valoracion_acompanamiento(
+    total_siempre: int,
+    total_frecuentemente: int,
+    total_ocasionalmente: int,
+    total_nunca: int,
+) -> str:
+    """Calcula valoración cualitativa para acompañamiento usando puntaje ponderado (1..36)."""
+    puntaje_total = calcular_puntaje_ponderado_acompanamiento(
+        total_siempre=total_siempre,
+        total_frecuentemente=total_frecuentemente,
+        total_ocasionalmente=total_ocasionalmente,
+        total_nunca=total_nunca,
+    )
+    return calcular_valoracion_acompanamiento_desde_puntaje(puntaje_total)
+
+
+def calcular_puntaje_ponderado_acompanamiento(
+    total_siempre: int,
+    total_frecuentemente: int,
+    total_ocasionalmente: int,
+    total_nunca: int,
+) -> int:
+    """Convierte conteos de respuestas en puntaje ponderado."""
+    return (
+        (int(total_siempre) * 4)
+        + (int(total_frecuentemente) * 3)
+        + (int(total_ocasionalmente) * 2)
+        + (int(total_nunca) * 1)
+    )
+
+
+def calcular_valoracion_acompanamiento_desde_puntaje(puntaje_total: int) -> str:
+    """Evalúa la escala cualitativa institucional con base en puntaje total ponderado."""
+    if 35 <= puntaje_total <= 36:
+        return "A+"
+    if 33 <= puntaje_total <= 34:
+        return "A-"
+    if 30 <= puntaje_total <= 32:
+        return "B+"
+    if 27 <= puntaje_total <= 29:
+        return "B-"
+    if 20 <= puntaje_total <= 26:
+        return "C+"
+    if 18 <= puntaje_total <= 19:
+        return "C-"
+    if 15 <= puntaje_total <= 17:
+        return "D+"
+    if 13 <= puntaje_total <= 14:
+        return "D-"
+    if 11 <= puntaje_total <= 12:
+        return "E+"
+    if 9 <= puntaje_total <= 10:
+        return "E-"
+    return ""

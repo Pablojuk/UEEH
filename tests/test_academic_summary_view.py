@@ -17,6 +17,8 @@ class _FakeAcademicSummaryService:
     def __init__(self, rows: list[dict] | None = None) -> None:
         self.rows = rows or []
         self.signers = [{"id_docente": "D1", "firma": "Econ. Pablo Juca"}]
+        self.trimestral_calls = 0
+        self.anual_calls = 0
 
     def listar_contextos_disponibles(self) -> list[dict]:
         return [{"id_asignacion": "AS1", "display": "Contexto demo"}]
@@ -25,9 +27,11 @@ class _FakeAcademicSummaryService:
         return list(self.rows)
 
     def obtener_reporte_anual(self, asignacion_id: str) -> list[dict]:
+        self.anual_calls += 1
         return list(self.rows)
 
     def obtener_reporte_trimestral(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
+        self.trimestral_calls += 1
         return list(self.rows)
 
     def recalcular_resumenes(self, rows: list[dict]) -> list[dict]:
@@ -124,10 +128,29 @@ class TestAcademicSummaryView(unittest.TestCase):
             _FakeAcademicSummaryService(rows=[]),
             report_export_service=fake_report_service,
         )
+        initial_calls = len(fake_report_service.calls)
         view.show_preview()
-        self.assertEqual(len(fake_report_service.calls), 1)
-        self.assertEqual(fake_report_service.calls[0]["asignacion_id"], "AS1")
+        self.assertEqual(len(fake_report_service.calls), initial_calls + 1)
+        self.assertEqual(fake_report_service.calls[-1]["asignacion_id"], "AS1")
         self.assertEqual(view.tabs.currentIndex(), 1)
+
+    def test_cambio_tipo_informe_dispara_carga_automatica(self) -> None:
+        from src.presentation.views.academic_summary_view import AcademicSummaryView
+
+        service = _FakeAcademicSummaryService(rows=[])
+        view = AcademicSummaryView(service, report_export_service=_FakeReportExportService())
+        before = service.trimestral_calls
+        view.report_type_combo.setCurrentIndex(1)
+        self.assertGreater(service.trimestral_calls, before)
+
+    def test_cambio_firmantes_refresca_vista_previa_en_tiempo_real(self) -> None:
+        from src.presentation.views.academic_summary_view import AcademicSummaryView
+
+        report_service = _FakeReportExportService()
+        view = AcademicSummaryView(_FakeAcademicSummaryService(rows=[]), report_export_service=report_service)
+        before = len(report_service.calls)
+        view.signer_docente_combo.setCurrentIndex(1)
+        self.assertGreater(len(report_service.calls), before)
 
     def test_sanitiza_nombre_de_archivo_desde_asignacion(self) -> None:
         from src.presentation.views.academic_summary_view import AcademicSummaryView

@@ -82,6 +82,7 @@ class AcademicSummaryView(QWidget):
             "rector": "",
             "tutor_curso": "",
         }
+        self._suppress_auto_refresh = False
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -97,6 +98,7 @@ class AcademicSummaryView(QWidget):
 
         self.assignment_combo = QComboBox()
         self.assignment_combo.setMinimumWidth(380)
+        self.assignment_combo.currentIndexChanged.connect(self._on_filters_changed)
         self.report_type_combo = QComboBox()
         self.report_type_combo.addItem("Anual", ("anual", None))
         self.report_type_combo.addItem("Primer Trimestre", ("trimestral", 1))
@@ -230,6 +232,7 @@ class AcademicSummaryView(QWidget):
         asignacion_id = self.assignment_combo.currentData()
         if not asignacion_id:
             self._fill_table([])
+            self._refresh_preview_silent()
             return
 
         report_type, trimestre_num = self.report_type_combo.currentData()
@@ -238,6 +241,7 @@ class AcademicSummaryView(QWidget):
         else:
             rows = self.academic_summary_service.obtener_reporte_anual(asignacion_id)
         self._fill_table(rows)
+        self._refresh_preview_silent()
 
     def recalculate_rows(self) -> None:
         report_type, _ = self.report_type_combo.currentData()
@@ -394,6 +398,7 @@ class AcademicSummaryView(QWidget):
         self.table.setHorizontalHeaderLabels([label for _, label in self._table_columns])
         self.table.setRowCount(0)
         self._rows_meta = []
+        self._on_filters_changed()
 
     def _set_preview_html(self, html_content: str) -> None:
         self.btn_toggle_filas.setChecked(False)
@@ -481,6 +486,31 @@ class AcademicSummaryView(QWidget):
             "rector": self.signer_rector_combo.currentData() or "",
             "tutor_curso": self.signer_tutor_combo.currentData() or "",
         }
+        self._refresh_preview_silent()
+
+    def _on_filters_changed(self) -> None:
+        if self._suppress_auto_refresh:
+            return
+        self.load_summary()
+
+    def _refresh_preview_silent(self) -> None:
+        if self.report_export_service is None:
+            return
+        asignacion_id = self.assignment_combo.currentData()
+        if not asignacion_id:
+            self._set_preview_html("")
+            return
+        report_type, trimestre_num = self.report_type_combo.currentData()
+        try:
+            html_report = self.report_export_service.generar_resumen_html(
+                asignacion_id,
+                report_type=report_type,
+                trimestre_num=trimestre_num,
+                firmantes=self._firmantes,
+            )
+        except Exception:  # noqa: BLE001
+            return
+        self._set_preview_html(html_report)
 
     def eventFilter(self, obj, event):  # type: ignore[override]
         if obj is self.table and event.type() == QEvent.KeyPress:

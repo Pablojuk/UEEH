@@ -77,6 +77,10 @@ def _run_compatibility_migrations(connection: sqlite3.Connection) -> None:
             if not _column_exists(connection, "grade_records", "mejoras_json"):
                 connection.execute("ALTER TABLE grade_records ADD COLUMN mejoras_json TEXT")
 
+        if _column_exists(connection, "grade_activity_config", "id_config"):
+            if not _column_exists(connection, "grade_activity_config", "metadata_json"):
+                connection.execute("ALTER TABLE grade_activity_config ADD COLUMN metadata_json TEXT")
+
 
 def initialize_database(db_path: str | None = None) -> sqlite3.Connection:
     """Inicializa el esquema completo y retorna la conexión activa."""
