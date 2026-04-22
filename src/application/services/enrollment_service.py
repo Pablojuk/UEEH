@@ -32,6 +32,31 @@ class EnrollmentService:
         self.repo.crear(payload)
         return True, "Matrícula creada"
 
+    def crear_matriculas_masivas(self, student_ids: list[str], context: dict) -> tuple[bool, str]:
+        if not student_ids:
+            return False, "No se recibieron estudiantes para matrícula masiva"
+        required = ["curso_id", "paralelo_id", "periodo_id"]
+        if not all(str(context.get(field, "")).strip() for field in required):
+            return False, "Curso, paralelo y período son obligatorios"
+
+        creadas = 0
+        duplicadas = 0
+        for student_id in student_ids:
+            payload = {
+                "estudiante_id": student_id,
+                "curso_id": context["curso_id"],
+                "paralelo_id": context["paralelo_id"],
+                "periodo_id": context["periodo_id"],
+            }
+            ok, _ = self.crear_matricula(payload)
+            if ok:
+                creadas += 1
+            else:
+                duplicadas += 1
+        if creadas == 0:
+            return False, "No se crearon matrículas nuevas; los estudiantes ya estaban registrados en ese contexto"
+        return True, f"Matrículas creadas: {creadas}. Omitidas por duplicado: {duplicadas}."
+
     def obtener_matricula_por_id(self, enrollment_id: str) -> dict | None:
         return self.repo.obtener_por_id(enrollment_id)
 

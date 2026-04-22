@@ -31,6 +31,7 @@ class TestEnrollmentsView(unittest.TestCase):
         self.assertIsNotNone(view.student_combo)
         self.assertIsNotNone(view.table)
         self.assertIsNotNone(view.delete_button)
+        self.assertEqual(view.bulk_select_button.text(), "Selec. Estu.")
         self.assertFalse(hasattr(view, "search_input"))
         self.assertEqual(view.table.rowCount(), 0)
         conn.close()
