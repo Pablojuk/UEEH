@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QDate, QEvent, Qt
 from PySide6.QtGui import QColor, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
     QComboBox,
+    QDateEdit,
     QFrame,
     QGridLayout,
     QHeaderView,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -124,6 +127,19 @@ class GradesView(QWidget):
         root.addWidget(title)
         root.addWidget(subtitle)
         root.addWidget(filter_card)
+        self.activities_meta_card = QFrame()
+        self.activities_meta_card.setObjectName("Card")
+        meta_card_layout = QVBoxLayout(self.activities_meta_card)
+        meta_card_layout.addWidget(QLabel("Metadatos por actividad (nombre y fechas)"))
+        self.activities_meta_scroll = QScrollArea()
+        self.activities_meta_scroll.setWidgetResizable(True)
+        self.activities_meta_content = QWidget()
+        self.activities_meta_grid = QGridLayout(self.activities_meta_content)
+        self.activities_meta_grid.setContentsMargins(0, 0, 0, 0)
+        self.activities_meta_grid.setSpacing(8)
+        self.activities_meta_scroll.setWidget(self.activities_meta_content)
+        meta_card_layout.addWidget(self.activities_meta_scroll)
+        root.addWidget(self.activities_meta_card)
         root.addWidget(self.table, 1)
 
         self.load_contexts()
@@ -154,6 +170,8 @@ class GradesView(QWidget):
         if ok:
             QMessageBox.information(self, "Éxito", message)
             self._numero_actividades = numero
+            self._build_activity_metadata_inputs()
+            self._save_activity_metadata()
             self._setup_columns()
             self._save_activity_names()
         else:
@@ -266,6 +284,17 @@ class GradesView(QWidget):
     def _clear_table(self) -> None:
         self.table.setRowCount(0)
         self._fila_meta = []
+        self._build_activity_metadata_inputs()
+
+    def _build_activity_metadata_inputs(self) -> None:
+        """Compatibilidad con versiones antiguas de GradesView.
+
+        La UI actual usa nombres de actividad en la fila superior combinada de la tabla,
+        por lo que ya no existe un panel separado de metadatos.
+        Este método se conserva como no-op para evitar AttributeError si queda una
+        llamada obsoleta en entornos que aún cargan código previo.
+        """
+        return
 
     def _build_activity_metadata_inputs(self) -> None:
         """Compatibilidad con versiones antiguas de GradesView.
