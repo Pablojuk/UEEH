@@ -506,13 +506,10 @@ class ClassroomAccompanimentView(QWidget):
         if not contexto:
             raise ValueError("No se encontró contexto de la asignación seleccionada.")
 
-        estudiantes_t1 = self._get_datos_trimestre(1)
-        estudiantes_t2 = self._get_datos_trimestre(2)
-        estudiantes_t3 = self._get_datos_trimestre(3)
-        estudiantes = self._construir_estudiantes_consolidados(estudiantes_t1, estudiantes_t2, estudiantes_t3)
-
         trimestre_actual = int(self.trimester_combo.currentData() or 1)
-        datos_trim_actual = {1: estudiantes_t1, 2: estudiantes_t2, 3: estudiantes_t3}.get(trimestre_actual, [])
+        trimestre_texto = str(self.trimester_combo.currentText() or f"Trimestre {trimestre_actual}").upper()
+        datos_trim_actual = self._get_datos_trimestre(trimestre_actual)
+        estudiantes = self._construir_estudiantes_trimestrales(datos_trim_actual)
         stats = self._calcular_stats_cualitativas(datos_trim_actual)
 
         institucion = self.accompaniment_service.obtener_datos_institucion()
@@ -522,12 +519,13 @@ class ClassroomAccompanimentView(QWidget):
         return {
             "docente": self._firmantes.get("docente")
             or f"{contexto.get('docente_apellidos', '')} {contexto.get('docente_nombres', '')}".strip(),
-            "asignatura": contexto.get("asignatura_nombre") or contexto.get("asignatura_id", ""),
             "curso": contexto.get("curso_nombre") or contexto.get("curso_id", ""),
             "paralelo": contexto.get("paralelo_nombre") or contexto.get("paralelo_id", ""),
             "nivel": contexto.get("curso_nivel") or "",
             "fecha": datetime.now().strftime("%Y-%m-%d"),
             "anio_lectivo": contexto.get("periodo_id", ""),
+            "trimestre": trimestre_texto,
+            "reporte_titulo": f"ACOMPAÑAMIENTO INTEGRAL EN EL AULA - {trimestre_texto} - PERIODO {contexto.get('periodo_id', '')}",
             "rector": self._firmantes.get("rector") or institucion.get("rector", ""),
             "logo_institucion": logo_institucional,
             "logo_ministerio": logo_mineduc,
@@ -575,40 +573,15 @@ class ClassroomAccompanimentView(QWidget):
             )
         return rows
 
-    def _construir_estudiantes_consolidados(
-        self,
-        estudiantes_t1: list[dict[str, str]],
-        estudiantes_t2: list[dict[str, str]],
-        estudiantes_t3: list[dict[str, str]],
-    ) -> list[dict[str, str]]:
-        todos_nombres = sorted(
-            {
-                e.get("nombre", "").strip()
-                for e in [*estudiantes_t1, *estudiantes_t2, *estudiantes_t3]
-                if e.get("nombre", "").strip()
-            }
-        )
-
-        def buscar_cual(lista: list[dict[str, str]], nombre: str) -> str:
-            for item in lista:
-                if item.get("nombre", "").strip() == nombre:
-                    return str(item.get("valoracion_final", "")).strip()
-            return ""
-
-        estudiantes: list[dict[str, str]] = []
-        for nombre in todos_nombres:
-            t1 = buscar_cual(estudiantes_t1, nombre)
-            t2 = buscar_cual(estudiantes_t2, nombre)
-            t3 = buscar_cual(estudiantes_t3, nombre)
+    def _construir_estudiantes_trimestrales(self, datos_trimestre: list[dict[str, str]]) -> list[dict[str, str]]:
+        estudiantes = []
+        for item in sorted(datos_trimestre, key=lambda x: str(x.get("nombre", "")).strip().lower()):
+            cual = str(item.get("valoracion_final", "")).strip()
             estudiantes.append(
                 {
-                    "nombre": nombre,
-                    "t1_cual": t1,
-                    "t1_desc": self._obtener_descripcion_cualitativa(t1),
-                    "t2_cual": t2,
-                    "t2_desc": self._obtener_descripcion_cualitativa(t2),
-                    "t3_cual": t3,
-                    "t3_desc": self._obtener_descripcion_cualitativa(t3),
+                    "nombre": str(item.get("nombre", "")).strip(),
+                    "cual": cual,
+                    "desc": self._obtener_descripcion_cualitativa(cual),
                 }
             )
         return estudiantes
@@ -678,7 +651,7 @@ class ClassroomAccompanimentView(QWidget):
             return
         try:
             html = self._generar_html_vista_previa()
-            suggested = f"reporte_cualitativo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            suggested = f"{self._build_export_filename_base()}.pdf"
             file_path, _ = QFileDialog.getSaveFileName(self, "Guardar PDF", suggested, "PDF (*.pdf)")
             if not file_path:
                 return
@@ -723,7 +696,7 @@ class ClassroomAccompanimentView(QWidget):
             QMessageBox.warning(self, "Exportar Excel", "Seleccione una asignación y cargue el listado.")
             return
         self._collect_responses_from_table()
-        suggested = f"acompanamiento_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        suggested = f"{self._build_export_filename_base()}.xlsx"
         file_path, _ = QFileDialog.getSaveFileName(self, "Guardar Excel", suggested, "Excel (*.xlsx)")
         if not file_path:
             return
@@ -744,6 +717,20 @@ class ClassroomAccompanimentView(QWidget):
             ws.append(row)
         wb.save(file_path)
         QMessageBox.information(self, "Exportar Excel", f"Excel generado correctamente:\n{file_path}")
+
+    def _build_export_filename_base(self) -> str:
+        assignment_text = self.assignment_combo.currentText() or "acompanamiento"
+        return self._sanitize_filename(assignment_text)
+
+    @staticmethod
+    def _sanitize_filename(text: str) -> str:
+        import re
+
+        normalized = re.sub(r"[|/\\\\:*?\"<>]+", "_", str(text or "").strip())
+        normalized = re.sub(r"\s+", "_", normalized)
+        normalized = re.sub(r"_+", "_", normalized)
+        normalized = normalized.strip(" ._")
+        return normalized or "acompanamiento"
 
     def _load_signer_options(self) -> None:
         options = self.accompaniment_service.listar_firmantes_disponibles()

@@ -4,21 +4,15 @@
 <meta charset="UTF-8">
 <title>Reporte de Cualificaciones y Descripciones - UEEH</title>
 <style>
-  /* ══════════════════════════════════════════
-      VARIABLES
-  ══════════════════════════════════════════ */
   :root {
-    --azul-oscuro:    #1F4E79;
-    --azul-medio:     #2E75B6;
-    --azul-claro:     #9DC3E6;
-    --azul-linea:     #1E4DFF;
-    --gris-tabla:     #B7B7B7;
-    --fila-par:       #FFFFFF;
-    --fila-impar:     #F0F7FF;
+    --azul-oscuro: #1F4E79;
+    --azul-medio: #2E75B6;
+    --azul-claro: #9DC3E6;
+    --azul-linea: #1E4DFF;
+    --gris-tabla: #B7B7B7;
+    --fila-impar: #F0F7FF;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
     background: #C8C8C8;
     font-family: 'Calibri', 'Trebuchet MS', sans-serif;
@@ -29,7 +23,6 @@
     align-items: center;
     padding: 24px 0 48px;
   }
-
   .hoja {
     width: 794px;
     background: white;
@@ -37,8 +30,6 @@
     display: flex;
     flex-direction: column;
   }
-
-  /* ══ HEADER ══ */
   .header-top {
     background: var(--azul-oscuro);
     display: flex;
@@ -49,12 +40,10 @@
   }
   .logo-box { width: 78px; height: 62px; display: flex; align-items: center; justify-content: center; }
   .logo-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
-  
   .header-center { flex: 1; text-align: center; padding: 0 8px; }
   .inst-nombre { font-size: 18pt; font-weight: bold; color: white; line-height: 1.15; text-transform: uppercase; }
   .inst-subtitulo { font-size: 8.5pt; color: rgba(255,255,255,0.88); margin-top: 1px; }
 
-  /* ══ METADATOS ══ */
   .meta-bloque {
     background: var(--azul-claro);
     padding: 8px 15px;
@@ -65,39 +54,29 @@
   .meta-row { display: flex; align-items: baseline; font-size: 9pt; }
   .meta-label { font-weight: bold; font-style: italic; margin-right: 6px; white-space: nowrap; }
 
-  /* ══ TABLA PRINCIPAL ══ */
   .tabla-wrap { flex: 1; }
   table.principal { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7.5pt; }
-  
-  .c-num { width: 25px; } 
-  .c-nomina { width: 160px; }
-  .c-cual { width: 40px; } 
-  .c-desc { width: 125px; }
-
+  .c-num { width: 25px; }
+  .c-nomina { width: 200px; }
+  .c-cual { width: 80px; }
+  .c-desc { width: auto; }
   table.principal th, table.principal td {
     border: 1px solid var(--gris-tabla);
-    text-align: center; padding: 4px 2px;
+    text-align: center;
+    padding: 4px 2px;
     word-wrap: break-word;
   }
-
   table.principal thead tr.head1 th { background: var(--azul-medio); color: white; height: 28px; font-size: 8pt; }
-  table.principal thead tr.head2 th { background: var(--azul-claro); height: 26px; font-size: 7pt; font-weight: bold; }
-
   table.principal td.nomina { text-align: left; padding-left: 5px; font-weight: bold; }
-  table.principal td.text-desc { text-align: left; padding-left: 4px; font-size: 6.5pt; white-space: normal; }
-  
+  table.principal td.text-desc { text-align: left; padding-left: 4px; font-size: 6.8pt; white-space: normal; }
   table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); }
 
-  /* ══ BLOQUE ESTADÍSTICO ══ */
   .bloque-inferior { padding: 15px; background: #fff; }
   .fila-stats { display: flex; gap: 30px; align-items: stretch; }
-  
   table.resumen-cualitativo { border-collapse: collapse; width: 350px; font-size: 8pt; }
   table.resumen-cualitativo th, table.resumen-cualitativo td { border: 1px solid #000; padding: 4px; }
   table.resumen-cualitativo thead th { background-color: var(--azul-medio); color: white; text-align: center; font-weight: bold; }
   table.resumen-cualitativo tfoot td { background-color: var(--azul-claro); color: #000; font-weight: bold; }
-  table.resumen-cualitativo tbody tr:nth-child(even) td { background-color: #f9f9f9; }
-  table.resumen-cualitativo tbody tr:nth-child(odd) td { background-color: #ffffff; }
   .c-escala { text-align: left; width: 60%; font-weight: bold; padding-left: 10px !important; }
   .c-cantidad { text-align: center; width: 20%; }
   .c-pct { text-align: center; width: 20%; }
@@ -121,7 +100,6 @@
     text-align: center;
   }
 
-  /* ══ FIRMAS (Ajustado a 2 columnas) ══ */
   .firmas {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -144,48 +122,33 @@
 <body>
 
 <div class="hoja">
-  <!-- HEADER -->
   <div class="header-top">
-    <div class="logo-box">
-        <img src="{{ logo_institucion }}" alt="Logo" onerror="this.style.display='none';">
-    </div>
+    <div class="logo-box"><img src="{{ logo_institucion }}" alt="Logo" onerror="this.style.display='none';"></div>
     <div class="header-center">
       <div class="inst-nombre">Unidad Educativa Emiliano Hinostroza</div>
       <div class="inst-subtitulo">San Salvador de Cañaribamba - Santa Isabel</div>
-      <div class="inst-subtitulo" style="font-weight:bold; margin-top:5px; color:white;">
-        REPORTE CUALITATIVO ANUAL - PERIODO {{ anio_lectivo }}
-      </div>
+      <div class="inst-subtitulo" style="font-weight:bold; margin-top:5px; color:white;">{{ reporte_titulo }}</div>
     </div>
-    <div class="logo-box">
-        <img src="{{ logo_ministerio }}" alt="MinEdu" onerror="this.style.display='none';">
-    </div>
+    <div class="logo-box"><img src="{{ logo_ministerio }}" alt="MinEdu" onerror="this.style.display='none';"></div>
   </div>
 
-  <!-- METADATOS -->
   <div class="meta-bloque">
     <div class="meta-row"><span class="meta-label">Docente:</span> {{ docente }}</div>
-    <div class="meta-row"><span class="meta-label">Asignatura:</span> {{ asignatura }}</div>
     <div class="meta-row"><span class="meta-label">Curso:</span> {{ curso }}</div>
     <div class="meta-row"><span class="meta-label">Paralelo:</span> {{ paralelo }}</div>
     <div class="meta-row"><span class="meta-label">Nivel:</span> {{ nivel }}</div>
     <div class="meta-row"><span class="meta-label">Fecha:</span> {{ fecha }}</div>
+    <div class="meta-row"><span class="meta-label">Periodo:</span> {{ anio_lectivo }}</div>
   </div>
 
-  <!-- TABLA PRINCIPAL -->
   <div class="tabla-wrap">
     <table class="principal">
       <thead>
         <tr class="head1">
-          <th rowspan="2" class="c-num">N°</th>
-          <th rowspan="2" class="c-nomina">Nómina de Estudiantes</th>
-          <th colspan="2">1er Trimestre</th>
-          <th colspan="2">2do Trimestre</th>
-          <th colspan="2">3er Trimestre</th>
-        </tr>
-        <tr class="head2">
-          <th class="c-cual">Cual</th><th class="c-desc">Descripción</th>
-          <th class="c-cual">Cual</th><th class="c-desc">Descripción</th>
-          <th class="c-cual">Cual</th><th class="c-desc">Descripción</th>
+          <th class="c-num">N°</th>
+          <th class="c-nomina">Nómina de Estudiantes</th>
+          <th class="c-cual">{{ trimestre }} - Cual</th>
+          <th class="c-desc">{{ trimestre }} - Descripción</th>
         </tr>
       </thead>
       <tbody>
@@ -193,28 +156,20 @@
         <tr>
           <td>{{ loop.index }}</td>
           <td class="nomina">{{ est.nombre }}</td>
-          <td>{{ est.t1_cual }}</td><td class="text-desc">{{ est.t1_desc }}</td>
-          <td>{{ est.t2_cual }}</td><td class="text-desc">{{ est.t2_desc }}</td>
-          <td>{{ est.t3_cual }}</td><td class="text-desc">{{ est.t3_desc }}</td>
+          <td>{{ est.cual }}</td>
+          <td class="text-desc">{{ est.desc }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  <!-- BLOQUE ESTADÍSTICO -->
   <div class="bloque-inferior">
     <div class="fila-stats">
       <table class="resumen-cualitativo" id="tabla-estadistica">
-        <thead>
-          <tr>
-            <th class="c-escala">ESCALA CUALITATIVA</th>
-            <th class="c-cantidad">N°</th>
-            <th class="c-pct">%</th>
-          </tr>
-        </thead>
+        <thead><tr><th class="c-escala">ESCALA CUALITATIVA</th><th class="c-cantidad">N°</th><th class="c-pct">%</th></tr></thead>
         <tbody>
-          <tr><td class="c-escala">A+</td><td class="c-cantidad">{{ stats.a_plus_n | default('34') }}</td><td class="c-pct">{{ stats.a_plus_p | default('100,00%') }}</td></tr>
+          <tr><td class="c-escala">A+</td><td class="c-cantidad">{{ stats.a_plus_n | default('0') }}</td><td class="c-pct">{{ stats.a_plus_p | default('0,00%') }}</td></tr>
           <tr><td class="c-escala">A-</td><td class="c-cantidad">{{ stats.a_minus_n | default('0') }}</td><td class="c-pct">{{ stats.a_minus_p | default('0,00%') }}</td></tr>
           <tr><td class="c-escala">B+</td><td class="c-cantidad">{{ stats.b_plus_n | default('0') }}</td><td class="c-pct">{{ stats.b_plus_p | default('0,00%') }}</td></tr>
           <tr><td class="c-escala">B-</td><td class="c-cantidad">{{ stats.b_minus_n | default('0') }}</td><td class="c-pct">{{ stats.b_minus_p | default('0,00%') }}</td></tr>
@@ -225,24 +180,16 @@
           <tr><td class="c-escala">E+</td><td class="c-cantidad">{{ stats.e_plus_n | default('0') }}</td><td class="c-pct">{{ stats.e_plus_p | default('0,00%') }}</td></tr>
           <tr><td class="c-escala">E-</td><td class="c-cantidad">{{ stats.e_minus_n | default('0') }}</td><td class="c-pct">{{ stats.e_minus_p | default('0,00%') }}</td></tr>
         </tbody>
-        <tfoot>
-          <tr>
-            <td class="c-escala">TOTAL ESTUDIANTES</td>
-            <td class="c-cantidad">{{ stats.total_n | default('34') }}</td>
-            <td class="c-pct">{{ stats.total_p | default('100,00%') }}</td>
-          </tr>
-        </tfoot>
+        <tfoot><tr><td class="c-escala">TOTAL ESTUDIANTES</td><td class="c-cantidad">{{ stats.total_n | default('0') }}</td><td class="c-pct">{{ stats.total_p | default('0,00%') }}</td></tr></tfoot>
       </table>
 
       <div class="grafico-box">
         <div class="grafico-titulo">Frecuencia por Escala Cualitativa</div>
-        <!-- El viewBox define el sistema de coordenadas interno del SVG -->
         <svg id="bar-chart" width="100%" height="200" viewBox="0 0 380 200"></svg>
       </div>
     </div>
   </div>
 
-  <!-- FIRMAS (Docente y Rector únicamente) -->
   <div class="firmas">
     <div class="firma-bloque">
       <div class="firma-linea"></div>
@@ -259,111 +206,65 @@
 
 <script>
   function dibujarGraficoBarras() {
-    // 1. Extraer datos directamente de la tabla HTML
     const filas = document.querySelectorAll('#tabla-estadistica tbody tr');
     const datos = [];
     let maxValor = 0;
-
     filas.forEach(fila => {
       const etiqueta = fila.querySelector('.c-escala').innerText.trim();
-      // Limpiamos el texto por si hay espacios y lo convertimos a número
       const cantidadTexto = fila.querySelector('.c-cantidad').innerText.replace(/\D/g, '');
       const cantidad = parseInt(cantidadTexto) || 0;
-      // Extraemos también el porcentaje de la tabla
       const porcentaje = fila.querySelector('.c-pct').innerText.trim();
-      
       datos.push({ etiqueta, cantidad, porcentaje });
       if (cantidad > maxValor) maxValor = cantidad;
     });
 
     const svg = document.getElementById('bar-chart');
-    svg.innerHTML = ''; // Limpiar gráfico anterior
+    svg.innerHTML = '';
+    if (maxValor === 0) return;
 
-    if (maxValor === 0) return; // No dibujar si no hay datos
-
-    // 2. Configuración de dimensiones del lienzo SVG
-    const anchoSVG = 380;
-    const altoSVG = 200;
-    const margenSuperior = 35; // Aumentado para dar espacio a la segunda línea de texto
-    const margenInferior = 30;
-    const margenLateral = 15;
-
+    const anchoSVG = 380, altoSVG = 200, margenSuperior = 35, margenInferior = 30, margenLateral = 15;
     const anchoGrafico = anchoSVG - (margenLateral * 2);
     const altoGrafico = altoSVG - margenSuperior - margenInferior;
-    
-    // Espacio para cada barra (incluye la barra y el espacio en blanco)
     const pasoBarra = anchoGrafico / datos.length;
-    // Ancho real de la barra pintada (75% del paso)
-    const anchoBarra = pasoBarra * 0.75; 
+    const anchoBarra = pasoBarra * 0.75;
 
-    // 3. Dibujar las barras y las etiquetas
     datos.forEach((item, indice) => {
-      // Calcular altura proporcional al valor máximo
       const alturaBarra = (item.cantidad / maxValor) * altoGrafico;
       const x = margenLateral + (indice * pasoBarra) + ((pasoBarra - anchoBarra) / 2);
       const y = altoSVG - margenInferior - alturaBarra;
-
-      // Dibujar Rectángulo (Barra)
       const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      rect.setAttribute("x", x);
-      rect.setAttribute("y", y);
-      rect.setAttribute("width", anchoBarra);
-      rect.setAttribute("height", alturaBarra);
-      rect.setAttribute("fill", "#2E75B6"); // Color institucional (--azul-medio)
-      rect.setAttribute("rx", "2"); // Bordes superiores ligeramente redondeados
+      rect.setAttribute("x", x); rect.setAttribute("y", y);
+      rect.setAttribute("width", anchoBarra); rect.setAttribute("height", alturaBarra);
+      rect.setAttribute("fill", "#2E75B6"); rect.setAttribute("rx", "2");
       svg.appendChild(rect);
-
-      // Etiqueta de cantidad y porcentaje (arriba de la barra)
       if (item.cantidad > 0) {
-        // Texto del porcentaje (Más arriba, en gris)
         const txtPct = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        txtPct.setAttribute("x", x + (anchoBarra / 2));
-        txtPct.setAttribute("y", y - 16);
-        txtPct.setAttribute("text-anchor", "middle");
-        txtPct.setAttribute("font-size", "9px");
-        txtPct.setAttribute("font-family", "Arial, sans-serif");
-        txtPct.setAttribute("fill", "#666");
-        txtPct.textContent = item.porcentaje;
-        svg.appendChild(txtPct);
+        txtPct.setAttribute("x", x + (anchoBarra / 2)); txtPct.setAttribute("y", y - 16);
+        txtPct.setAttribute("text-anchor", "middle"); txtPct.setAttribute("font-size", "9px");
+        txtPct.setAttribute("font-family", "Arial, sans-serif"); txtPct.setAttribute("fill", "#666");
+        txtPct.textContent = item.porcentaje; svg.appendChild(txtPct);
 
-        // Texto de la cantidad (Justo encima de la barra, en azul y negrita)
         const txtValor = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        txtValor.setAttribute("x", x + (anchoBarra / 2));
-        txtValor.setAttribute("y", y - 4);
-        txtValor.setAttribute("text-anchor", "middle");
-        txtValor.setAttribute("font-size", "11px");
-        txtValor.setAttribute("font-family", "Arial, sans-serif");
-        txtValor.setAttribute("font-weight", "bold");
-        txtValor.setAttribute("fill", "#1F4E79");
-        txtValor.textContent = item.cantidad;
+        txtValor.setAttribute("x", x + (anchoBarra / 2)); txtValor.setAttribute("y", y - 4);
+        txtValor.setAttribute("text-anchor", "middle"); txtValor.setAttribute("font-size", "11px");
+        txtValor.setAttribute("font-family", "Arial, sans-serif"); txtValor.setAttribute("font-weight", "bold");
+        txtValor.setAttribute("fill", "#1F4E79"); txtValor.textContent = item.cantidad;
         svg.appendChild(txtValor);
       }
 
-      // Etiqueta de categoría (debajo de la barra, ej: A+, A-)
       const txtCat = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      txtCat.setAttribute("x", x + (anchoBarra / 2));
-      txtCat.setAttribute("y", altoSVG - margenInferior + 16);
-      txtCat.setAttribute("text-anchor", "middle");
-      txtCat.setAttribute("font-size", "12px");
-      txtCat.setAttribute("font-family", "Arial, sans-serif");
-      txtCat.setAttribute("font-weight", "bold");
-      txtCat.setAttribute("fill", "#333");
-      txtCat.textContent = item.etiqueta;
-      svg.appendChild(txtCat);
+      txtCat.setAttribute("x", x + (anchoBarra / 2)); txtCat.setAttribute("y", altoSVG - margenInferior + 16);
+      txtCat.setAttribute("text-anchor", "middle"); txtCat.setAttribute("font-size", "12px");
+      txtCat.setAttribute("font-family", "Arial, sans-serif"); txtCat.setAttribute("font-weight", "bold");
+      txtCat.setAttribute("fill", "#333"); txtCat.textContent = item.etiqueta; svg.appendChild(txtCat);
     });
 
-    // 4. Dibujar línea base (Eje X)
     const lineaBase = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    lineaBase.setAttribute("x1", margenLateral);
-    lineaBase.setAttribute("y1", altoSVG - margenInferior);
-    lineaBase.setAttribute("x2", anchoSVG - margenLateral);
-    lineaBase.setAttribute("y2", altoSVG - margenInferior);
-    lineaBase.setAttribute("stroke", "#666");
-    lineaBase.setAttribute("stroke-width", "1");
+    lineaBase.setAttribute("x1", margenLateral); lineaBase.setAttribute("y1", altoSVG - margenInferior);
+    lineaBase.setAttribute("x2", anchoSVG - margenLateral); lineaBase.setAttribute("y2", altoSVG - margenInferior);
+    lineaBase.setAttribute("stroke", "#666"); lineaBase.setAttribute("stroke-width", "1");
     svg.appendChild(lineaBase);
   }
-
-  // Ejecutar al cargar la página
   window.onload = dibujarGraficoBarras;
 </script>
 </body>
