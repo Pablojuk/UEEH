@@ -286,6 +286,16 @@ class GradesView(QWidget):
         self._fila_meta = []
         self._build_activity_metadata_inputs()
 
+    def _build_activity_metadata_inputs(self) -> None:
+        """Compatibilidad con versiones antiguas de GradesView.
+
+        La UI actual usa nombres de actividad en la fila superior combinada de la tabla,
+        por lo que ya no existe un panel separado de metadatos.
+        Este método se conserva como no-op para evitar AttributeError si queda una
+        llamada obsoleta en entornos que aún cargan código previo.
+        """
+        return
+
     def refresh_data(self) -> None:
         selected_assignment_id = self.assignment_combo.currentData()
         self.load_contexts(selected_assignment_id=selected_assignment_id)
