@@ -17,6 +17,7 @@ class _FakeGradeRegistrationService:
     def __init__(self, rows: list[dict] | None = None, contexts: list[dict] | None = None) -> None:
         self.rows = rows or []
         self.contexts = contexts or [{"id_asignacion": "AS1", "display": "Contexto demo"}]
+        self.activity_config = {"numero_actividades": 3, "metadata": [{"nombre": "Actividad Diagnóstica"}]}
 
     def listar_contextos_disponibles(self) -> list[dict]:
         return list(self.contexts)
@@ -26,6 +27,13 @@ class _FakeGradeRegistrationService:
 
     def obtener_numero_actividades(self, asignacion_id: str, trimestre_num: int) -> int:
         return 3
+
+    def obtener_configuracion_actividades(self, asignacion_id: str, trimestre_num: int) -> dict:
+        return dict(self.activity_config)
+
+    def guardar_configuracion_actividades(self, asignacion_id: str, trimestre_num: int, metadata: list[dict]) -> tuple[bool, str]:
+        self.activity_config["metadata"] = list(metadata)
+        return True, "ok"
 
     def configurar_numero_actividades(self, asignacion_id: str, trimestre_num: int, numero: int) -> tuple[bool, str]:
         return True, "ok"
@@ -61,7 +69,14 @@ class TestGradesView(unittest.TestCase):
 
         view = GradesView(_FakeGradeRegistrationService(rows=[]))
         view.load_rows()
-        self.assertEqual(view.table.rowCount(), 0)
+        self.assertEqual(view.table.rowCount(), 1)
+
+    def test_fila_superior_para_nombre_actividad(self) -> None:
+        from src.presentation.views.grades_view import GradesView
+
+        view = GradesView(_FakeGradeRegistrationService(rows=[]))
+        view.load_rows()
+        self.assertIn("Actividad", view.table.item(0, 1).text())
 
     def test_poblar_tabla_con_estudiantes(self) -> None:
         from src.presentation.views.grades_view import GradesView

@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QFrame,
+    QGridLayout,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -48,6 +50,8 @@ class GradesView(QWidget):
         self._fila_meta: list[dict] = []
         self._numero_actividades = 3
         self._table_columns: list[tuple[str, str]] = []
+        self._activity_name_inputs: dict[int, str] = {}
+        self._activity_group_columns: list[tuple[int, int, int]] = []
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -95,9 +99,14 @@ class GradesView(QWidget):
         filter_row.addWidget(self.save_button)
 
         self.table = QTableWidget(0, 1)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        header = self.table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setMinimumSectionSize(60)
         self.table.setSelectionMode(QAbstractItemView.ContiguousSelection)
         self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.table.setWordWrap(False)
         self.table.setStyleSheet(
             """
             QTableWidget::item:selected {
@@ -146,6 +155,7 @@ class GradesView(QWidget):
             QMessageBox.information(self, "Éxito", message)
             self._numero_actividades = numero
             self._setup_columns()
+            self._save_activity_names()
         else:
             QMessageBox.warning(self, "Validación", message)
 
@@ -156,8 +166,14 @@ class GradesView(QWidget):
             self._clear_table()
             return
 
-        self._numero_actividades = self.grade_registration_service.obtener_numero_actividades(asignacion_id, int(trimestre))
+        config = self.grade_registration_service.obtener_configuracion_actividades(asignacion_id, int(trimestre))
+        self._numero_actividades = int(config.get("numero_actividades", 3))
         self.activities_count_input.setValue(self._numero_actividades)
+        self._activity_name_inputs = {
+            idx + 1: str(item.get("nombre", "")).strip()
+            for idx, item in enumerate(config.get("metadata", []))
+            if isinstance(item, dict)
+        }
         try:
             filas = self.grade_registration_service.cargar_registro(asignacion_id, int(trimestre))
         except ValueError as exc:
@@ -187,6 +203,7 @@ class GradesView(QWidget):
             return
 
         filas = self._collect_rows_from_table()
+        self._save_activity_names()
         try:
             ok, message = self.grade_registration_service.guardar_registros(asignacion_id, int(trimestre), filas)
         except ValueError as exc:
@@ -203,9 +220,13 @@ class GradesView(QWidget):
 
     def _setup_columns(self) -> None:
         self._table_columns = [("estudiante", "Estudiante")]
+        self._activity_group_columns = []
         for idx in range(1, self._numero_actividades + 1):
+            col_act = len(self._table_columns)
             self._table_columns.append((f"actividad_{idx}", f"Actividad {idx}"))
+            col_ref = len(self._table_columns)
             self._table_columns.append((f"mejora_{idx}", f"Refuerzo {idx}"))
+            self._activity_group_columns.append((idx, col_act, col_ref))
             self._table_columns.append((f"promedio_{idx}", f"Promedio {idx}"))
         self._table_columns.extend(self.SUMMATIVE_COLUMNS)
         self.table.setColumnCount(len(self._table_columns))
@@ -214,6 +235,7 @@ class GradesView(QWidget):
     def _fill_table(self, rows: list[dict]) -> None:
         self._clear_table()
         self._setup_columns()
+        self._insert_activity_name_row()
         self._fila_meta = rows
         for row_data in rows:
             row = self.table.rowCount()
@@ -226,11 +248,13 @@ class GradesView(QWidget):
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 self._apply_item_colors(item, field, value)
                 self.table.setItem(row, col, item)
+        self._apply_column_resize_policy()
 
     def _collect_rows_from_table(self) -> list[dict]:
         rows: list[dict] = []
-        for row_idx in range(self.table.rowCount()):
-            meta = self._fila_meta[row_idx] if row_idx < len(self._fila_meta) else {}
+        for row_idx in range(1, self.table.rowCount()):
+            meta_idx = row_idx - 1
+            meta = self._fila_meta[meta_idx] if meta_idx < len(self._fila_meta) else {}
             row_data = dict(meta)
             for col, (field, _) in enumerate(self._table_columns):
                 item = self.table.item(row_idx, col)
@@ -312,6 +336,8 @@ class GradesView(QWidget):
         current_col = self.table.currentColumn()
         if current_row < 0 or current_col < 0:
             return
+        if current_row == 0:
+            return
 
         rows = [line.split("\t") for line in text.splitlines()]
         for row_offset, values in enumerate(rows):
@@ -344,3 +370,58 @@ class GradesView(QWidget):
             return text
         formatted = f"{number:.2f}".rstrip("0").rstrip(".")
         return formatted
+
+    def _insert_activity_name_row(self) -> None:
+        self.table.insertRow(0)
+        header_bg = QColor("#EAF2FF")
+        for col in range(self.table.columnCount()):
+            item = QTableWidgetItem("")
+            item.setBackground(header_bg)
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+            self.table.setItem(0, col, item)
+        for activity_idx, col_act, col_ref in self._activity_group_columns:
+            self.table.setSpan(0, col_act, 1, 2)
+            name_value = self._activity_name_inputs.get(activity_idx, "")
+            text = name_value or f"Nombre actividad {activity_idx}"
+            name_item = QTableWidgetItem(text)
+            name_item.setBackground(header_bg)
+            self.table.setItem(0, col_act, name_item)
+
+    def _read_activity_names_from_header(self) -> dict[int, str]:
+        names: dict[int, str] = {}
+        if self.table.rowCount() == 0:
+            return names
+        for activity_idx, col_act, _ in self._activity_group_columns:
+            item = self.table.item(0, col_act)
+            text = item.text().strip() if item else ""
+            if text.lower().startswith("nombre actividad "):
+                text = ""
+            names[activity_idx] = text
+        return names
+
+    def _save_activity_names(self) -> None:
+        asignacion_id = self.assignment_combo.currentData()
+        trimestre = self.trimester_combo.currentData()
+        if not asignacion_id or not trimestre:
+            return
+        self._activity_name_inputs = self._read_activity_names_from_header()
+        metadata = [
+            {
+                "nombre": self._activity_name_inputs.get(idx, ""),
+                "fecha_actividad": "",
+                "fecha_refuerzo": "",
+            }
+            for idx in range(1, self._numero_actividades + 1)
+        ]
+        self.grade_registration_service.guardar_configuracion_actividades(
+            str(asignacion_id),
+            int(trimestre),
+            metadata,
+        )
+
+    def _apply_column_resize_policy(self) -> None:
+        self.table.resizeColumnToContents(0)
+        self.table.setColumnWidth(0, max(self.table.columnWidth(0), 220))
+        for _, col_act, col_ref in self._activity_group_columns:
+            self.table.setColumnWidth(col_act, max(90, self.table.columnWidth(col_act)))
+            self.table.setColumnWidth(col_ref, max(90, self.table.columnWidth(col_ref)))
