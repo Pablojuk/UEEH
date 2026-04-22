@@ -184,7 +184,7 @@ class GradeRecordsRepository(SQLiteRepository):
 class GradeActivityConfigRepository(SQLiteRepository):
     table_name = "grade_activity_config"
     id_field = "id_config"
-    fields = ("id_config", "asignacion_id", "trimestre_num", "numero_actividades")
+    fields = ("id_config", "asignacion_id", "trimestre_num", "numero_actividades", "metadata_json")
 
 
 class FinalSupplementaryRepository(SQLiteRepository):
@@ -195,4 +195,29 @@ class FinalSupplementaryRepository(SQLiteRepository):
         "estudiante_id",
         "asignacion_id",
         "nota_supletorio",
+    )
+
+
+class ClassroomAccompanimentRepository(SQLiteRepository):
+    table_name = "acompanamiento_evaluaciones"
+    id_field = "id_evaluacion"
+    fields = (
+        "id_evaluacion",
+        "asignacion_id",
+        "trimestre_num",
+        "estudiante_id",
+        "habilidad_clave",
+        "valor",
+    )
+
+
+class ClassroomAccompanimentSkillConfigRepository(SQLiteRepository):
+    table_name = "acompanamiento_habilidades_config"
+    id_field = "id_config"
+    fields = (
+        "id_config",
+        "asignacion_id",
+        "trimestre_num",
+        "habilidad_clave",
+        "visible",
     )
