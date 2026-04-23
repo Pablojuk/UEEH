@@ -26,6 +26,7 @@ class TestUISmoke(unittest.TestCase):
         from src.application.services.academic_summary_service import AcademicSummaryService
         from src.application.services.backup_service import BackupService
         from src.application.services.catalog_service import CatalogService
+        from src.application.services.classroom_accompaniment_service import ClassroomAccompanimentService
         from src.application.services.report_export_service import ReportExportService
         from src.application.services.enrollment_service import EnrollmentService
         from src.application.services.grade_registration_service import GradeRegistrationService
@@ -55,6 +56,7 @@ class TestUISmoke(unittest.TestCase):
                 institution_service=InstitutionService(conn),
             ),
             backup_service=BackupService(":memory:"),
+            classroom_accompaniment_service=ClassroomAccompanimentService(conn),
         )
 
         self.assertEqual(window.windowTitle(), "Sistema Académico UEEH")

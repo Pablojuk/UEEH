@@ -84,6 +84,12 @@ class TestApplicationServices(unittest.TestCase):
         cursos_ids = {row["id_curso"] for row in self.catalog_service.listar_cursos()}
         paralelos_ids = {row["id_paralelo"] for row in self.catalog_service.listar_paralelos()}
         asignaturas_ids = {row["id_asignatura"] for row in self.catalog_service.listar_asignaturas()}
+        self.assertIn("CUR-000", cursos_ids)
+        self.assertIn("CUR-00A", cursos_ids)
+        self.assertIn("CUR-00B", cursos_ids)
+        self.assertIn("ASIG-000", asignaturas_ids)
+        self.assertIn("ASIG-00A", asignaturas_ids)
+        self.assertIn("ASIG-00B", asignaturas_ids)
         self.assertIn("C1", cursos_ids)
         self.assertIn("P1", paralelos_ids)
         self.assertIn("A1", asignaturas_ids)
