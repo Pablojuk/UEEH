@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMainWindow, QStacked
 from src.application.services.academic_summary_service import AcademicSummaryService
 from src.application.services.backup_service import BackupService
 from src.application.services.catalog_service import CatalogService
+from src.application.services.classroom_accompaniment_service import ClassroomAccompanimentService
 from src.application.services.enrollment_service import EnrollmentService
 from src.application.services.grade_registration_service import GradeRegistrationService
 from src.application.services.institution_service import InstitutionService
@@ -17,6 +18,7 @@ from src.application.services.teacher_service import TeacherService
 from src.application.services.teaching_assignment_service import TeachingAssignmentService
 from src.presentation.app_signals import AppSignals
 from src.presentation.views.catalogs_view import CatalogsView
+from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
 from src.presentation.views.dashboard_view import DashboardView
 from src.presentation.views.enrollments_view import EnrollmentsView
 from src.presentation.views.grades_view import GradesView
@@ -43,6 +45,7 @@ class MainWindow(QMainWindow):
         academic_summary_service: AcademicSummaryService,
         report_export_service: ReportExportService,
         backup_service: BackupService,
+        classroom_accompaniment_service: ClassroomAccompanimentService,
     ) -> None:
         super().__init__()
 
@@ -57,6 +60,7 @@ class MainWindow(QMainWindow):
         self.academic_summary_service = academic_summary_service
         self.report_export_service = report_export_service
         self.backup_service = backup_service
+        self.classroom_accompaniment_service = classroom_accompaniment_service
         self.app_signals = AppSignals()
 
         self.setWindowTitle("Sistema Académico UEEH")
@@ -102,10 +106,18 @@ class MainWindow(QMainWindow):
                 catalog_service=self.catalog_service,
                 app_signals=self.app_signals,
             ),
-            "grades": GradesView(grade_registration_service=self.grade_registration_service, app_signals=self.app_signals),
+            "grades": GradesView(
+                grade_registration_service=self.grade_registration_service,
+                app_signals=self.app_signals,
+                classroom_accompaniment_service=self.classroom_accompaniment_service,
+            ),
             "reports": ReportsView(
                 academic_summary_service=self.academic_summary_service,
                 report_export_service=self.report_export_service,
+            ),
+            "classroom_accompaniment": ClassroomAccompanimentView(
+                accompaniment_service=self.classroom_accompaniment_service,
+                app_signals=self.app_signals,
             ),
             "settings": SettingsView(backup_service=self.backup_service),
         }

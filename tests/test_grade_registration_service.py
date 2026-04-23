@@ -152,6 +152,23 @@ class TestGradeRegistrationService(unittest.TestCase):
         rows = self.service.cargar_registro("AS2", 1)
         self.assertEqual(rows, [])
 
+    def test_persistencia_metadata_actividades(self) -> None:
+        ok, _ = self.service.configurar_numero_actividades("AS1", 1, 2)
+        self.assertTrue(ok)
+        ok, _ = self.service.guardar_configuracion_actividades(
+            "AS1",
+            1,
+            [
+                {"nombre": "Trabajo grupal", "fecha_actividad": "2026-04-01", "fecha_refuerzo": "2026-04-05"},
+                {"nombre": "Exposición", "fecha_actividad": "2026-04-10", "fecha_refuerzo": ""},
+            ],
+        )
+        self.assertTrue(ok)
+        cfg = self.service.obtener_configuracion_actividades("AS1", 1)
+        self.assertEqual(cfg["numero_actividades"], 2)
+        self.assertEqual(cfg["metadata"][0]["nombre"], "Trabajo grupal")
+        self.assertEqual(cfg["metadata"][0]["fecha_refuerzo"], "2026-04-05")
+
 
 if __name__ == "__main__":
     unittest.main()

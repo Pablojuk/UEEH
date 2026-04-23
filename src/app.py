@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 from src.application.services.academic_summary_service import AcademicSummaryService
 from src.application.services.backup_service import BackupService
 from src.application.services.catalog_service import CatalogService
+from src.application.services.classroom_accompaniment_service import ClassroomAccompanimentService
 from src.application.services.enrollment_service import EnrollmentService
 from src.application.services.grade_registration_service import GradeRegistrationService
 from src.application.services.institution_service import InstitutionService
@@ -50,6 +51,7 @@ def run_application() -> int:
         institution_service=institution_service,
     )
     backup_service = BackupService(str(DEFAULT_DB_PATH))
+    classroom_accompaniment_service = ClassroomAccompanimentService(connection)
 
     if setup_service.es_primer_uso():
         setup_dialog = SetupView(setup_service=setup_service, institution_service=institution_service)
@@ -74,6 +76,7 @@ def run_application() -> int:
         academic_summary_service=academic_summary_service,
         report_export_service=report_export_service,
         backup_service=backup_service,
+        classroom_accompaniment_service=classroom_accompaniment_service,
     )
     window.show()
 
