@@ -151,14 +151,14 @@ class ClassroomAccompanimentView(QWidget):
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
 
-        title = QLabel("Acompañamiento Integral en el Aula")
-        title.setObjectName("Title")
-        subtitle = QLabel("Evaluación cualitativa por estudiante, asignación y trimestre")
-        subtitle.setObjectName("Subtitle")
+        self.title_label = QLabel("Acompañamiento Integral en el Aula")
+        self.title_label.setObjectName("Title")
+        self.subtitle_label = QLabel("Evaluación cualitativa por estudiante, asignación y trimestre")
+        self.subtitle_label.setObjectName("Subtitle")
 
-        filter_card = QFrame()
-        filter_card.setObjectName("Card")
-        filter_row = QHBoxLayout(filter_card)
+        self.filter_card = QFrame()
+        self.filter_card.setObjectName("Card")
+        filter_row = QHBoxLayout(self.filter_card)
 
         self.assignment_combo = QComboBox()
         self.assignment_combo.setMinimumWidth(300)
@@ -199,9 +199,11 @@ class ClassroomAccompanimentView(QWidget):
         self.btn_exportar_excel_cual.setEnabled(False)
         self.btn_exportar_excel_cual.clicked.connect(self._exportar_excel)
 
-        filter_row.addWidget(QLabel("Asignación"))
+        self.assignment_label = QLabel("Asignación")
+        self.trimester_label = QLabel("Trimestre")
+        filter_row.addWidget(self.assignment_label)
         filter_row.addWidget(self.assignment_combo, 1)
-        filter_row.addWidget(QLabel("Trimestre"))
+        filter_row.addWidget(self.trimester_label)
         filter_row.addWidget(self.trimester_combo)
         filter_row.addWidget(self.load_button)
         filter_row.addWidget(self.save_button)
@@ -210,8 +212,8 @@ class ClassroomAccompanimentView(QWidget):
         filter_row.addWidget(self.btn_exportar_pdf_cual)
         filter_row.addWidget(self.btn_exportar_excel_cual)
 
-        sign_card = QGroupBox("Firmantes del reporte")
-        sign_layout = QHBoxLayout(sign_card)
+        self.sign_card = QGroupBox("Firmantes del reporte")
+        sign_layout = QHBoxLayout(self.sign_card)
         self.signer_docente_combo = QComboBox()
         self.signer_rector_combo = QComboBox()
         self.signer_docente_combo.currentIndexChanged.connect(self._update_signers)
@@ -252,14 +254,24 @@ class ClassroomAccompanimentView(QWidget):
         preview_layout.addWidget(self.preview_view)
         self.tabs.addTab(preview_tab, "Vista previa")
 
-        root.addWidget(title)
-        root.addWidget(subtitle)
-        root.addWidget(filter_card)
-        root.addWidget(sign_card)
+        root.addWidget(self.title_label)
+        root.addWidget(self.subtitle_label)
+        root.addWidget(self.filter_card)
+        root.addWidget(self.sign_card)
         root.addWidget(self.tabs, 1)
 
         self.load_contexts()
         self._load_signer_options()
+
+    def set_embedded_mode(self, embedded: bool) -> None:
+        self.title_label.setVisible(not embedded)
+        self.subtitle_label.setVisible(not embedded)
+        self.sign_card.setVisible(not embedded)
+        self.assignment_label.setVisible(not embedded)
+        self.assignment_combo.setVisible(not embedded)
+        self.trimester_label.setVisible(not embedded)
+        self.trimester_combo.setVisible(not embedded)
+        self.load_button.setVisible(not embedded)
 
     def load_contexts(self, selected_assignment_id: str | None = None) -> None:
         self.assignment_combo.clear()
