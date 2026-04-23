@@ -103,11 +103,13 @@ class GradesView(QWidget):
         self.save_button = QPushButton("Guardar")
         self.save_button.clicked.connect(self.save_rows)
 
+        self.activities_count_label = QLabel("N° actividades")
+
         filter_row.addWidget(QLabel("Asignación"))
         filter_row.addWidget(self.assignment_combo, 1)
         filter_row.addWidget(QLabel("Trimestre"))
         filter_row.addWidget(self.trimester_combo)
-        filter_row.addWidget(QLabel("N° actividades"))
+        filter_row.addWidget(self.activities_count_label)
         filter_row.addWidget(self.activities_count_input)
         filter_row.addWidget(self.generate_activities_button)
         filter_row.addWidget(self.load_button)
@@ -149,6 +151,7 @@ class GradesView(QWidget):
                 accompaniment_service=self.classroom_accompaniment_service,
                 app_signals=self.app_signals,
             )
+            self.accompaniment_view.set_embedded_mode(True)
             self.accompaniment_view.hide()
             root.addWidget(self.accompaniment_view, 1)
 
@@ -483,12 +486,17 @@ class GradesView(QWidget):
                 self._sync_accompaniment_view()
             return
         self._accompaniment_mode = use_accompaniment
+        # Widgets exclusivos del modo cuantitativo
+        for w in (
+            self.activities_count_label,
+            self.activities_count_input,
+            self.generate_activities_button,
+            self.load_button,
+            self.recalc_button,
+            self.save_button,
+        ):
+            w.setVisible(not use_accompaniment)
         self.table.setVisible(not use_accompaniment)
-        self.generate_activities_button.setEnabled(not use_accompaniment)
-        self.load_button.setEnabled(not use_accompaniment)
-        self.recalc_button.setEnabled(not use_accompaniment)
-        self.save_button.setEnabled(not use_accompaniment)
-        self.activities_count_input.setEnabled(not use_accompaniment)
         if self.accompaniment_view is not None:
             self.accompaniment_view.setVisible(use_accompaniment)
             if use_accompaniment:

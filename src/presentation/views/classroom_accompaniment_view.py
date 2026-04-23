@@ -266,7 +266,6 @@ class ClassroomAccompanimentView(QWidget):
     def set_embedded_mode(self, embedded: bool) -> None:
         self.title_label.setVisible(not embedded)
         self.subtitle_label.setVisible(not embedded)
-        self.sign_card.setVisible(not embedded)
         self.assignment_label.setVisible(not embedded)
         self.assignment_combo.setVisible(not embedded)
         self.trimester_label.setVisible(not embedded)
