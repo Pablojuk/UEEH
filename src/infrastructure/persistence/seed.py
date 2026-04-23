@@ -8,6 +8,9 @@ from .repositories import ConfiguracionSistemaRepository
 
 
 CATALOG_COURSES: tuple[dict[str, str], ...] = (
+    {"id_curso": "CUR-000", "nombre": "2do de EGB", "nivel": "EGB"},
+    {"id_curso": "CUR-00A", "nombre": "3ro de EGB", "nivel": "EGB"},
+    {"id_curso": "CUR-00B", "nombre": "4to de EGB", "nivel": "EGB"},
     {"id_curso": "CUR-001", "nombre": "5to EGB", "nivel": "EGB"},
     {"id_curso": "CUR-002", "nombre": "6to EGB", "nivel": "EGB"},
     {"id_curso": "CUR-003", "nombre": "7mo EGB", "nivel": "EGB"},
@@ -31,6 +34,9 @@ CATALOG_PARALLELS: tuple[dict[str, str], ...] = (
 )
 
 CATALOG_SUBJECTS: tuple[dict[str, str], ...] = (
+    {"id_asignatura": "ASIG-000", "nombre": "Orientación vocacional y profesional", "codigo": "OVP"},
+    {"id_asignatura": "ASIG-00A", "nombre": "Acompañamiento integral en el aula", "codigo": "AIA"},
+    {"id_asignatura": "ASIG-00B", "nombre": "Animación a la Lectura", "codigo": "AL"},
     {"id_asignatura": "ASIG-001", "nombre": "Matemática", "codigo": "MAT"},
     {"id_asignatura": "ASIG-002", "nombre": "Lengua y Literatura", "codigo": "LYL"},
     {"id_asignatura": "ASIG-003", "nombre": "Ciencias Naturales", "codigo": "CN"},

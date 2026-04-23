@@ -1,6 +1,7 @@
 """Vista funcional para registro de notas por trimestre."""
 
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QDate, QEvent, Qt
 from PySide6.QtGui import QColor, QShortcut
@@ -25,6 +26,10 @@ from PySide6.QtWidgets import (
 from src.application.services.grade_registration_service import GradeRegistrationService
 from src.presentation.app_signals import AppSignals
 
+if TYPE_CHECKING:
+    from src.application.services.classroom_accompaniment_service import ClassroomAccompanimentService
+    from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
+
 
 class GradesView(QWidget):
     SUMMATIVE_COLUMNS = [
@@ -42,16 +47,25 @@ class GradesView(QWidget):
         ("cualitativo_adicional", "Equivalencia"),
     ]
 
-    def __init__(self, grade_registration_service: GradeRegistrationService, app_signals: AppSignals | None = None) -> None:
+    ACCOMPANIMENT_SUBJECT_NAME = "acompañamiento integral en el aula"
+
+    def __init__(
+        self,
+        grade_registration_service: GradeRegistrationService,
+        app_signals: AppSignals | None = None,
+        classroom_accompaniment_service: "ClassroomAccompanimentService | None" = None,
+    ) -> None:
         super().__init__()
         self.grade_registration_service = grade_registration_service
         self.app_signals = app_signals
+        self.classroom_accompaniment_service = classroom_accompaniment_service
         self._contextos: list[dict] = []
         self._fila_meta: list[dict] = []
         self._numero_actividades = 3
         self._table_columns: list[tuple[str, str]] = []
         self._activity_name_inputs: dict[int, str] = {}
         self._activity_group_columns: list[tuple[int, int, int]] = []
+        self._accompaniment_mode = False
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -61,16 +75,18 @@ class GradesView(QWidget):
         subtitle = QLabel("Registro de notas por asignación y trimestre")
         subtitle.setObjectName("Subtitle")
 
-        filter_card = QFrame()
-        filter_card.setObjectName("Card")
-        filter_row = QHBoxLayout(filter_card)
+        self.filter_card = QFrame()
+        self.filter_card.setObjectName("Card")
+        filter_row = QHBoxLayout(self.filter_card)
 
         self.assignment_combo = QComboBox()
         self.assignment_combo.setMinimumWidth(350)
+        self.assignment_combo.currentIndexChanged.connect(self._on_assignment_or_trimester_changed)
         self.trimester_combo = QComboBox()
         self.trimester_combo.addItem("Trimestre 1", 1)
         self.trimester_combo.addItem("Trimestre 2", 2)
         self.trimester_combo.addItem("Trimestre 3", 3)
+        self.trimester_combo.currentIndexChanged.connect(self._on_assignment_or_trimester_changed)
 
         self.activities_count_input = QSpinBox()
         self.activities_count_input.setRange(1, 20)
@@ -123,8 +139,18 @@ class GradesView(QWidget):
 
         root.addWidget(title)
         root.addWidget(subtitle)
-        root.addWidget(filter_card)
+        root.addWidget(self.filter_card)
         root.addWidget(self.table, 1)
+        self.accompaniment_view: "ClassroomAccompanimentView | None" = None
+        if self.classroom_accompaniment_service is not None:
+            from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
+
+            self.accompaniment_view = ClassroomAccompanimentView(
+                accompaniment_service=self.classroom_accompaniment_service,
+                app_signals=self.app_signals,
+            )
+            self.accompaniment_view.hide()
+            root.addWidget(self.accompaniment_view, 1)
 
         self.load_contexts()
 
@@ -142,6 +168,7 @@ class GradesView(QWidget):
             idx = self.assignment_combo.findData(selected_assignment_id)
             if idx >= 0:
                 self.assignment_combo.setCurrentIndex(idx)
+        self._toggle_mode_by_assignment()
 
     def generate_activities(self) -> None:
         asignacion_id = self.assignment_combo.currentData()
@@ -283,6 +310,8 @@ class GradesView(QWidget):
     def refresh_data(self) -> None:
         selected_assignment_id = self.assignment_combo.currentData()
         self.load_contexts(selected_assignment_id=selected_assignment_id)
+        if self.accompaniment_view is not None:
+            self.accompaniment_view.refresh_data()
 
     @staticmethod
     def _format_header_label(title: str) -> str:
@@ -438,3 +467,44 @@ class GradesView(QWidget):
         for _, col_act, col_ref in self._activity_group_columns:
             self.table.setColumnWidth(col_act, max(90, self.table.columnWidth(col_act)))
             self.table.setColumnWidth(col_ref, max(90, self.table.columnWidth(col_ref)))
+
+    def _on_assignment_or_trimester_changed(self) -> None:
+        self._toggle_mode_by_assignment()
+
+    def _toggle_mode_by_assignment(self) -> None:
+        selected_assignment = self.assignment_combo.currentData()
+        assignment = next((row for row in self._contextos if row.get("id_asignacion") == selected_assignment), None)
+        subject_name = str((assignment or {}).get("asignatura_nombre") or "").strip().lower()
+        use_accompaniment = (
+            self.accompaniment_view is not None and subject_name == self.ACCOMPANIMENT_SUBJECT_NAME
+        )
+        if use_accompaniment == self._accompaniment_mode:
+            if use_accompaniment:
+                self._sync_accompaniment_view()
+            return
+        self._accompaniment_mode = use_accompaniment
+        self.table.setVisible(not use_accompaniment)
+        self.generate_activities_button.setEnabled(not use_accompaniment)
+        self.load_button.setEnabled(not use_accompaniment)
+        self.recalc_button.setEnabled(not use_accompaniment)
+        self.save_button.setEnabled(not use_accompaniment)
+        self.activities_count_input.setEnabled(not use_accompaniment)
+        if self.accompaniment_view is not None:
+            self.accompaniment_view.setVisible(use_accompaniment)
+            if use_accompaniment:
+                self._sync_accompaniment_view()
+
+    def _sync_accompaniment_view(self) -> None:
+        if self.accompaniment_view is None:
+            return
+        assignment_id = self.assignment_combo.currentData()
+        trimester = self.trimester_combo.currentData()
+        if assignment_id:
+            idx = self.accompaniment_view.assignment_combo.findData(assignment_id)
+            if idx >= 0:
+                self.accompaniment_view.assignment_combo.setCurrentIndex(idx)
+        if trimester:
+            idx = self.accompaniment_view.trimester_combo.findData(int(trimester))
+            if idx >= 0:
+                self.accompaniment_view.trimester_combo.setCurrentIndex(idx)
+        self.accompaniment_view.load_rows()

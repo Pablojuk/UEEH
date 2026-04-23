@@ -106,7 +106,11 @@ class MainWindow(QMainWindow):
                 catalog_service=self.catalog_service,
                 app_signals=self.app_signals,
             ),
-            "grades": GradesView(grade_registration_service=self.grade_registration_service, app_signals=self.app_signals),
+            "grades": GradesView(
+                grade_registration_service=self.grade_registration_service,
+                app_signals=self.app_signals,
+                classroom_accompaniment_service=self.classroom_accompaniment_service,
+            ),
             "reports": ReportsView(
                 academic_summary_service=self.academic_summary_service,
                 report_export_service=self.report_export_service,
