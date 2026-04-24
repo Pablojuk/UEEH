@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import os
+from datetime import datetime
 from dataclasses import dataclass
 from typing import Any, Callable
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QTextDocument
+from PySide6.QtPrintSupport import QPrinter
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QDoubleSpinBox,
+    QFileDialog,
     QFrame,
     QGroupBox,
     QHeaderView,
@@ -22,9 +28,14 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
+    QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
+from jinja2 import Environment, FileSystemLoader
+from openpyxl import Workbook
+
+from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
 
 
 @dataclass(frozen=True)
@@ -179,10 +190,14 @@ class AnimacionLecturaView(QWidget):
     def __init__(
         self,
         list_signers: Callable[[], list[str]] | None = None,
+        get_assignment_context: Callable[[str], dict[str, Any] | None] | None = None,
+        get_institution_data: Callable[[], dict[str, Any]] | None = None,
         on_save_payload: Callable[[dict[str, Any]], tuple[bool, str]] | None = None,
     ) -> None:
         super().__init__()
         self._list_signers = list_signers
+        self._get_assignment_context = get_assignment_context
+        self._get_institution_data = get_institution_data
         self._on_save_payload = on_save_payload
 
         self._students: list[dict[str, str]] = []
@@ -191,6 +206,7 @@ class AnimacionLecturaView(QWidget):
         self._assignment_id: str | None = None
         self._trimester_num: int | None = None
         self._header_details: dict[tuple[int, int], tuple[str, str]] = {}
+        self._last_preview_html = ""
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -207,11 +223,11 @@ class AnimacionLecturaView(QWidget):
             self.level_combo.addItem(label, value)
         self.level_combo.currentIndexChanged.connect(self._on_level_changed)
         self.preview_button = QPushButton("Vista Previa")
-        self.preview_button.clicked.connect(lambda: self._show_placeholder("Vista Previa"))
+        self.preview_button.clicked.connect(self._show_preview)
         self.export_pdf_button = QPushButton("Exportar PDF")
-        self.export_pdf_button.clicked.connect(lambda: self._show_placeholder("Exportar PDF"))
+        self.export_pdf_button.clicked.connect(self._export_preview_pdf)
         self.export_excel_button = QPushButton("Exportar Excel")
-        self.export_excel_button.clicked.connect(lambda: self._show_placeholder("Exportar Excel"))
+        self.export_excel_button.clicked.connect(self._export_preview_excel)
 
         actions_layout.addWidget(self.save_button)
         actions_layout.addWidget(self.level_combo)
@@ -697,6 +713,171 @@ class AnimacionLecturaView(QWidget):
             "Pendiente",
             f"{action_name} para Animación a la Lectura está preparado para integración con el servicio de reportes.",
         )
+
+    def _build_preview_rows(self) -> list[dict[str, str]]:
+        rows: list[dict[str, str]] = []
+        for index, student in enumerate(self._students, start=1):
+            row_idx = 2 + index
+            student_name = student.get("estudiante", "")
+            value_item = self.right_table.item(row_idx, 0)
+            qual_item = self.right_table.item(row_idx, 1)
+            qual1_item = self.right_table.item(row_idx, 2)
+            valor = value_item.text().strip() if value_item else ""
+            cualitativo = qual_item.text().strip() if qual_item else ""
+            cualitativo_1 = qual1_item.text().strip() if qual1_item else ""
+            rows.append(
+                {
+                    "nro": str(index),
+                    "nomina": student_name,
+                    "valor": "" if valor == "-" else valor,
+                    "cualitativo": "" if cualitativo == "-" else cualitativo,
+                    "cualitativo_1": "" if cualitativo_1 == "-" else cualitativo_1,
+                    "descripcion": self._descripcion_por_cualitativo_1(cualitativo_1),
+                }
+            )
+        return rows
+
+    @staticmethod
+    def _descripcion_por_cualitativo_1(cualitativo_1: str) -> str:
+        descriptions = {
+            "A": "Gusto por la lectura avanzado",
+            "B": "Gusto por la lectura en desarrollo intermedio",
+            "C": "Gusto lector progresivo",
+            "D": "Gusto lector exploratorio",
+            "E": "Gusto por la lectura obstaculizado",
+        }
+        key = str(cualitativo_1 or "").strip().upper()
+        return descriptions.get(key, "Sin información")
+
+    def _build_preview_context(self) -> dict[str, Any]:
+        if not self._assignment_id:
+            raise ValueError("Seleccione una asignación.")
+        if not self._trimester_num:
+            raise ValueError("Seleccione un trimestre.")
+
+        assignment_context = self._get_assignment_context(str(self._assignment_id)) if self._get_assignment_context else {}
+        assignment_context = assignment_context or {}
+        institution_data = self._get_institution_data() if self._get_institution_data else {}
+        institution_data = institution_data or {}
+
+        docente_default = f"{assignment_context.get('docente_apellidos', '')} {assignment_context.get('docente_nombres', '')}".strip()
+        trimestre_label = f"TRIMESTRE {self._trimester_num}"
+        level_label = str(self.level_combo.currentText() or "").strip()
+
+        logo_institucional = HtmlReportRenderer._build_logo_source(institution_data.get("logo_path"), "institucional")
+        logo_mineduc = HtmlReportRenderer._build_logo_source(institution_data.get("logo_ministerio_path"), "ministerio")
+
+        return {
+            "docente": self.sign_docente_combo.currentText().strip() or docente_default,
+            "curso": assignment_context.get("curso_nombre") or assignment_context.get("curso_id", ""),
+            "paralelo": assignment_context.get("paralelo_nombre") or assignment_context.get("paralelo_id", ""),
+            "nivel": level_label or assignment_context.get("curso_nivel", ""),
+            "fecha": datetime.now().strftime("%Y-%m-%d"),
+            "anio_lectivo": assignment_context.get("periodo_id", ""),
+            "trimestre": trimestre_label,
+            "reporte_titulo": f"ANIMACIÓN A LA LECTURA - {trimestre_label}",
+            "rector": self.sign_rector_combo.currentText().strip() or institution_data.get("rector", ""),
+            "logo_institucion": logo_institucional,
+            "logo_ministerio": logo_mineduc,
+            "estudiantes": self._build_preview_rows(),
+        }
+
+    def _render_preview_html(self) -> str:
+        context = self._build_preview_context()
+        templates_dir = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "infrastructure",
+                "templates",
+            )
+        )
+        env = Environment(loader=FileSystemLoader(templates_dir), autoescape=False)
+        template = env.get_template("reporte_animacion_lectura.html")
+        return template.render(**context)
+
+    def _show_preview(self) -> None:
+        try:
+            html = self._render_preview_html()
+            self._last_preview_html = html
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Vista Previa", f"No se pudo generar la vista previa:\n{exc}")
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Vista Previa - Animación a la Lectura")
+        dialog.resize(1000, 720)
+        layout = QVBoxLayout(dialog)
+        viewer = QTextBrowser(dialog)
+        viewer.setHtml(html)
+        layout.addWidget(viewer, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close, parent=dialog)
+        buttons.rejected.connect(dialog.reject)
+        buttons.button(QDialogButtonBox.Close).clicked.connect(dialog.accept)
+        layout.addWidget(buttons)
+        dialog.exec()
+
+    def _export_preview_pdf(self) -> None:
+        try:
+            html = self._render_preview_html()
+            self._last_preview_html = html
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Exportar PDF", f"No se pudo generar la vista previa:\n{exc}")
+            return
+
+        suggested = f"{self._sanitize_filename('animacion_lectura_' + str(self._assignment_id or 'reporte'))}.pdf"
+        file_path, _ = QFileDialog.getSaveFileName(self, "Guardar PDF", suggested, "PDF (*.pdf)")
+        if not file_path:
+            return
+        if not file_path.lower().endswith(".pdf"):
+            file_path = f"{file_path}.pdf"
+
+        document = QTextDocument()
+        document.setHtml(html)
+        printer = QPrinter(QPrinter.HighResolution)
+        printer.setOutputFormat(QPrinter.PdfFormat)
+        printer.setOutputFileName(file_path)
+        document.print(printer)
+        QMessageBox.information(self, "Exportar PDF", f"PDF generado correctamente:\n{file_path}")
+
+    def _export_preview_excel(self) -> None:
+        rows = self._build_preview_rows()
+        suggested = f"{self._sanitize_filename('animacion_lectura_' + str(self._assignment_id or 'reporte'))}.xlsx"
+        file_path, _ = QFileDialog.getSaveFileName(self, "Guardar Excel", suggested, "Excel (*.xlsx)")
+        if not file_path:
+            return
+        if not file_path.lower().endswith(".xlsx"):
+            file_path = f"{file_path}.xlsx"
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Animación Lectura"
+        headers = ["N°", "Nómina de Estudiantes", "Valor", "Cualitativo", "Cualitativo 1", "Descripción"]
+        ws.append(headers)
+        for row in rows:
+            ws.append(
+                [
+                    row["nro"],
+                    row["nomina"],
+                    row["valor"],
+                    row["cualitativo"],
+                    row["cualitativo_1"],
+                    row["descripcion"],
+                ]
+            )
+        wb.save(file_path)
+        QMessageBox.information(self, "Exportar Excel", f"Excel generado correctamente:\n{file_path}")
+
+    @staticmethod
+    def _sanitize_filename(text: str) -> str:
+        import re
+
+        normalized = re.sub(r"[|/\\\\:*?\"<>]+", "_", str(text or "").strip())
+        normalized = re.sub(r"\s+", "_", normalized)
+        normalized = re.sub(r"_+", "_", normalized)
+        normalized = normalized.strip(" ._")
+        return normalized or "reporte_animacion_lectura"
 
     def _set_header_item(
         self,

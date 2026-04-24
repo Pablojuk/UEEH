@@ -162,6 +162,8 @@ class GradesView(QWidget):
             root.addWidget(self.accompaniment_view, 1)
             self.animation_reading_view = AnimacionLecturaView(
                 list_signers=self.classroom_accompaniment_service.listar_firmantes_disponibles,
+                get_assignment_context=self.classroom_accompaniment_service.obtener_contexto,
+                get_institution_data=self.classroom_accompaniment_service.obtener_datos_institucion,
             )
             self.animation_reading_view.hide()
             root.addWidget(self.animation_reading_view, 1)
