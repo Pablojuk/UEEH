@@ -97,6 +97,17 @@ class _FakeClassroomAccompanimentService:
 
 
 class _FakeGradeRegistrationService:
+    def obtener_animacion_lectura_evaluacion(self, asignacion_id: str, trimestre_num: int, nivel: str | None = None) -> list[dict]:
+        return [
+            {
+                "estudiante_id": "E1",
+                "estudiante": "Lopez Maria",
+                "valor": 8.5,
+                "cualitativo": "B+",
+                "cualitativo_1": "B",
+            }
+        ]
+
     def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
         return [
             {

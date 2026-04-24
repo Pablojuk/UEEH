@@ -146,16 +146,18 @@ class ReportsView(QWidget):
         if not assignment_id:
             return []
         try:
-            rows = self.grade_registration_service.cargar_registro(assignment_id, int(trimester_num))
+            rows = self.grade_registration_service.obtener_animacion_lectura_evaluacion(assignment_id, int(trimester_num))
+            if not rows:
+                rows = self.grade_registration_service.cargar_registro(assignment_id, int(trimester_num))
         except ValueError:
             return []
         return [
             {
                 "estudiante_id": str(row.get("estudiante_id") or ""),
                 "estudiante": str(row.get("estudiante") or ""),
-                "valor": row.get("nota_trimestral"),
+                "valor": row.get("valor", row.get("nota_trimestral")),
                 "cualitativo": str(row.get("cualitativo") or ""),
-                "cualitativo_1": str(row.get("cualitativo_adicional") or ""),
+                "cualitativo_1": str(row.get("cualitativo_1", row.get("cualitativo_adicional")) or ""),
             }
             for row in rows
         ]

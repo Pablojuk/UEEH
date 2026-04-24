@@ -165,6 +165,7 @@ class GradesView(QWidget):
                 list_signers=self.classroom_accompaniment_service.listar_firmantes_disponibles,
                 get_assignment_context=self.classroom_accompaniment_service.obtener_contexto,
                 get_institution_data=self.classroom_accompaniment_service.obtener_datos_institucion,
+                on_save_payload=self._save_animation_reading_payload,
             )
             self.animation_reading_view.set_notes_mode(True)
             self.animation_reading_view.hide()
@@ -562,17 +563,36 @@ class GradesView(QWidget):
         students: list[dict[str, str]] = []
         if assignment_id and trimester:
             try:
-                rows = self.grade_registration_service.cargar_registro(str(assignment_id), int(trimester))
-                students = [
-                    {
-                        "estudiante_id": str(row.get("estudiante_id") or ""),
-                        "estudiante": str(row.get("estudiante") or ""),
-                    }
-                    for row in rows
-                ]
+                rows = self.grade_registration_service.obtener_animacion_lectura_evaluacion(str(assignment_id), int(trimester))
+                if rows:
+                    students = [
+                        {
+                            "estudiante_id": str(row.get("estudiante_id") or ""),
+                            "estudiante": str(row.get("estudiante") or ""),
+                            "valor": row.get("valor"),
+                            "cualitativo": str(row.get("cualitativo") or ""),
+                            "cualitativo_1": str(row.get("cualitativo_1") or ""),
+                        }
+                        for row in rows
+                    ]
+                else:
+                    fallback_rows = self.grade_registration_service.cargar_registro(str(assignment_id), int(trimester))
+                    students = [
+                        {
+                            "estudiante_id": str(row.get("estudiante_id") or ""),
+                            "estudiante": str(row.get("estudiante") or ""),
+                        }
+                        for row in fallback_rows
+                    ]
             except ValueError:
                 students = []
         self.animation_reading_view.set_students(students)
+
+    def _save_animation_reading_payload(self, payload: dict) -> tuple[bool, str]:
+        ok, message = self.grade_registration_service.guardar_animacion_lectura_evaluacion(payload)
+        if ok and self.app_signals:
+            self.app_signals.data_changed.emit("grades")
+        return ok, message
 
     @staticmethod
     def _normalize_subject_name(value: str) -> str:
