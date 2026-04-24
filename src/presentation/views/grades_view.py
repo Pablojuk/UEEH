@@ -158,6 +158,7 @@ class GradesView(QWidget):
                 app_signals=self.app_signals,
             )
             self.accompaniment_view.set_embedded_mode(True)
+            self.accompaniment_view.set_notes_mode(True)
             self.accompaniment_view.hide()
             root.addWidget(self.accompaniment_view, 1)
             self.animation_reading_view = AnimacionLecturaView(

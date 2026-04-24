@@ -114,6 +114,7 @@ class MainWindow(QMainWindow):
             "reports": ReportsView(
                 academic_summary_service=self.academic_summary_service,
                 report_export_service=self.report_export_service,
+                classroom_accompaniment_service=self.classroom_accompaniment_service,
             ),
             "classroom_accompaniment": ClassroomAccompanimentView(
                 accompaniment_service=self.classroom_accompaniment_service,
