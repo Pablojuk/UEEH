@@ -11,7 +11,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 class HtmlReportRenderer:
     def render(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         template_name = "reporte_trimestral.html" if context.get("report_type") == "trimestral" else "reporte_anual.html"
@@ -69,6 +68,41 @@ class HtmlReportRenderer:
 
         return pattern.sub(replace_token, rendered)
 
+    def render_animacion_lectura(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
+        template_path = Path(__file__).resolve().parent.parent / "templates" / "reporte_animacion_lectura.html"
+        if not template_path.exists():
+            return ""
+        template = template_path.read_text(encoding="utf-8")
+        rows_html = self._build_animacion_rows_html(rows)
+        stats_rows_html = self._build_animacion_stats_rows_html(context.get("stats", {}))
+        stats = context.get("stats", {}) if isinstance(context.get("stats"), dict) else {}
+        values = {
+            "reporte_titulo": context.get("reporte_titulo", ""),
+            "docente": context.get("docente", ""),
+            "curso": context.get("curso", ""),
+            "paralelo": context.get("paralelo", ""),
+            "nivel": context.get("nivel", ""),
+            "fecha": context.get("fecha", ""),
+            "anio_lectivo": context.get("anio_lectivo", ""),
+            "trimestre": context.get("trimestre", ""),
+            "logo_institucion": context.get("logo_institucion", ""),
+            "logo_ministerio": context.get("logo_ministerio", ""),
+            "rector": context.get("rector", ""),
+            "estudiantes_rows_html": rows_html,
+            "stats_rows_html": stats_rows_html,
+            "stats_total_n": stats.get("total_n", 0),
+            "stats_total_p": stats.get("total_p", "0,00%"),
+        }
+        raw_keys = {"estudiantes_rows_html", "stats_rows_html"}
+        pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_]+)\s*\]\]")
+
+        def replace_token(match: re.Match[str]) -> str:
+            key = match.group(1) or match.group(2) or ""
+            value = values.get(key, "")
+            return str(value) if key in raw_keys else html.escape(str(value))
+
+        return pattern.sub(replace_token, template)
+
     @staticmethod
     def _fmt(value: Any) -> str:
         if value is None:
@@ -96,6 +130,36 @@ class HtmlReportRenderer:
             (label, sigla, counts[sigla], round((counts[sigla] / total) * 100, 2))
             for label, sigla in defs
         ]
+
+    @staticmethod
+    def _build_animacion_rows_html(rows: list[dict[str, Any]]) -> str:
+        parts: list[str] = []
+        for row in rows:
+            parts.append(
+                "<tr>"
+                f"<td>{html.escape(str(row.get('nro', '')))}</td>"
+                f"<td class='nomina'>{html.escape(str(row.get('nomina', '')))}</td>"
+                f"<td>{html.escape(str(row.get('valor', '')))}</td>"
+                f"<td>{html.escape(str(row.get('cualitativo', '')))}</td>"
+                f"<td>{html.escape(str(row.get('cualitativo_1', '')))}</td>"
+                f"<td class='text-desc'>{html.escape(str(row.get('descripcion', '')))}</td>"
+                "</tr>"
+            )
+        return "".join(parts)
+
+    @staticmethod
+    def _build_animacion_stats_rows_html(stats: dict[str, Any]) -> str:
+        rows = stats.get("rows", []) if isinstance(stats, dict) else []
+        parts: list[str] = []
+        for row in rows:
+            parts.append(
+                "<tr>"
+                f"<td>{html.escape(str(row.get('escala', '')))}</td>"
+                f"<td>{html.escape(str(row.get('numero', 0)))}</td>"
+                f"<td>{html.escape(str(row.get('porcentaje', '0,00%')))}</td>"
+                "</tr>"
+            )
+        return "".join(parts)
 
     def _build_trimestral_rows_html(self, rows: list[dict[str, Any]]) -> str:
         html_rows: list[str] = []

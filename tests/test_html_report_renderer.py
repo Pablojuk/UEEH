@@ -63,6 +63,48 @@ class TestHtmlReportRenderer(unittest.TestCase):
         self.assertIn("<circle", svg)
         self.assertIn("Aprobados (2)", svg)
 
+    def test_render_animacion_lectura_incluye_tabla_seis_columnas(self) -> None:
+        renderer = HtmlReportRenderer()
+        html = renderer.render_animacion_lectura(
+            {
+                "reporte_titulo": "ANIMACIÓN A LA LECTURA - TRIMESTRE 1",
+                "docente": "Ana Pérez",
+                "curso": "8vo",
+                "paralelo": "A",
+                "nivel": "Básica Media",
+                "fecha": "2026-04-24",
+                "anio_lectivo": "2025-2026",
+                "trimestre": "TRIMESTRE 1",
+                "logo_institucion": "",
+                "logo_ministerio": "",
+                "rector": "Rector",
+                "stats": {
+                    "rows": [
+                        {"escala": "A", "numero": 1, "porcentaje": "100,00%"},
+                        {"escala": "B", "numero": 0, "porcentaje": "0,00%"},
+                    ],
+                    "total_n": 1,
+                    "total_p": "100,00%",
+                },
+            },
+            [
+                {
+                    "nro": "1",
+                    "nomina": "Lopez Maria",
+                    "valor": "8.50",
+                    "cualitativo": "B+",
+                    "cualitativo_1": "B",
+                    "descripcion": "Gusto por la lectura en desarrollo intermedio",
+                }
+            ],
+        )
+        self.assertIn("<table class=\"principal\">", html)
+        self.assertIn("Nómina de Estudiantes", html)
+        self.assertEqual(html.count("<th class="), 6)
+        self.assertIn("Gusto por la lectura en desarrollo intermedio", html)
+        self.assertIn("ESCALA CUALITATIVA", html)
+        self.assertIn("TOTAL ESTUDIANTES", html)
+
 
 if __name__ == "__main__":
     unittest.main()
