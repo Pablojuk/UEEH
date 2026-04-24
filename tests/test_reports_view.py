@@ -16,7 +16,11 @@ except ImportError:  # pragma: no cover
 
 class _FakeAcademicSummaryService:
     def listar_contextos_disponibles(self) -> list[dict]:
-        return [{"id_asignacion": "AS1", "display": "Contexto demo"}]
+        return [
+            {"id_asignacion": "AS1", "display": "Matemática | 8vo-A", "asignatura_nombre": "Matemática"},
+            {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "  ANIMACIÓN   A   LA   LECTURA  "},
+            {"id_asignacion": "AS3", "display": "Acompañamiento | 8vo-A", "asignatura_nombre": "Acompanamiento integral en el aula"},
+        ]
 
     def obtener_resumen_por_asignacion(self, asignacion_id: str) -> list[dict]:
         return []
@@ -45,6 +49,79 @@ class _FakeReportExportService:
         return False, "No hay datos para exportar"
 
 
+class _FakeClassroomAccompanimentService:
+    def listar_contextos_disponibles(self) -> list[dict]:
+        return [
+            {"id_asignacion": "AS1", "display": "Matemática | 8vo-A", "asignatura_nombre": "Matemática"},
+            {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "Animación a la Lectura"},
+            {"id_asignacion": "AS3", "display": "Acompañamiento | 8vo-A", "asignatura_nombre": "Acompañamiento integral en el aula"},
+        ]
+
+    def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
+        return {
+            "students": [],
+            "skill_categories": [],
+            "active_skills": [],
+            "responses": {},
+            "results": {},
+            "validation_message": "",
+        }
+
+    def guardar_evaluacion(self, asignacion_id: str, trimestre_num: int, active_skills: list[str], responses: dict) -> tuple[bool, str]:
+        return True, "ok"
+
+    def calcular_resultado_estudiante(self, skill_values: dict[str, str], active_skills: list[str]) -> dict:
+        return {
+            "total_siempre": 0,
+            "total_frecuentemente": 0,
+            "total_ocasionalmente": 0,
+            "total_nunca": 0,
+            "puntaje_total_ponderado": 0,
+            "valoracion_final": "",
+            "validation_message": "",
+        }
+
+    def listar_firmantes_disponibles(self) -> list[str]:
+        return []
+
+    def obtener_contexto(self, asignacion_id: str) -> dict:
+        return {
+            "docente_apellidos": "",
+            "docente_nombres": "",
+            "curso_nombre": "",
+            "paralelo_nombre": "",
+            "curso_nivel": "",
+            "periodo_id": "",
+        }
+
+    def obtener_datos_institucion(self) -> dict:
+        return {"rector": "", "logo_path": "", "logo_ministerio_path": ""}
+
+
+class _FakeGradeRegistrationService:
+    def obtener_animacion_lectura_evaluacion(self, asignacion_id: str, trimestre_num: int, nivel: str | None = None) -> list[dict]:
+        return [
+            {
+                "estudiante_id": "E1",
+                "estudiante": "Lopez Maria",
+                "valor": 8.5,
+                "cualitativo": "B+",
+                "cualitativo_1": "B",
+            }
+        ]
+
+    def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
+        return [
+            {
+                "estudiante_id": "E1",
+                "estudiante": "Lopez Maria",
+                "nota_trimestral": 8.5,
+                "cualitativo": "B+",
+                "cualitativo_adicional": "B",
+            }
+        ]
+
+
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
 class TestReportsView(unittest.TestCase):
     @classmethod
@@ -54,17 +131,27 @@ class TestReportsView(unittest.TestCase):
     def test_crear_vista_sin_error_y_botones_exportacion(self) -> None:
         from src.presentation.views.reports_view import ReportsView
 
-        view = ReportsView(_FakeAcademicSummaryService(), _FakeReportExportService())
+        view = ReportsView(
+            _FakeAcademicSummaryService(),
+            _FakeReportExportService(),
+            _FakeClassroomAccompanimentService(),
+            _FakeGradeRegistrationService(),
+        )
         summary_view = view.findChild(type(view.layout().itemAt(0).widget()))
         self.assertIsNotNone(summary_view)
-        self.assertIsNotNone(summary_view.export_pdf_button)
-        self.assertIsNotNone(summary_view.export_excel_button)
+        self.assertIsNotNone(view.academic_summary_view.export_pdf_button)
+        self.assertIsNotNone(view.academic_summary_view.export_excel_button)
 
     def test_manejar_escenario_sin_datos_sin_romper(self) -> None:
         from src.presentation.views.reports_view import ReportsView
 
-        view = ReportsView(_FakeAcademicSummaryService(), _FakeReportExportService())
-        summary_view = view.layout().itemAt(0).widget()
+        view = ReportsView(
+            _FakeAcademicSummaryService(),
+            _FakeReportExportService(),
+            _FakeClassroomAccompanimentService(),
+            _FakeGradeRegistrationService(),
+        )
+        summary_view = view.academic_summary_view
 
         original = QFileDialog.getSaveFileName
         QFileDialog.getSaveFileName = staticmethod(lambda *args, **kwargs: ("", ""))
@@ -75,6 +162,53 @@ class TestReportsView(unittest.TestCase):
             QFileDialog.getSaveFileName = original
 
         self.assertEqual(summary_view.table.rowCount(), 0)
+
+    def test_animacion_mantiene_combo_asignacion_y_sincroniza(self) -> None:
+        from src.presentation.views.reports_view import ReportsView
+
+        view = ReportsView(
+            _FakeAcademicSummaryService(),
+            _FakeReportExportService(),
+            _FakeClassroomAccompanimentService(),
+            _FakeGradeRegistrationService(),
+        )
+        summary_combo = view.academic_summary_view.assignment_combo
+        animation_combo = view.animation_report_view.report_assignment_combo
+
+        idx_animacion = summary_combo.findData("AS2")
+        self.assertGreaterEqual(idx_animacion, 0)
+        summary_combo.setCurrentIndex(idx_animacion)
+
+        self.assertEqual(view.stack.currentWidget(), view.animation_report_view)
+        self.assertGreater(animation_combo.count(), 1)
+        self.assertEqual(animation_combo.currentData(), "AS2")
+        self.assertTrue(view.animation_report_view.level_combo.isVisible())
+
+        idx_mate = animation_combo.findData("AS1")
+        self.assertGreaterEqual(idx_mate, 0)
+        animation_combo.setCurrentIndex(idx_mate)
+        self.assertEqual(summary_combo.currentData(), "AS1")
+
+    def test_cambio_desde_acompanamiento_a_animacion_no_caer_en_resumen_cuantitativo(self) -> None:
+        from src.presentation.views.reports_view import ReportsView
+
+        view = ReportsView(
+            _FakeAcademicSummaryService(),
+            _FakeReportExportService(),
+            _FakeClassroomAccompanimentService(),
+            _FakeGradeRegistrationService(),
+        )
+        summary_combo = view.academic_summary_view.assignment_combo
+
+        idx_acomp = summary_combo.findData("AS3")
+        self.assertGreaterEqual(idx_acomp, 0)
+        summary_combo.setCurrentIndex(idx_acomp)
+        self.assertEqual(view.stack.currentWidget(), view.accompaniment_report_view)
+
+        idx_anim = summary_combo.findData("AS2")
+        self.assertGreaterEqual(idx_anim, 0)
+        summary_combo.setCurrentIndex(idx_anim)
+        self.assertEqual(view.stack.currentWidget(), view.animation_report_view)
 
 
 if __name__ == "__main__":
