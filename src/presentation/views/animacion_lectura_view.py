@@ -5,14 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QApplication,
     QAbstractItemView,
     QComboBox,
     QDoubleSpinBox,
     QFrame,
     QGroupBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -188,20 +190,11 @@ class AnimacionLecturaView(QWidget):
         self._updating_cells = False
         self._assignment_id: str | None = None
         self._trimester_num: int | None = None
+        self._header_details: dict[tuple[int, int], tuple[str, str]] = {}
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(10)
-
-        self.context_card = QFrame()
-        self.context_card.setObjectName("Card")
-        context_layout = QHBoxLayout(self.context_card)
-        self.assignment_value = QLabel("-")
-        self.trimester_value = QLabel("-")
-        context_layout.addWidget(QLabel("Asignación"))
-        context_layout.addWidget(self.assignment_value, 1)
-        context_layout.addWidget(QLabel("Trimestre"))
-        context_layout.addWidget(self.trimester_value)
 
         self.actions_card = QFrame()
         self.actions_card.setObjectName("Card")
@@ -252,12 +245,13 @@ class AnimacionLecturaView(QWidget):
         self.center_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.center_table.setItemDelegate(NotaDelegate(self.center_table))
         self.center_table.itemChanged.connect(self._on_grade_item_changed)
+        self.center_table.cellDoubleClicked.connect(self._on_center_table_double_clicked)
+        self.center_table.cellClicked.connect(self._on_center_table_cell_clicked)
 
         tables_row.addWidget(self.left_table)
         tables_row.addWidget(self.center_table, 1)
         tables_row.addWidget(self.right_table)
 
-        root.addWidget(self.context_card)
         root.addWidget(self.actions_card)
         root.addWidget(self.sign_card)
         root.addLayout(tables_row, 1)
@@ -269,8 +263,6 @@ class AnimacionLecturaView(QWidget):
     def set_context(self, assignment_id: str | None, assignment_label: str, trimester_num: int | None, trimester_label: str) -> None:
         self._assignment_id = assignment_id
         self._trimester_num = trimester_num
-        self.assignment_value.setText(assignment_label or "-")
-        self.trimester_value.setText(trimester_label or "-")
 
     def set_students(self, students: list[dict[str, str]]) -> None:
         self._students = students
@@ -278,12 +270,24 @@ class AnimacionLecturaView(QWidget):
 
     def _setup_table(self, table: QTableWidget, editable: bool) -> None:
         table.verticalHeader().setVisible(False)
-        table.horizontalHeader().setVisible(False)
+        header = table.horizontalHeader()
+        header.setVisible(True)
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setMinimumSectionSize(50)
+        header.setDefaultSectionSize(100)
         table.setSelectionBehavior(QAbstractItemView.SelectItems)
         table.setSelectionMode(QAbstractItemView.SingleSelection)
         table.setAlternatingRowColors(False)
         table.setWordWrap(True)
-        table.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed if editable else QAbstractItemView.NoEditTriggers)
+        if editable:
+            table.setEditTriggers(
+                QAbstractItemView.SelectedClicked
+                | QAbstractItemView.EditKeyPressed
+                | QAbstractItemView.AnyKeyPressed
+            )
+            table.installEventFilter(self)
+        else:
+            table.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
     def _connect_scrollbars(self) -> None:
         for table in (self.left_table, self.center_table, self.right_table):
@@ -310,6 +314,7 @@ class AnimacionLecturaView(QWidget):
         criterios = self.DATOS_EVALUACION.get(level_key, []) if level_key else []
         indicator_count = sum(len(c.indicadores) for c in criterios)
         total_rows = 3 + len(self._students)
+        self._header_details = {}
 
         self.left_table.clearSpans()
         self.center_table.clearSpans()
@@ -317,10 +322,14 @@ class AnimacionLecturaView(QWidget):
 
         self.left_table.setRowCount(total_rows)
         self.left_table.setColumnCount(2)
+        self.left_table.setHorizontalHeaderLabels(["", ""])
         self.center_table.setRowCount(total_rows)
         self.center_table.setColumnCount(indicator_count)
+        if indicator_count:
+            self.center_table.setHorizontalHeaderLabels([""] * indicator_count)
         self.right_table.setRowCount(total_rows)
         self.right_table.setColumnCount(3)
+        self.right_table.setHorizontalHeaderLabels(["", "", ""])
 
         self._populate_headers(criterios, indicator_count)
         self._populate_students(criterios, indicator_count)
@@ -347,6 +356,7 @@ class AnimacionLecturaView(QWidget):
                     "criterion",
                     criterio.titulo,
                 )
+                self._header_details[(1, col)] = ("Criterio", criterio.titulo)
                 self.center_table.setSpan(1, col, 1, span)
                 for ind_index, indicador in enumerate(criterio.indicadores, start=1):
                     self._set_header_item(
@@ -357,6 +367,7 @@ class AnimacionLecturaView(QWidget):
                         "indicator",
                         f"Cr. {crit_index} - {indicador}",
                     )
+                    self._header_details[(2, col)] = ("Indicador", indicador)
                     col += 1
         else:
             self._set_header_item(self.center_table, 0, 0, "Seleccione nivel", "group")
@@ -390,8 +401,8 @@ class AnimacionLecturaView(QWidget):
             self._updating_cells = False
 
     def _apply_dimensions(self, criterios: list[CriterioEvaluacion], indicator_count: int) -> None:
-        self.left_table.setColumnWidth(0, 40)
-        self.left_table.setColumnWidth(1, 280)
+        self.left_table.setColumnWidth(0, 50)
+        self.left_table.setColumnWidth(1, 300)
         for col in range(indicator_count):
             self.center_table.setColumnWidth(col, 110)
         self.right_table.setColumnWidth(0, 110)
@@ -404,6 +415,96 @@ class AnimacionLecturaView(QWidget):
             self.left_table.setRowHeight(row, height)
             self.center_table.setRowHeight(row, height)
             self.right_table.setRowHeight(row, height)
+
+    def _on_center_table_cell_clicked(self, row: int, col: int) -> None:
+        if row < 3:
+            return
+        item = self.center_table.item(row, col)
+        if item is None or not (item.flags() & Qt.ItemIsEditable):
+            return
+        self.center_table.editItem(item)
+
+    def _on_center_table_double_clicked(self, row: int, col: int) -> None:
+        if row not in (1, 2):
+            return
+        resolved = self._resolve_header_origin(row, col)
+        if resolved is None:
+            return
+        title, text = self._header_details.get(resolved, ("", ""))
+        if not text:
+            return
+        QMessageBox.information(self, f"{title} completo", text)
+
+    def _resolve_header_origin(self, row: int, col: int) -> tuple[int, int] | None:
+        for origin_col in range(col, -1, -1):
+            item = self.center_table.item(row, origin_col)
+            if item is None:
+                continue
+            span = self.center_table.columnSpan(row, origin_col)
+            if origin_col <= col < origin_col + span:
+                return (row, origin_col)
+        return None
+
+    def eventFilter(self, obj, event):  # type: ignore[override]
+        if obj is self.center_table and event.type() == QEvent.KeyPress:
+            if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_V:
+                self._paste_from_clipboard()
+                return True
+            if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_C:
+                self._copy_selected_cells()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _copy_selected_cells(self) -> None:
+        ranges = self.center_table.selectedRanges()
+        if not ranges:
+            return
+        selected_range = ranges[0]
+        lines: list[str] = []
+        for row in range(selected_range.topRow(), selected_range.bottomRow() + 1):
+            if row < 3:
+                continue
+            cells: list[str] = []
+            for col in range(selected_range.leftColumn(), selected_range.rightColumn() + 1):
+                item = self.center_table.item(row, col)
+                cells.append(item.text() if item else "")
+            lines.append("\t".join(cells))
+        if lines:
+            QApplication.clipboard().setText("\n".join(lines))
+
+    def _paste_from_clipboard(self) -> None:
+        text = QApplication.clipboard().text()
+        if not text.strip():
+            return
+        start_row = self.center_table.currentRow()
+        start_col = self.center_table.currentColumn()
+        if start_row < 3 or start_col < 0:
+            return
+
+        rows = [line.split("\t") for line in text.splitlines() if line.strip()]
+        changed_rows: set[int] = set()
+        self._updating_cells = True
+        try:
+            for row_offset, values in enumerate(rows):
+                target_row = start_row + row_offset
+                if target_row >= self.center_table.rowCount():
+                    break
+                if target_row < 3:
+                    continue
+                for col_offset, value in enumerate(values):
+                    target_col = start_col + col_offset
+                    if target_col >= self.center_table.columnCount():
+                        break
+                    item = self.center_table.item(target_row, target_col)
+                    if item is None or not (item.flags() & Qt.ItemIsEditable):
+                        continue
+                    item.setText(value.strip())
+                    changed_rows.add(target_row)
+        finally:
+            self._updating_cells = False
+
+        for row in sorted(changed_rows):
+            self._recalculate_row(row)
 
     def _on_grade_item_changed(self, item: QTableWidgetItem) -> None:
         if self._updating_cells:
