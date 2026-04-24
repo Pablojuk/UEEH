@@ -100,10 +100,12 @@ class TestHtmlReportRenderer(unittest.TestCase):
         )
         self.assertIn("<table class=\"principal\">", html)
         self.assertIn("Nómina de Estudiantes", html)
-        self.assertEqual(html.count("<th class="), 6)
+        self.assertGreaterEqual(html.count("<th"), 9)
         self.assertIn("Gusto por la lectura en desarrollo intermedio", html)
         self.assertIn("ESCALA CUALITATIVA", html)
         self.assertIn("TOTAL ESTUDIANTES", html)
+        self.assertIn("Frecuencia por Escala Cualitativa", html)
+        self.assertIn("id=\"bar-chart\"", html)
 
 
 if __name__ == "__main__":

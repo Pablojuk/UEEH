@@ -154,9 +154,9 @@ class HtmlReportRenderer:
         for row in rows:
             parts.append(
                 "<tr>"
-                f"<td>{html.escape(str(row.get('escala', '')))}</td>"
-                f"<td>{html.escape(str(row.get('numero', 0)))}</td>"
-                f"<td>{html.escape(str(row.get('porcentaje', '0,00%')))}</td>"
+                f"<td class='c-escala'>{html.escape(str(row.get('escala', '')))}</td>"
+                f"<td class='c-cantidad'>{html.escape(str(row.get('numero', 0)))}</td>"
+                f"<td class='c-pct'>{html.escape(str(row.get('porcentaje', '0,00%')))}</td>"
                 "</tr>"
             )
         return "".join(parts)

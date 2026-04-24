@@ -18,7 +18,8 @@ class _FakeAcademicSummaryService:
     def listar_contextos_disponibles(self) -> list[dict]:
         return [
             {"id_asignacion": "AS1", "display": "Matemática | 8vo-A", "asignatura_nombre": "Matemática"},
-            {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "Animación a la Lectura"},
+            {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "  ANIMACIÓN   A   LA   LECTURA  "},
+            {"id_asignacion": "AS3", "display": "Acompañamiento | 8vo-A", "asignatura_nombre": "Acompanamiento integral en el aula"},
         ]
 
     def obtener_resumen_por_asignacion(self, asignacion_id: str) -> list[dict]:
@@ -53,6 +54,7 @@ class _FakeClassroomAccompanimentService:
         return [
             {"id_asignacion": "AS1", "display": "Matemática | 8vo-A", "asignatura_nombre": "Matemática"},
             {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "Animación a la Lectura"},
+            {"id_asignacion": "AS3", "display": "Acompañamiento | 8vo-A", "asignatura_nombre": "Acompañamiento integral en el aula"},
         ]
 
     def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
@@ -186,6 +188,27 @@ class TestReportsView(unittest.TestCase):
         self.assertGreaterEqual(idx_mate, 0)
         animation_combo.setCurrentIndex(idx_mate)
         self.assertEqual(summary_combo.currentData(), "AS1")
+
+    def test_cambio_desde_acompanamiento_a_animacion_no_caer_en_resumen_cuantitativo(self) -> None:
+        from src.presentation.views.reports_view import ReportsView
+
+        view = ReportsView(
+            _FakeAcademicSummaryService(),
+            _FakeReportExportService(),
+            _FakeClassroomAccompanimentService(),
+            _FakeGradeRegistrationService(),
+        )
+        summary_combo = view.academic_summary_view.assignment_combo
+
+        idx_acomp = summary_combo.findData("AS3")
+        self.assertGreaterEqual(idx_acomp, 0)
+        summary_combo.setCurrentIndex(idx_acomp)
+        self.assertEqual(view.stack.currentWidget(), view.accompaniment_report_view)
+
+        idx_anim = summary_combo.findData("AS2")
+        self.assertGreaterEqual(idx_anim, 0)
+        summary_combo.setCurrentIndex(idx_anim)
+        self.assertEqual(view.stack.currentWidget(), view.animation_report_view)
 
 
 if __name__ == "__main__":
