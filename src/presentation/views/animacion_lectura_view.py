@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Any, Callable
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QColor, QTextDocument
+from PySide6.QtGui import QColor, QPageLayout, QPageSize, QTextDocument
 from PySide6.QtPrintSupport import QPrinter
 from PySide6.QtWidgets import (
     QApplication,
@@ -31,10 +30,19 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from jinja2 import Environment, FileSystemLoader
 from openpyxl import Workbook
 
 from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
+try:
+    from PySide6.QtCore import QEventLoop, QMarginsF, QUrl
+    from PySide6.QtWebEngineCore import QWebEnginePage
+    from PySide6.QtWebEngineWidgets import QWebEngineView
+except ImportError:  # pragma: no cover
+    QEventLoop = None
+    QMarginsF = None
+    QUrl = None
+    QWebEnginePage = None
+    QWebEngineView = None
 
 
 @dataclass(frozen=True)
@@ -295,8 +303,13 @@ class AnimacionLecturaView(QWidget):
         preview_tab = QWidget()
         preview_layout = QVBoxLayout(preview_tab)
         preview_layout.setContentsMargins(0, 0, 0, 0)
-        self.preview_view = QTextBrowser()
-        self.preview_view.setOpenExternalLinks(True)
+        if QWebEngineView is not None:
+            self.preview_view = QWebEngineView()
+            self._preview_uses_webengine = True
+        else:
+            self.preview_view = QTextBrowser()
+            self.preview_view.setOpenExternalLinks(True)
+            self._preview_uses_webengine = False
         preview_layout.addWidget(self.preview_view, 1)
         self.tabs.addTab(preview_tab, "Vista previa")
 
@@ -355,10 +368,10 @@ class AnimacionLecturaView(QWidget):
         for context in contexts:
             self.report_assignment_combo.addItem(
                 context.get("display", context.get("id_asignacion", "")),
-                context.get("id_asignacion"),
+                str(context.get("id_asignacion") or ""),
             )
         if selected_assignment_id:
-            idx = self.report_assignment_combo.findData(selected_assignment_id)
+            idx = self.report_assignment_combo.findData(str(selected_assignment_id))
             if idx >= 0:
                 self.report_assignment_combo.setCurrentIndex(idx)
         self.report_assignment_combo.blockSignals(False)
@@ -877,18 +890,7 @@ class AnimacionLecturaView(QWidget):
 
     def _render_preview_html(self) -> str:
         context = self._build_preview_context()
-        templates_dir = os.path.abspath(
-            os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "..",
-                "infrastructure",
-                "templates",
-            )
-        )
-        env = Environment(loader=FileSystemLoader(templates_dir), autoescape=False)
-        template = env.get_template("reporte_animacion_lectura.html")
-        return template.render(**context)
+        return HtmlReportRenderer().render_animacion_lectura(context, self._build_preview_rows())
 
     def _show_preview(self) -> None:
         try:
@@ -914,6 +916,37 @@ class AnimacionLecturaView(QWidget):
             return
         if not file_path.lower().endswith(".pdf"):
             file_path = f"{file_path}.pdf"
+
+        if QWebEnginePage is not None and QEventLoop is not None and QPageLayout is not None and QPageSize is not None and QMarginsF is not None and QUrl is not None:
+            page = QWebEnginePage(self)
+            loop = QEventLoop(self)
+            result = {"ok": False}
+
+            def on_load_finished(ok: bool) -> None:
+                if not ok:
+                    loop.quit()
+                    return
+                page_layout = QPageLayout(
+                    QPageSize(QPageSize.A4),
+                    QPageLayout.Portrait,
+                    QMarginsF(12, 12, 12, 12),
+                    QPageLayout.Millimeter,
+                )
+                page.printToPdf(file_path, page_layout)
+
+            def on_pdf_done(_path: str, success: bool) -> None:
+                result["ok"] = success
+                loop.quit()
+
+            page.loadFinished.connect(on_load_finished)
+            page.pdfPrintingFinished.connect(on_pdf_done)
+            page.setHtml(html, QUrl("about:blank"))
+            loop.exec()
+            if result["ok"]:
+                QMessageBox.information(self, "Exportar PDF", f"PDF generado correctamente:\n{file_path}")
+            else:
+                QMessageBox.warning(self, "Exportar PDF", "No se pudo generar el PDF.")
+            return
 
         document = QTextDocument()
         document.setHtml(html)
@@ -952,7 +985,10 @@ class AnimacionLecturaView(QWidget):
         QMessageBox.information(self, "Exportar Excel", f"Excel generado correctamente:\n{file_path}")
 
     def _set_preview_html(self, html_content: str) -> None:
-        self.preview_view.setHtml(html_content)
+        if self._preview_uses_webengine:
+            self.preview_view.setHtml(html_content, QUrl("about:blank"))
+        else:
+            self.preview_view.setHtml(html_content)
 
     @staticmethod
     def _sanitize_filename(text: str) -> str:

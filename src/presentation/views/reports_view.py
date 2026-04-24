@@ -56,6 +56,8 @@ class ReportsView(QWidget):
         self.academic_summary_view.assignment_combo.currentIndexChanged.connect(self._sync_mode_from_summary_assignment)
         self.academic_summary_view.report_type_combo.currentIndexChanged.connect(self._sync_mode_from_summary_assignment)
         self.accompaniment_report_view.assignment_combo.currentIndexChanged.connect(self._sync_mode_from_accompaniment_assignment)
+        self.animation_report_view.report_assignment_combo.currentIndexChanged.connect(self._sync_mode_from_animation_assignment)
+        self.animation_report_view.report_trimester_combo.currentIndexChanged.connect(self._sync_mode_from_animation_trimester)
         self._refresh_contexts()
         self._sync_mode_from_summary_assignment()
 
@@ -84,6 +86,11 @@ class ReportsView(QWidget):
             self.stack.setCurrentWidget(self.animation_report_view)
             report_type, trimester_num = self.academic_summary_view.report_type_combo.currentData()
             trimester = int(trimester_num) if report_type == "trimestral" and trimester_num else 1
+            self.animation_report_view.configure_report_filters(
+                list(self._contexts_by_id.values()),
+                selected_assignment_id=assignment_id_str,
+                selected_trimester=trimester,
+            )
             self.animation_report_view.set_context(
                 assignment_id=str(assignment_id) if assignment_id else None,
                 assignment_label=self.academic_summary_view.assignment_combo.currentText(),
@@ -102,6 +109,24 @@ class ReportsView(QWidget):
             if idx >= 0:
                 self.academic_summary_view.assignment_combo.setCurrentIndex(idx)
             self.stack.setCurrentWidget(self.academic_summary_view)
+
+    def _sync_mode_from_animation_assignment(self) -> None:
+        assignment_id = self.animation_report_view.report_assignment_combo.currentData()
+        idx = self.academic_summary_view.assignment_combo.findData(assignment_id)
+        if idx >= 0 and idx != self.academic_summary_view.assignment_combo.currentIndex():
+            self.academic_summary_view.assignment_combo.setCurrentIndex(idx)
+            return
+        self._sync_mode_from_summary_assignment()
+
+    def _sync_mode_from_animation_trimester(self) -> None:
+        trimester = self.animation_report_view.report_trimester_combo.currentData()
+        if trimester is None:
+            return
+        idx = self.academic_summary_view.report_type_combo.findData(("trimestral", int(trimester)))
+        if idx >= 0 and idx != self.academic_summary_view.report_type_combo.currentIndex():
+            self.academic_summary_view.report_type_combo.setCurrentIndex(idx)
+            return
+        self._sync_mode_from_summary_assignment()
 
     def _is_accompaniment_assignment(self, assignment_id: str) -> bool:
         if not assignment_id:
@@ -128,6 +153,9 @@ class ReportsView(QWidget):
             {
                 "estudiante_id": str(row.get("estudiante_id") or ""),
                 "estudiante": str(row.get("estudiante") or ""),
+                "valor": row.get("nota_trimestral"),
+                "cualitativo": str(row.get("cualitativo") or ""),
+                "cualitativo_1": str(row.get("cualitativo_adicional") or ""),
             }
             for row in rows
         ]

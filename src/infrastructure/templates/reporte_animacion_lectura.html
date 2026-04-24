@@ -55,13 +55,13 @@
   .meta-label { font-weight: bold; font-style: italic; margin-right: 6px; white-space: nowrap; }
 
   .tabla-wrap { flex: 1; }
-  table.principal { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7.5pt; }
-  .c-num { width: 25px; }
-  .c-nomina { width: 200px; }
-  .c-valor { width: 70px; }
-  .c-cual { width: 80px; }
-  .c-cual1 { width: 70px; }
-  .c-desc { width: auto; }
+  table.principal { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8pt; }
+  .c-num { width: 5%; }
+  .c-nomina { width: 35%; }
+  .c-valor { width: 10%; }
+  .c-cual { width: 12%; }
+  .c-cual1 { width: 10%; }
+  .c-desc { width: 28%; }
   table.principal th, table.principal td {
     border: 1px solid var(--gris-tabla);
     text-align: center;
@@ -70,7 +70,7 @@
   }
   table.principal thead tr.head1 th { background: var(--azul-medio); color: white; height: 28px; font-size: 8pt; }
   table.principal td.nomina { text-align: left; padding-left: 5px; font-weight: bold; }
-  table.principal td.text-desc { text-align: left; padding-left: 4px; font-size: 6.8pt; white-space: normal; }
+  table.principal td.text-desc { text-align: left; padding-left: 4px; font-size: 7.6pt; white-space: normal; }
   table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); }
 
   .firmas {
@@ -128,16 +128,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for est in estudiantes %}
-        <tr>
-          <td>{{ est.nro }}</td>
-          <td class="nomina">{{ est.nomina }}</td>
-          <td>{{ est.valor }}</td>
-          <td>{{ est.cualitativo }}</td>
-          <td>{{ est.cualitativo_1 }}</td>
-          <td class="text-desc">{{ est.descripcion }}</td>
-        </tr>
-        {% endfor %}
+        [[estudiantes_rows_html]]
       </tbody>
     </table>
   </div>
@@ -145,12 +136,12 @@
   <div class="firmas">
     <div class="firma-bloque">
       <div class="firma-linea"></div>
-      <div class="firma-nombre">{{ docente if docente else '____________________' }}</div>
+      <div class="firma-nombre">{{ docente }}</div>
       <div class="firma-cargo">Docente</div>
     </div>
     <div class="firma-bloque">
       <div class="firma-linea"></div>
-      <div class="firma-nombre">{{ rector if rector else '____________________' }}</div>
+      <div class="firma-nombre">{{ rector }}</div>
       <div class="firma-cargo">Rector / Director</div>
     </div>
   </div>

@@ -16,7 +16,10 @@ except ImportError:  # pragma: no cover
 
 class _FakeAcademicSummaryService:
     def listar_contextos_disponibles(self) -> list[dict]:
-        return [{"id_asignacion": "AS1", "display": "Contexto demo"}]
+        return [
+            {"id_asignacion": "AS1", "display": "Matemática | 8vo-A", "asignatura_nombre": "Matemática"},
+            {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "Animación a la Lectura"},
+        ]
 
     def obtener_resumen_por_asignacion(self, asignacion_id: str) -> list[dict]:
         return []
@@ -47,7 +50,10 @@ class _FakeReportExportService:
 
 class _FakeClassroomAccompanimentService:
     def listar_contextos_disponibles(self) -> list[dict]:
-        return [{"id_asignacion": "AS1", "display": "Contexto demo", "asignatura_nombre": "Matemática"}]
+        return [
+            {"id_asignacion": "AS1", "display": "Matemática | 8vo-A", "asignatura_nombre": "Matemática"},
+            {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "Animación a la Lectura"},
+        ]
 
     def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
         return {
@@ -92,7 +98,15 @@ class _FakeClassroomAccompanimentService:
 
 class _FakeGradeRegistrationService:
     def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
-        return []
+        return [
+            {
+                "estudiante_id": "E1",
+                "estudiante": "Lopez Maria",
+                "nota_trimestral": 8.5,
+                "cualitativo": "B+",
+                "cualitativo_adicional": "B",
+            }
+        ]
 
 
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
@@ -135,6 +149,32 @@ class TestReportsView(unittest.TestCase):
             QFileDialog.getSaveFileName = original
 
         self.assertEqual(summary_view.table.rowCount(), 0)
+
+    def test_animacion_mantiene_combo_asignacion_y_sincroniza(self) -> None:
+        from src.presentation.views.reports_view import ReportsView
+
+        view = ReportsView(
+            _FakeAcademicSummaryService(),
+            _FakeReportExportService(),
+            _FakeClassroomAccompanimentService(),
+            _FakeGradeRegistrationService(),
+        )
+        summary_combo = view.academic_summary_view.assignment_combo
+        animation_combo = view.animation_report_view.report_assignment_combo
+
+        idx_animacion = summary_combo.findData("AS2")
+        self.assertGreaterEqual(idx_animacion, 0)
+        summary_combo.setCurrentIndex(idx_animacion)
+
+        self.assertEqual(view.stack.currentWidget(), view.animation_report_view)
+        self.assertGreater(animation_combo.count(), 1)
+        self.assertEqual(animation_combo.currentData(), "AS2")
+        self.assertTrue(view.animation_report_view.level_combo.isVisible())
+
+        idx_mate = animation_combo.findData("AS1")
+        self.assertGreaterEqual(idx_mate, 0)
+        animation_combo.setCurrentIndex(idx_mate)
+        self.assertEqual(summary_combo.currentData(), "AS1")
 
 
 if __name__ == "__main__":
