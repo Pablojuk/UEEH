@@ -213,6 +213,20 @@ class AnimacionLecturaView(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(10)
 
+        self.report_filter_card = QFrame()
+        self.report_filter_card.setObjectName("Card")
+        report_filter_row = QHBoxLayout(self.report_filter_card)
+        self.report_assignment_combo = QComboBox()
+        self.report_assignment_combo.setMinimumWidth(340)
+        self.report_trimester_combo = QComboBox()
+        self.report_trimester_combo.addItem("Trimestre 1", 1)
+        self.report_trimester_combo.addItem("Trimestre 2", 2)
+        self.report_trimester_combo.addItem("Trimestre 3", 3)
+        report_filter_row.addWidget(QLabel("Asignación"))
+        report_filter_row.addWidget(self.report_assignment_combo, 1)
+        report_filter_row.addWidget(QLabel("Trimestre"))
+        report_filter_row.addWidget(self.report_trimester_combo)
+
         self.actions_card = QFrame()
         self.actions_card.setObjectName("Card")
         actions_layout = QHBoxLayout(self.actions_card)
@@ -286,6 +300,7 @@ class AnimacionLecturaView(QWidget):
         preview_layout.addWidget(self.preview_view, 1)
         self.tabs.addTab(preview_tab, "Vista previa")
 
+        root.addWidget(self.report_filter_card)
         root.addWidget(self.actions_card)
         root.addWidget(self.sign_card)
         root.addWidget(self.tabs, 1)
@@ -308,6 +323,7 @@ class AnimacionLecturaView(QWidget):
         self.preview_button.setVisible(not enabled)
         self.export_pdf_button.setVisible(not enabled)
         self.export_excel_button.setVisible(not enabled)
+        self.report_filter_card.setVisible(False)
         self.tabs.tabBar().setTabVisible(0, True)
         self.tabs.tabBar().setTabVisible(1, False)
         self.tabs.setCurrentIndex(0)
@@ -322,10 +338,34 @@ class AnimacionLecturaView(QWidget):
         self.preview_button.setVisible(enabled)
         self.export_pdf_button.setVisible(enabled)
         self.export_excel_button.setVisible(enabled)
+        self.report_filter_card.setVisible(enabled)
         self.tabs.tabBar().setTabVisible(0, not enabled)
         self.tabs.tabBar().setTabVisible(1, True)
         if enabled:
             self.tabs.setCurrentIndex(1)
+
+    def configure_report_filters(
+        self,
+        contexts: list[dict[str, Any]],
+        selected_assignment_id: str | None = None,
+        selected_trimester: int | None = None,
+    ) -> None:
+        self.report_assignment_combo.blockSignals(True)
+        self.report_assignment_combo.clear()
+        for context in contexts:
+            self.report_assignment_combo.addItem(
+                context.get("display", context.get("id_asignacion", "")),
+                context.get("id_asignacion"),
+            )
+        if selected_assignment_id:
+            idx = self.report_assignment_combo.findData(selected_assignment_id)
+            if idx >= 0:
+                self.report_assignment_combo.setCurrentIndex(idx)
+        self.report_assignment_combo.blockSignals(False)
+        if selected_trimester:
+            idx = self.report_trimester_combo.findData(int(selected_trimester))
+            if idx >= 0:
+                self.report_trimester_combo.setCurrentIndex(idx)
 
     def set_students(self, students: list[dict[str, str]]) -> None:
         self._students = students
