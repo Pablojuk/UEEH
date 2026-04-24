@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Reporte Animación a la Lectura - UEEH</title>
+<title>Reporte de Animación a la Lectura - UEEH</title>
 <style>
   :root {
     --azul-oscuro: #1F4E79;
@@ -54,30 +54,30 @@
   .meta-row { display: flex; align-items: baseline; font-size: 9pt; }
   .meta-label { font-weight: bold; font-style: italic; margin-right: 6px; white-space: nowrap; }
 
-  .tabla-wrap { padding: 10px 12px 20px; }
-  table.principal { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8pt; }
-  .c-num { width: 30px; }
-  .c-nomina { width: 220px; }
-  .c-valor { width: 80px; }
+  .tabla-wrap { flex: 1; }
+  table.principal { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7.5pt; }
+  .c-num { width: 25px; }
+  .c-nomina { width: 200px; }
+  .c-valor { width: 70px; }
   .c-cual { width: 80px; }
-  .c-cual1 { width: 80px; }
+  .c-cual1 { width: 70px; }
   .c-desc { width: auto; }
   table.principal th, table.principal td {
     border: 1px solid var(--gris-tabla);
     text-align: center;
-    padding: 5px 3px;
+    padding: 4px 2px;
     word-wrap: break-word;
   }
-  table.principal thead tr th { background: var(--azul-medio); color: white; height: 30px; }
+  table.principal thead tr.head1 th { background: var(--azul-medio); color: white; height: 28px; font-size: 8pt; }
   table.principal td.nomina { text-align: left; padding-left: 5px; font-weight: bold; }
-  table.principal td.text-desc { text-align: left; padding-left: 4px; font-size: 7.4pt; }
+  table.principal td.text-desc { text-align: left; padding-left: 4px; font-size: 6.8pt; white-space: normal; }
   table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); }
 
   .firmas {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 80px;
-    margin-top: 38px;
+    margin-top: 50px;
     padding: 0 100px 40px;
   }
   .firma-bloque { text-align: center; }
@@ -93,6 +93,7 @@
 </style>
 </head>
 <body>
+
 <div class="hoja">
   <div class="header-top">
     <div class="logo-box"><img src="{{ logo_institucion }}" alt="Logo" onerror="this.style.display='none';"></div>
@@ -117,7 +118,7 @@
   <div class="tabla-wrap">
     <table class="principal">
       <thead>
-        <tr>
+        <tr class="head1">
           <th class="c-num">N°</th>
           <th class="c-nomina">Nómina de Estudiantes</th>
           <th class="c-valor">Valor</th>

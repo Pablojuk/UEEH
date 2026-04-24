@@ -14,8 +14,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
     QComboBox,
-    QDialog,
-    QDialogButtonBox,
     QDoubleSpinBox,
     QFileDialog,
     QFrame,
@@ -28,6 +26,7 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
@@ -272,9 +271,24 @@ class AnimacionLecturaView(QWidget):
         tables_row.addWidget(self.center_table, 1)
         tables_row.addWidget(self.right_table)
 
+        self.tabs = QTabWidget()
+        eval_tab = QWidget()
+        eval_layout = QVBoxLayout(eval_tab)
+        eval_layout.setContentsMargins(0, 0, 0, 0)
+        eval_layout.addWidget(self.tables_container, 1)
+        self.tabs.addTab(eval_tab, "Evaluación")
+
+        preview_tab = QWidget()
+        preview_layout = QVBoxLayout(preview_tab)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        self.preview_view = QTextBrowser()
+        self.preview_view.setOpenExternalLinks(True)
+        preview_layout.addWidget(self.preview_view, 1)
+        self.tabs.addTab(preview_tab, "Vista previa")
+
         root.addWidget(self.actions_card)
         root.addWidget(self.sign_card)
-        root.addWidget(self.tables_container, 1)
+        root.addWidget(self.tabs, 1)
 
         self._connect_scrollbars()
         self._load_signers()
@@ -294,7 +308,9 @@ class AnimacionLecturaView(QWidget):
         self.preview_button.setVisible(not enabled)
         self.export_pdf_button.setVisible(not enabled)
         self.export_excel_button.setVisible(not enabled)
-        self.tables_container.setVisible(True)
+        self.tabs.tabBar().setTabVisible(0, True)
+        self.tabs.tabBar().setTabVisible(1, False)
+        self.tabs.setCurrentIndex(0)
 
     def set_reports_mode(self, enabled: bool = True) -> None:
         """Modo Reportes: firmantes + vista previa/exportación."""
@@ -306,7 +322,10 @@ class AnimacionLecturaView(QWidget):
         self.preview_button.setVisible(enabled)
         self.export_pdf_button.setVisible(enabled)
         self.export_excel_button.setVisible(enabled)
-        self.tables_container.setVisible(not enabled)
+        self.tabs.tabBar().setTabVisible(0, not enabled)
+        self.tabs.tabBar().setTabVisible(1, True)
+        if enabled:
+            self.tabs.setCurrentIndex(1)
 
     def set_students(self, students: list[dict[str, str]]) -> None:
         self._students = students
@@ -753,6 +772,12 @@ class AnimacionLecturaView(QWidget):
             valor = value_item.text().strip() if value_item else ""
             cualitativo = qual_item.text().strip() if qual_item else ""
             cualitativo_1 = qual1_item.text().strip() if qual1_item else ""
+            if not valor or valor == "-":
+                valor = str(student.get("valor") or "").strip()
+            if not cualitativo or cualitativo == "-":
+                cualitativo = str(student.get("cualitativo") or "").strip()
+            if not cualitativo_1 or cualitativo_1 == "-":
+                cualitativo_1 = str(student.get("cualitativo_1") or "").strip()
             rows.append(
                 {
                     "nro": str(index),
@@ -832,19 +857,8 @@ class AnimacionLecturaView(QWidget):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Vista Previa", f"No se pudo generar la vista previa:\n{exc}")
             return
-
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Vista Previa - Animación a la Lectura")
-        dialog.resize(1000, 720)
-        layout = QVBoxLayout(dialog)
-        viewer = QTextBrowser(dialog)
-        viewer.setHtml(html)
-        layout.addWidget(viewer, 1)
-        buttons = QDialogButtonBox(QDialogButtonBox.Close, parent=dialog)
-        buttons.rejected.connect(dialog.reject)
-        buttons.button(QDialogButtonBox.Close).clicked.connect(dialog.accept)
-        layout.addWidget(buttons)
-        dialog.exec()
+        self._set_preview_html(html)
+        self.tabs.setCurrentIndex(1)
 
     def _export_preview_pdf(self) -> None:
         try:
@@ -896,6 +910,9 @@ class AnimacionLecturaView(QWidget):
             )
         wb.save(file_path)
         QMessageBox.information(self, "Exportar Excel", f"Excel generado correctamente:\n{file_path}")
+
+    def _set_preview_html(self, html_content: str) -> None:
+        self.preview_view.setHtml(html_content)
 
     @staticmethod
     def _sanitize_filename(text: str) -> str:

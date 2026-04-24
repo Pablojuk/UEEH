@@ -54,6 +54,7 @@ class ReportsView(QWidget):
         layout.addWidget(self.stack)
 
         self.academic_summary_view.assignment_combo.currentIndexChanged.connect(self._sync_mode_from_summary_assignment)
+        self.academic_summary_view.report_type_combo.currentIndexChanged.connect(self._sync_mode_from_summary_assignment)
         self.accompaniment_report_view.assignment_combo.currentIndexChanged.connect(self._sync_mode_from_accompaniment_assignment)
         self._refresh_contexts()
         self._sync_mode_from_summary_assignment()
