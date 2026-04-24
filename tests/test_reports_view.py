@@ -45,6 +45,51 @@ class _FakeReportExportService:
         return False, "No hay datos para exportar"
 
 
+class _FakeClassroomAccompanimentService:
+    def listar_contextos_disponibles(self) -> list[dict]:
+        return [{"id_asignacion": "AS1", "display": "Contexto demo", "asignatura_nombre": "Matemática"}]
+
+    def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
+        return {
+            "students": [],
+            "skill_categories": [],
+            "active_skills": [],
+            "responses": {},
+            "results": {},
+            "validation_message": "",
+        }
+
+    def guardar_evaluacion(self, asignacion_id: str, trimestre_num: int, active_skills: list[str], responses: dict) -> tuple[bool, str]:
+        return True, "ok"
+
+    def calcular_resultado_estudiante(self, skill_values: dict[str, str], active_skills: list[str]) -> dict:
+        return {
+            "total_siempre": 0,
+            "total_frecuentemente": 0,
+            "total_ocasionalmente": 0,
+            "total_nunca": 0,
+            "puntaje_total_ponderado": 0,
+            "valoracion_final": "",
+            "validation_message": "",
+        }
+
+    def listar_firmantes_disponibles(self) -> list[str]:
+        return []
+
+    def obtener_contexto(self, asignacion_id: str) -> dict:
+        return {
+            "docente_apellidos": "",
+            "docente_nombres": "",
+            "curso_nombre": "",
+            "paralelo_nombre": "",
+            "curso_nivel": "",
+            "periodo_id": "",
+        }
+
+    def obtener_datos_institucion(self) -> dict:
+        return {"rector": "", "logo_path": "", "logo_ministerio_path": ""}
+
+
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
 class TestReportsView(unittest.TestCase):
     @classmethod
@@ -54,17 +99,25 @@ class TestReportsView(unittest.TestCase):
     def test_crear_vista_sin_error_y_botones_exportacion(self) -> None:
         from src.presentation.views.reports_view import ReportsView
 
-        view = ReportsView(_FakeAcademicSummaryService(), _FakeReportExportService())
+        view = ReportsView(
+            _FakeAcademicSummaryService(),
+            _FakeReportExportService(),
+            _FakeClassroomAccompanimentService(),
+        )
         summary_view = view.findChild(type(view.layout().itemAt(0).widget()))
         self.assertIsNotNone(summary_view)
-        self.assertIsNotNone(summary_view.export_pdf_button)
-        self.assertIsNotNone(summary_view.export_excel_button)
+        self.assertIsNotNone(view.academic_summary_view.export_pdf_button)
+        self.assertIsNotNone(view.academic_summary_view.export_excel_button)
 
     def test_manejar_escenario_sin_datos_sin_romper(self) -> None:
         from src.presentation.views.reports_view import ReportsView
 
-        view = ReportsView(_FakeAcademicSummaryService(), _FakeReportExportService())
-        summary_view = view.layout().itemAt(0).widget()
+        view = ReportsView(
+            _FakeAcademicSummaryService(),
+            _FakeReportExportService(),
+            _FakeClassroomAccompanimentService(),
+        )
+        summary_view = view.academic_summary_view
 
         original = QFileDialog.getSaveFileName
         QFileDialog.getSaveFileName = staticmethod(lambda *args, **kwargs: ("", ""))
