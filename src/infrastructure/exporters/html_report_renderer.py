@@ -74,6 +74,8 @@ class HtmlReportRenderer:
             return ""
         template = template_path.read_text(encoding="utf-8")
         rows_html = self._build_animacion_rows_html(rows)
+        stats_rows_html = self._build_animacion_stats_rows_html(context.get("stats", {}))
+        stats = context.get("stats", {}) if isinstance(context.get("stats"), dict) else {}
         values = {
             "reporte_titulo": context.get("reporte_titulo", ""),
             "docente": context.get("docente", ""),
@@ -87,8 +89,11 @@ class HtmlReportRenderer:
             "logo_ministerio": context.get("logo_ministerio", ""),
             "rector": context.get("rector", ""),
             "estudiantes_rows_html": rows_html,
+            "stats_rows_html": stats_rows_html,
+            "stats_total_n": stats.get("total_n", 0),
+            "stats_total_p": stats.get("total_p", "0,00%"),
         }
-        raw_keys = {"estudiantes_rows_html"}
+        raw_keys = {"estudiantes_rows_html", "stats_rows_html"}
         pattern = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_]+)\s*\]\]")
 
         def replace_token(match: re.Match[str]) -> str:
@@ -138,6 +143,20 @@ class HtmlReportRenderer:
                 f"<td>{html.escape(str(row.get('cualitativo', '')))}</td>"
                 f"<td>{html.escape(str(row.get('cualitativo_1', '')))}</td>"
                 f"<td class='text-desc'>{html.escape(str(row.get('descripcion', '')))}</td>"
+                "</tr>"
+            )
+        return "".join(parts)
+
+    @staticmethod
+    def _build_animacion_stats_rows_html(stats: dict[str, Any]) -> str:
+        rows = stats.get("rows", []) if isinstance(stats, dict) else []
+        parts: list[str] = []
+        for row in rows:
+            parts.append(
+                "<tr>"
+                f"<td>{html.escape(str(row.get('escala', '')))}</td>"
+                f"<td>{html.escape(str(row.get('numero', 0)))}</td>"
+                f"<td>{html.escape(str(row.get('porcentaje', '0,00%')))}</td>"
                 "</tr>"
             )
         return "".join(parts)

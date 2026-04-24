@@ -208,6 +208,7 @@ class AnimacionLecturaView(QWidget):
         self._on_save_payload = on_save_payload
 
         self._students: list[dict[str, str]] = []
+        self._saved_rows_by_student: dict[str, dict[str, Any]] = {}
         self._syncing_scroll = False
         self._updating_cells = False
         self._assignment_id: str | None = None
@@ -380,8 +381,16 @@ class AnimacionLecturaView(QWidget):
             if idx >= 0:
                 self.report_trimester_combo.setCurrentIndex(idx)
 
-    def set_students(self, students: list[dict[str, str]]) -> None:
+    def set_students(self, students: list[dict[str, str]], selected_level: str | None = None) -> None:
         self._students = students
+        self._saved_rows_by_student = {
+            str(row.get("estudiante_id") or ""): row for row in students if str(row.get("estudiante_id") or "").strip()
+        }
+        if selected_level:
+            idx = self.level_combo.findData(selected_level)
+            if idx >= 0 and idx != self.level_combo.currentIndex():
+                self.level_combo.setCurrentIndex(idx)
+                return
         self._build_tables()
 
     def _setup_table(self, table: QTableWidget, editable: bool) -> None:
@@ -450,6 +459,37 @@ class AnimacionLecturaView(QWidget):
         self._populate_headers(criterios, indicator_count)
         self._populate_students(criterios, indicator_count)
         self._apply_dimensions(criterios, indicator_count)
+        self._apply_saved_rows(indicator_count)
+
+    def _apply_saved_rows(self, indicator_count: int) -> None:
+        self._updating_cells = True
+        self.center_table.blockSignals(True)
+        try:
+            for index, student in enumerate(self._students, start=1):
+                row_idx = 2 + index
+                saved = self._saved_rows_by_student.get(str(student.get("estudiante_id") or ""))
+                if not saved:
+                    continue
+                notas = saved.get("notas_indicadores") or []
+                if isinstance(notas, list):
+                    for col in range(min(indicator_count, len(notas))):
+                        value = notas[col]
+                        if value is None or str(value).strip() == "":
+                            continue
+                        item = self.center_table.item(row_idx, col)
+                        if item is not None:
+                            item.setText(str(value))
+                has_notes = any(v is not None and str(v).strip() != "" for v in notas) if isinstance(notas, list) else False
+                if has_notes and indicator_count > 0:
+                    self._recalculate_row(row_idx)
+                else:
+                    valor = str(saved.get("valor") or "").strip() or "-"
+                    cualitativo = str(saved.get("cualitativo") or "").strip() or "-"
+                    cualitativo_1 = str(saved.get("cualitativo_1") or "").strip() or "-"
+                    self._set_result_values(row_idx, valor, cualitativo, cualitativo_1)
+        finally:
+            self.center_table.blockSignals(False)
+            self._updating_cells = False
 
     def _populate_headers(self, criterios: list[CriterioEvaluacion], indicator_count: int) -> None:
         self._set_header_item(self.left_table, 0, 0, "N°", "left")
@@ -886,6 +926,27 @@ class AnimacionLecturaView(QWidget):
             "logo_institucion": logo_institucional,
             "logo_ministerio": logo_mineduc,
             "estudiantes": self._build_preview_rows(),
+            "stats": self._build_stats_summary(),
+        }
+
+    def _build_stats_summary(self) -> dict[str, Any]:
+        rows = self._build_preview_rows()
+        total = len(rows)
+        counts = {key: 0 for key in ("A", "B", "C", "D", "E")}
+        for row in rows:
+            key = str(row.get("cualitativo_1") or "").strip().upper()
+            if key in counts:
+                counts[key] += 1
+
+        def pct(value: int) -> str:
+            if total == 0:
+                return "0,00%"
+            return f"{(value * 100 / total):.2f}%".replace(".", ",")
+
+        return {
+            "rows": [{"escala": key, "numero": counts[key], "porcentaje": pct(counts[key])} for key in ("A", "B", "C", "D", "E")],
+            "total_n": total,
+            "total_p": "100,00%" if total > 0 else "0,00%",
         }
 
     def _render_preview_html(self) -> str:
@@ -958,6 +1019,7 @@ class AnimacionLecturaView(QWidget):
 
     def _export_preview_excel(self) -> None:
         rows = self._build_preview_rows()
+        stats = self._build_stats_summary()
         suggested = f"{self._sanitize_filename('animacion_lectura_' + str(self._assignment_id or 'reporte'))}.xlsx"
         file_path, _ = QFileDialog.getSaveFileName(self, "Guardar Excel", suggested, "Excel (*.xlsx)")
         if not file_path:
@@ -981,6 +1043,11 @@ class AnimacionLecturaView(QWidget):
                     row["descripcion"],
                 ]
             )
+        ws.append([])
+        ws.append(["ESCALA CUALITATIVA", "N°", "%"])
+        for stat in stats["rows"]:
+            ws.append([stat["escala"], stat["numero"], stat["porcentaje"]])
+        ws.append(["TOTAL ESTUDIANTES", stats["total_n"], stats["total_p"]])
         wb.save(file_path)
         QMessageBox.information(self, "Exportar Excel", f"Excel generado correctamente:\n{file_path}")
 

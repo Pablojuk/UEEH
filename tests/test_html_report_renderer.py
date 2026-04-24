@@ -78,6 +78,14 @@ class TestHtmlReportRenderer(unittest.TestCase):
                 "logo_institucion": "",
                 "logo_ministerio": "",
                 "rector": "Rector",
+                "stats": {
+                    "rows": [
+                        {"escala": "A", "numero": 1, "porcentaje": "100,00%"},
+                        {"escala": "B", "numero": 0, "porcentaje": "0,00%"},
+                    ],
+                    "total_n": 1,
+                    "total_p": "100,00%",
+                },
             },
             [
                 {
@@ -94,6 +102,8 @@ class TestHtmlReportRenderer(unittest.TestCase):
         self.assertIn("Nómina de Estudiantes", html)
         self.assertEqual(html.count("<th class="), 6)
         self.assertIn("Gusto por la lectura en desarrollo intermedio", html)
+        self.assertIn("ESCALA CUALITATIVA", html)
+        self.assertIn("TOTAL ESTUDIANTES", html)
 
 
 if __name__ == "__main__":
