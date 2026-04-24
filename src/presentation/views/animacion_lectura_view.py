@@ -207,6 +207,8 @@ class AnimacionLecturaView(QWidget):
         self._trimester_num: int | None = None
         self._header_details: dict[tuple[int, int], tuple[str, str]] = {}
         self._last_preview_html = ""
+        self._notes_mode = False
+        self._reports_mode = False
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -245,7 +247,9 @@ class AnimacionLecturaView(QWidget):
         sign_layout.addWidget(QLabel("Rector"))
         sign_layout.addWidget(self.sign_rector_combo, 1)
 
-        tables_row = QHBoxLayout()
+        self.tables_container = QWidget()
+        tables_row = QHBoxLayout(self.tables_container)
+        tables_row.setContentsMargins(0, 0, 0, 0)
         tables_row.setSpacing(0)
 
         self.left_table = QTableWidget(0, 2)
@@ -270,7 +274,7 @@ class AnimacionLecturaView(QWidget):
 
         root.addWidget(self.actions_card)
         root.addWidget(self.sign_card)
-        root.addLayout(tables_row, 1)
+        root.addWidget(self.tables_container, 1)
 
         self._connect_scrollbars()
         self._load_signers()
@@ -279,6 +283,30 @@ class AnimacionLecturaView(QWidget):
     def set_context(self, assignment_id: str | None, assignment_label: str, trimester_num: int | None, trimester_label: str) -> None:
         self._assignment_id = assignment_id
         self._trimester_num = trimester_num
+
+    def set_notes_mode(self, enabled: bool = True) -> None:
+        """Modo Notas: registro de calificaciones sin controles de reporte."""
+        self._notes_mode = enabled
+        self._reports_mode = not enabled
+        self.save_button.setVisible(True)
+        self.level_combo.setVisible(True)
+        self.sign_card.setVisible(not enabled)
+        self.preview_button.setVisible(not enabled)
+        self.export_pdf_button.setVisible(not enabled)
+        self.export_excel_button.setVisible(not enabled)
+        self.tables_container.setVisible(True)
+
+    def set_reports_mode(self, enabled: bool = True) -> None:
+        """Modo Reportes: firmantes + vista previa/exportación."""
+        self._reports_mode = enabled
+        self._notes_mode = not enabled
+        self.save_button.setVisible(not enabled)
+        self.level_combo.setVisible(True)
+        self.sign_card.setVisible(enabled)
+        self.preview_button.setVisible(enabled)
+        self.export_pdf_button.setVisible(enabled)
+        self.export_excel_button.setVisible(enabled)
+        self.tables_container.setVisible(not enabled)
 
     def set_students(self, students: list[dict[str, str]]) -> None:
         self._students = students

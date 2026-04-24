@@ -166,6 +166,7 @@ class GradesView(QWidget):
                 get_assignment_context=self.classroom_accompaniment_service.obtener_contexto,
                 get_institution_data=self.classroom_accompaniment_service.obtener_datos_institucion,
             )
+            self.animation_reading_view.set_notes_mode(True)
             self.animation_reading_view.hide()
             root.addWidget(self.animation_reading_view, 1)
 

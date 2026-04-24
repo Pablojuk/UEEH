@@ -90,6 +90,11 @@ class _FakeClassroomAccompanimentService:
         return {"rector": "", "logo_path": "", "logo_ministerio_path": ""}
 
 
+class _FakeGradeRegistrationService:
+    def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
+        return []
+
+
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
 class TestReportsView(unittest.TestCase):
     @classmethod
@@ -103,6 +108,7 @@ class TestReportsView(unittest.TestCase):
             _FakeAcademicSummaryService(),
             _FakeReportExportService(),
             _FakeClassroomAccompanimentService(),
+            _FakeGradeRegistrationService(),
         )
         summary_view = view.findChild(type(view.layout().itemAt(0).widget()))
         self.assertIsNotNone(summary_view)
@@ -116,6 +122,7 @@ class TestReportsView(unittest.TestCase):
             _FakeAcademicSummaryService(),
             _FakeReportExportService(),
             _FakeClassroomAccompanimentService(),
+            _FakeGradeRegistrationService(),
         )
         summary_view = view.academic_summary_view
 
