@@ -63,6 +63,7 @@ class ReportsView(QWidget):
         self.accompaniment_report_view.assignment_combo.currentIndexChanged.connect(self._sync_mode_from_accompaniment_assignment)
         self.animation_report_view.report_assignment_combo.currentIndexChanged.connect(self._sync_mode_from_animation_assignment)
         self.animation_report_view.report_trimester_combo.currentIndexChanged.connect(self._sync_mode_from_animation_trimester)
+        self.animation_report_view.level_combo.currentIndexChanged.connect(self._sync_mode_from_animation_level)
         self._refresh_contexts()
         self._sync_mode_from_summary_assignment()
 
@@ -95,6 +96,8 @@ class ReportsView(QWidget):
                     self.accompaniment_report_view.assignment_combo.setCurrentIndex(idx)
                 self.accompaniment_report_view.load_rows()
             elif mode == self.MODE_ANIMATION:
+                selected_level = str(self.animation_report_view.level_combo.currentData() or "").strip() or None
+                trimester = self._resolve_animation_trimester(trimester)
                 self.stack.setCurrentWidget(self.animation_report_view)
                 self.animation_report_view.configure_report_filters(
                     list(self._contexts_by_id.values()),
@@ -107,7 +110,10 @@ class ReportsView(QWidget):
                     trimester_num=trimester,
                     trimester_label=f"Trimestre {trimester}",
                 )
-                self.animation_report_view.set_students(self._load_animation_students(str(assignment_id), trimester))
+                self.animation_report_view.set_students(
+                    self._load_animation_students(str(assignment_id), trimester, nivel=selected_level),
+                    selected_level=selected_level,
+                )
             else:
                 self.stack.setCurrentWidget(self.academic_summary_view)
         finally:
@@ -145,6 +151,11 @@ class ReportsView(QWidget):
             return
         self._sync_mode_from_summary_assignment()
 
+    def _sync_mode_from_animation_level(self) -> None:
+        if self._syncing_mode:
+            return
+        self._sync_mode_from_summary_assignment()
+
     def _is_accompaniment_assignment(self, assignment_id: str) -> bool:
         if not assignment_id:
             return False
@@ -166,11 +177,21 @@ class ReportsView(QWidget):
             return self.MODE_ANIMATION
         return self.MODE_SUMMARY
 
-    def _load_animation_students(self, assignment_id: str, trimester_num: int) -> list[dict[str, str]]:
+    def _resolve_animation_trimester(self, fallback_trimester: int) -> int:
+        selected_trimester = self.animation_report_view.report_trimester_combo.currentData()
+        if selected_trimester is not None:
+            return int(selected_trimester)
+        return int(fallback_trimester or 1)
+
+    def _load_animation_students(self, assignment_id: str, trimester_num: int, nivel: str | None = None) -> list[dict[str, str]]:
         if not assignment_id:
             return []
         try:
-            rows = self.grade_registration_service.obtener_animacion_lectura_evaluacion(assignment_id, int(trimester_num))
+            rows = self.grade_registration_service.obtener_animacion_lectura_evaluacion(
+                assignment_id,
+                int(trimester_num),
+                nivel=nivel,
+            )
             if not rows:
                 rows = self.grade_registration_service.cargar_registro(assignment_id, int(trimester_num))
         except ValueError:

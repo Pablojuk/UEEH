@@ -106,6 +106,7 @@ class TestHtmlReportRenderer(unittest.TestCase):
         self.assertIn("TOTAL ESTUDIANTES", html)
         self.assertIn("Frecuencia por Escala Cualitativa", html)
         self.assertIn("id=\"bar-chart\"", html)
+        self.assertIn("txtPorcentaje", html)
 
 
 if __name__ == "__main__":

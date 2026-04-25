@@ -99,7 +99,11 @@ class _FakeClassroomAccompanimentService:
 
 
 class _FakeGradeRegistrationService:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, int, str | None]] = []
+
     def obtener_animacion_lectura_evaluacion(self, asignacion_id: str, trimestre_num: int, nivel: str | None = None) -> list[dict]:
+        self.calls.append((asignacion_id, trimestre_num, nivel))
         return [
             {
                 "estudiante_id": "E1",
@@ -107,6 +111,7 @@ class _FakeGradeRegistrationService:
                 "valor": 8.5,
                 "cualitativo": "B+",
                 "cualitativo_1": "B",
+                "nivel": nivel or "elemental",
             }
         ]
 
@@ -128,29 +133,27 @@ class TestReportsView(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_crear_vista_sin_error_y_botones_exportacion(self) -> None:
+    def _build_view(self):
         from src.presentation.views.reports_view import ReportsView
 
+        grade_service = _FakeGradeRegistrationService()
         view = ReportsView(
             _FakeAcademicSummaryService(),
             _FakeReportExportService(),
             _FakeClassroomAccompanimentService(),
-            _FakeGradeRegistrationService(),
+            grade_service,
         )
+        return view, grade_service
+
+    def test_crear_vista_sin_error_y_botones_exportacion(self) -> None:
+        view, _ = self._build_view()
         summary_view = view.findChild(type(view.layout().itemAt(0).widget()))
         self.assertIsNotNone(summary_view)
         self.assertIsNotNone(view.academic_summary_view.export_pdf_button)
         self.assertIsNotNone(view.academic_summary_view.export_excel_button)
 
     def test_manejar_escenario_sin_datos_sin_romper(self) -> None:
-        from src.presentation.views.reports_view import ReportsView
-
-        view = ReportsView(
-            _FakeAcademicSummaryService(),
-            _FakeReportExportService(),
-            _FakeClassroomAccompanimentService(),
-            _FakeGradeRegistrationService(),
-        )
+        view, _ = self._build_view()
         summary_view = view.academic_summary_view
 
         original = QFileDialog.getSaveFileName
@@ -164,14 +167,7 @@ class TestReportsView(unittest.TestCase):
         self.assertEqual(summary_view.table.rowCount(), 0)
 
     def test_animacion_mantiene_combo_asignacion_y_sincroniza(self) -> None:
-        from src.presentation.views.reports_view import ReportsView
-
-        view = ReportsView(
-            _FakeAcademicSummaryService(),
-            _FakeReportExportService(),
-            _FakeClassroomAccompanimentService(),
-            _FakeGradeRegistrationService(),
-        )
+        view, _ = self._build_view()
         summary_combo = view.academic_summary_view.assignment_combo
         animation_combo = view.animation_report_view.report_assignment_combo
 
@@ -190,14 +186,7 @@ class TestReportsView(unittest.TestCase):
         self.assertEqual(summary_combo.currentData(), "AS1")
 
     def test_cambio_desde_acompanamiento_a_animacion_no_caer_en_resumen_cuantitativo(self) -> None:
-        from src.presentation.views.reports_view import ReportsView
-
-        view = ReportsView(
-            _FakeAcademicSummaryService(),
-            _FakeReportExportService(),
-            _FakeClassroomAccompanimentService(),
-            _FakeGradeRegistrationService(),
-        )
+        view, _ = self._build_view()
         summary_combo = view.academic_summary_view.assignment_combo
 
         idx_acomp = summary_combo.findData("AS3")
@@ -209,6 +198,27 @@ class TestReportsView(unittest.TestCase):
         self.assertGreaterEqual(idx_anim, 0)
         summary_combo.setCurrentIndex(idx_anim)
         self.assertEqual(view.stack.currentWidget(), view.animation_report_view)
+
+    def test_animacion_conserva_trimestre_y_nivel_en_carga_automatica(self) -> None:
+        view, grade_service = self._build_view()
+        summary_combo = view.academic_summary_view.assignment_combo
+
+        idx_anim = summary_combo.findData("AS2")
+        self.assertGreaterEqual(idx_anim, 0)
+        summary_combo.setCurrentIndex(idx_anim)
+        self.assertEqual(view.stack.currentWidget(), view.animation_report_view)
+
+        idx_trim_2 = view.animation_report_view.report_trimester_combo.findData(2)
+        self.assertGreaterEqual(idx_trim_2, 0)
+        view.animation_report_view.report_trimester_combo.setCurrentIndex(idx_trim_2)
+        self.assertEqual(view.animation_report_view.report_trimester_combo.currentData(), 2)
+
+        idx_media = view.animation_report_view.level_combo.findData("media")
+        self.assertGreaterEqual(idx_media, 0)
+        view.animation_report_view.level_combo.setCurrentIndex(idx_media)
+        self.assertEqual(view.animation_report_view.level_combo.currentData(), "media")
+
+        self.assertIn(("AS2", 2, "media"), grade_service.calls)
 
 
 if __name__ == "__main__":

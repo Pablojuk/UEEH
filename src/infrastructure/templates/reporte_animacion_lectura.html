@@ -222,6 +222,13 @@
       rect.setAttribute("fill", "#2E75B6"); rect.setAttribute("rx", "2");
       svg.appendChild(rect);
 
+      const txtPorcentaje = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      txtPorcentaje.setAttribute("x", x + (anchoBarra / 2)); txtPorcentaje.setAttribute("y", y - 18);
+      txtPorcentaje.setAttribute("text-anchor", "middle"); txtPorcentaje.setAttribute("font-size", "11px");
+      txtPorcentaje.setAttribute("font-family", "Arial, sans-serif"); txtPorcentaje.setAttribute("font-weight", "bold");
+      txtPorcentaje.setAttribute("fill", "#1F4E79"); txtPorcentaje.textContent = item.porcentaje;
+      svg.appendChild(txtPorcentaje);
+
       const txtValor = document.createElementNS("http://www.w3.org/2000/svg", "text");
       txtValor.setAttribute("x", x + (anchoBarra / 2)); txtValor.setAttribute("y", y - 4);
       txtValor.setAttribute("text-anchor", "middle"); txtValor.setAttribute("font-size", "11px");
