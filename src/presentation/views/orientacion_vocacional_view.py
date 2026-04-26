@@ -69,7 +69,18 @@ class OrientacionVocacionalView(QWidget):
         header_layout.addWidget(self.save_button)
 
         self.table = QTableWidget(0, 8)
-        self.table.setHorizontalHeaderLabels(["N°", "Nómina / Estudiante", "Indicador 1", "Indicador 2", "Indicador 3", "Indicador 4", "Indicador 5", "Calificación"])
+        self.table.setHorizontalHeaderLabels(
+            [
+                "N°",
+                "Nómina / Estudiante",
+                "Indicador 1",
+                "Indicador 2",
+                "Indicador 3",
+                "Indicador 4",
+                "Indicador 5",
+                "Calificación",
+            ]
+        )
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, header.ResizeToContents)
         header.setSectionResizeMode(1, header.Stretch)
@@ -87,6 +98,7 @@ class OrientacionVocacionalView(QWidget):
         self._course_key = self.detect_course_key(self._course_name)
         self.course_label.setText(self._course_name)
         self._update_title()
+        self._update_indicator_headers()
 
     def set_students(self, students: list[dict[str, str]], saved_rows: list[dict[str, Any]] | None = None) -> None:
         self._students = students
@@ -98,6 +110,23 @@ class OrientacionVocacionalView(QWidget):
             self.title_label.setText(str(self.COURSE_CONFIG[self._course_key]["title"]))
         else:
             self.title_label.setText("Orientación Vocacional y Profesional")
+
+    def _update_indicator_headers(self) -> None:
+        headers = [
+            "N°",
+            "Nómina / Estudiante",
+            "Indicador 1",
+            "Indicador 2",
+            "Indicador 3",
+            "Indicador 4",
+            "Indicador 5",
+            "Calificación",
+        ]
+        indicators = self.COURSE_CONFIG.get(str(self._course_key or ""), {}).get("indicators", [])
+        for idx in range(5):
+            if idx < len(indicators):
+                headers[2 + idx] = str(indicators[idx])
+        self.table.setHorizontalHeaderLabels(headers)
 
     def _build_table(self) -> None:
         self.table.setRowCount(0)

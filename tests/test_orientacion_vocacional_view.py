@@ -33,6 +33,7 @@ class TestOrientacionVocacionalView(unittest.TestCase):
         view = OrientacionVocacionalView()
         view.set_context("AS1", 1, "8vo de EGB")
         view.set_students([{"estudiante_id": "E1", "estudiante": "Lopez Maria"}])
+        self.assertIn("fortalezas", view.table.horizontalHeaderItem(2).text().lower())
 
         values = [3, 3, 3, 2, 3]
         for idx, value in enumerate(values):
