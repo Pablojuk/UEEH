@@ -237,3 +237,18 @@ class AnimationReadingEvaluationRepository(SQLiteRepository):
         "cualitativo",
         "cualitativo_1",
     )
+
+
+class VocationalOrientationEvaluationRepository(SQLiteRepository):
+    table_name = "orientacion_vocacional_evaluaciones"
+    id_field = "id_evaluacion"
+    fields = (
+        "id_evaluacion",
+        "asignacion_id",
+        "trimestre_num",
+        "curso_clave",
+        "estudiante_id",
+        "respuestas_json",
+        "puntaje_total",
+        "calificacion",
+    )

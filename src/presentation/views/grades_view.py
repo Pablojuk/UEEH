@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from src.application.services.classroom_accompaniment_service import ClassroomAccompanimentService
     from src.presentation.views.animacion_lectura_view import AnimacionLecturaView
     from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
+    from src.presentation.views.orientacion_vocacional_view import OrientacionVocacionalView
 
 
 class GradesView(QWidget):
@@ -51,6 +52,7 @@ class GradesView(QWidget):
 
     ACCOMPANIMENT_SUBJECT_NAME = "acompañamiento integral en el aula"
     ANIMATION_READING_SUBJECT_NAME = "animacion a la lectura"
+    VOCATIONAL_ORIENTATION_SUBJECT_NAME = "orientacion vocacional y profesional"
 
     def __init__(
         self,
@@ -70,6 +72,7 @@ class GradesView(QWidget):
         self._activity_group_columns: list[tuple[int, int, int]] = []
         self._accompaniment_mode = False
         self._animation_reading_mode = False
+        self._vocational_orientation_mode = False
         self._switching_mode = False
 
         root = QVBoxLayout(self)
@@ -150,9 +153,11 @@ class GradesView(QWidget):
         root.addWidget(self.table, 1)
         self.accompaniment_view: "ClassroomAccompanimentView | None" = None
         self.animation_reading_view: "AnimacionLecturaView | None" = None
+        self.vocational_orientation_view: "OrientacionVocacionalView | None" = None
         if self.classroom_accompaniment_service is not None:
             from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
             from src.presentation.views.animacion_lectura_view import AnimacionLecturaView
+            from src.presentation.views.orientacion_vocacional_view import OrientacionVocacionalView
 
             self.accompaniment_view = ClassroomAccompanimentView(
                 accompaniment_service=self.classroom_accompaniment_service,
@@ -172,6 +177,11 @@ class GradesView(QWidget):
             self.animation_reading_view.level_combo.currentIndexChanged.connect(self._on_animation_level_changed)
             self.animation_reading_view.hide()
             root.addWidget(self.animation_reading_view, 1)
+            self.vocational_orientation_view = OrientacionVocacionalView(
+                on_save_payload=self._save_vocational_orientation_payload
+            )
+            self.vocational_orientation_view.hide()
+            root.addWidget(self.vocational_orientation_view, 1)
 
         self.load_contexts()
 
@@ -509,9 +519,16 @@ class GradesView(QWidget):
                 self.animation_reading_view is not None
                 and subject_name == self._normalize_subject_name(self.ANIMATION_READING_SUBJECT_NAME)
             )
+            use_vocational_orientation = (
+                self.vocational_orientation_view is not None
+                and self._is_vocational_orientation_subject(subject_name)
+            )
             if use_animation_reading:
                 self._show_animation_reading_view()
                 self._sync_animation_reading_view()
+            elif use_vocational_orientation:
+                self._show_vocational_orientation_view()
+                self._sync_vocational_orientation_view()
             elif use_accompaniment:
                 self._show_accompaniment_view()
                 self._sync_accompaniment_view()
@@ -524,6 +541,7 @@ class GradesView(QWidget):
     def _show_quantitative_view(self) -> None:
         self._accompaniment_mode = False
         self._animation_reading_mode = False
+        self._vocational_orientation_mode = False
         for w in (
             self.activities_count_label,
             self.activities_count_input,
@@ -538,10 +556,13 @@ class GradesView(QWidget):
             self.accompaniment_view.setVisible(False)
         if self.animation_reading_view is not None:
             self.animation_reading_view.setVisible(False)
+        if self.vocational_orientation_view is not None:
+            self.vocational_orientation_view.setVisible(False)
 
     def _show_accompaniment_view(self) -> None:
         self._accompaniment_mode = True
         self._animation_reading_mode = False
+        self._vocational_orientation_mode = False
         for w in (
             self.activities_count_label,
             self.activities_count_input,
@@ -556,10 +577,13 @@ class GradesView(QWidget):
             self.accompaniment_view.setVisible(True)
         if self.animation_reading_view is not None:
             self.animation_reading_view.setVisible(False)
+        if self.vocational_orientation_view is not None:
+            self.vocational_orientation_view.setVisible(False)
 
     def _show_animation_reading_view(self) -> None:
         self._accompaniment_mode = False
         self._animation_reading_mode = True
+        self._vocational_orientation_mode = False
         for w in (
             self.activities_count_label,
             self.activities_count_input,
@@ -574,6 +598,29 @@ class GradesView(QWidget):
             self.accompaniment_view.setVisible(False)
         if self.animation_reading_view is not None:
             self.animation_reading_view.setVisible(True)
+        if self.vocational_orientation_view is not None:
+            self.vocational_orientation_view.setVisible(False)
+
+    def _show_vocational_orientation_view(self) -> None:
+        self._accompaniment_mode = False
+        self._animation_reading_mode = False
+        self._vocational_orientation_mode = True
+        for w in (
+            self.activities_count_label,
+            self.activities_count_input,
+            self.generate_activities_button,
+            self.load_button,
+            self.recalc_button,
+            self.save_button,
+        ):
+            w.setVisible(False)
+        self.table.setVisible(False)
+        if self.accompaniment_view is not None:
+            self.accompaniment_view.setVisible(False)
+        if self.animation_reading_view is not None:
+            self.animation_reading_view.setVisible(False)
+        if self.vocational_orientation_view is not None:
+            self.vocational_orientation_view.setVisible(True)
 
     def _sync_accompaniment_view(self) -> None:
         if self.accompaniment_view is None:
@@ -653,8 +700,69 @@ class GradesView(QWidget):
             return
         self._sync_animation_reading_view()
 
+    def _sync_vocational_orientation_view(self) -> None:
+        if self.vocational_orientation_view is None:
+            return
+        assignment_id = self.assignment_combo.currentData()
+        trimester = self.trimester_combo.currentData()
+        assignment = next((row for row in self._contextos if row.get("id_asignacion") == assignment_id), None)
+        course_name = str((assignment or {}).get("curso_nombre") or "")
+        self.vocational_orientation_view.set_context(
+            assignment_id=str(assignment_id) if assignment_id else None,
+            trimester_num=int(trimester) if trimester is not None else None,
+            course_name=course_name,
+        )
+
+        if assignment_id and trimester:
+            valid_course, course_key, _ = self.grade_registration_service.validar_curso_orientacion_vocacional(str(assignment_id))
+            if not valid_course or course_key is None:
+                QMessageBox.warning(
+                    self,
+                    "Validación",
+                    "Orientación Vocacional y Profesional solo corresponde a 8vo, 9no y 10mo de EGB.",
+                )
+                self.vocational_orientation_view.set_students([])
+                return
+
+            saved_rows = self.grade_registration_service.obtener_orientacion_vocacional_evaluacion(
+                str(assignment_id),
+                int(trimester),
+            )
+            if saved_rows:
+                students = [
+                    {
+                        "estudiante_id": str(row.get("estudiante_id") or ""),
+                        "estudiante": str(row.get("estudiante") or ""),
+                    }
+                    for row in saved_rows
+                ]
+            else:
+                students = [
+                    {
+                        "estudiante_id": str(row.get("estudiante_id") or ""),
+                        "estudiante": str(row.get("estudiante") or ""),
+                    }
+                    for row in self.grade_registration_service.cargar_registro(str(assignment_id), int(trimester))
+                ]
+            self.vocational_orientation_view.set_students(students, saved_rows=saved_rows)
+            return
+        self.vocational_orientation_view.set_students([])
+
+    def _save_vocational_orientation_payload(self, payload: dict) -> tuple[bool, str]:
+        ok, message = self.grade_registration_service.guardar_orientacion_vocacional_evaluacion(payload)
+        if ok and self.app_signals:
+            self.app_signals.data_changed.emit("grades")
+        return ok, message
+
     @staticmethod
     def _normalize_subject_name(value: str) -> str:
         normalized = unicodedata.normalize("NFD", value.strip().lower())
         normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
         return " ".join(normalized.split())
+
+    def _is_vocational_orientation_subject(self, normalized_subject_name: str) -> bool:
+        if normalized_subject_name == self._normalize_subject_name(self.VOCATIONAL_ORIENTATION_SUBJECT_NAME):
+            return True
+        return normalized_subject_name in {
+            "orientacion vocacional profesional",
+        }

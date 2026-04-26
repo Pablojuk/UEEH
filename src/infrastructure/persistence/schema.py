@@ -217,6 +217,23 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         FOREIGN KEY (asignacion_id) REFERENCES asignaciones_docente(id_asignacion)
     );
     """,
+    """
+    CREATE TABLE IF NOT EXISTS orientacion_vocacional_evaluaciones (
+        id_evaluacion TEXT PRIMARY KEY,
+        asignacion_id TEXT NOT NULL,
+        trimestre_num INTEGER NOT NULL CHECK (trimestre_num IN (1,2,3)),
+        curso_clave TEXT NOT NULL CHECK (curso_clave IN ('8', '9', '10')),
+        estudiante_id TEXT NOT NULL,
+        respuestas_json TEXT NOT NULL,
+        puntaje_total INTEGER,
+        calificacion TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (asignacion_id, trimestre_num, estudiante_id),
+        FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id_estudiante),
+        FOREIGN KEY (asignacion_id) REFERENCES asignaciones_docente(id_asignacion)
+    );
+    """,
 )
 
 INDEX_STATEMENTS: tuple[str, ...] = (
@@ -234,6 +251,7 @@ INDEX_STATEMENTS: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_acompanamiento_eval_estudiante ON acompanamiento_evaluaciones(estudiante_id);",
     "CREATE INDEX IF NOT EXISTS idx_acompanamiento_cfg_asig_trim ON acompanamiento_habilidades_config(asignacion_id, trimestre_num);",
     "CREATE INDEX IF NOT EXISTS idx_animacion_eval_asig_trim ON animacion_lectura_evaluaciones(asignacion_id, trimestre_num);",
+    "CREATE INDEX IF NOT EXISTS idx_orientacion_eval_asig_trim ON orientacion_vocacional_evaluaciones(asignacion_id, trimestre_num);",
 )
 
 
