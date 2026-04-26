@@ -30,8 +30,12 @@ class TestTeachingAssignmentService(unittest.TestCase):
             "identificacion": "123",
         })
         self.catalog_service.crear_asignatura({"id_asignatura": "A1", "nombre": "Matemática", "codigo": "MAT"})
+        self.catalog_service.crear_asignatura(
+            {"id_asignatura": "A2", "nombre": "Orientación Vocacional y Profesional", "codigo": "OVP"}
+        )
         self.catalog_service.crear_curso({"id_curso": "C1", "nombre": "Primero", "nivel": "Basica"})
-        self.catalog_service.crear_paralelo({"id_paralelo": "P1", "nombre": "A"})
+        self.catalog_service.crear_curso({"id_curso": "C8", "nombre": "8vo de EGB", "nivel": "Básica Superior"})
+        self.catalog_service.crear_paralelo({"id_paralelo": "P-TA", "nombre": "P-TA"})
         self.catalog_service.crear_periodo_lectivo({
             "id_periodo": "2025-2026",
             "anio_inicio": 2025,
@@ -50,7 +54,7 @@ class TestTeachingAssignmentService(unittest.TestCase):
             "docente_id": "D1",
             "asignatura_id": "A1",
             "curso_id": "C1",
-            "paralelo_id": "P1",
+            "paralelo_id": "P-TA",
             "periodo_id": "2025-2026",
         })
         self.assertTrue(ok)
@@ -61,7 +65,7 @@ class TestTeachingAssignmentService(unittest.TestCase):
             "docente_id": "D1",
             "asignatura_id": "A1",
             "curso_id": "C1",
-            "paralelo_id": "P1",
+            "paralelo_id": "P-TA",
             "periodo_id": "2025-2026",
         }
         self.assignment_service.crear_asignacion(payload)
@@ -73,19 +77,19 @@ class TestTeachingAssignmentService(unittest.TestCase):
             "docente_id": "D1",
             "asignatura_id": "A1",
             "curso_id": "C1",
-            "paralelo_id": "P1",
+            "paralelo_id": "P-TA",
             "periodo_id": "2025-2026",
         }
         self.assignment_service.crear_asignacion(payload)
         self.assertEqual(len(self.assignment_service.listar_por_docente("D1")), 1)
-        self.assertEqual(len(self.assignment_service.listar_por_grupo("C1", "P1", "2025-2026")), 1)
+        self.assertEqual(len(self.assignment_service.listar_por_grupo("C1", "P-TA", "2025-2026")), 1)
 
     def test_eliminar_asignacion(self) -> None:
         ok, _ = self.assignment_service.crear_asignacion({
             "docente_id": "D1",
             "asignatura_id": "A1",
             "curso_id": "C1",
-            "paralelo_id": "P1",
+            "paralelo_id": "P-TA",
             "periodo_id": "2025-2026",
         })
         self.assertTrue(ok)
@@ -93,3 +97,29 @@ class TestTeachingAssignmentService(unittest.TestCase):
         deleted, _ = self.assignment_service.eliminar_asignacion(assignment_id)
         self.assertTrue(deleted)
         self.assertEqual(len(self.assignment_service.listar_asignaciones()), 0)
+
+    def test_bloquea_orientacion_en_curso_no_permitido(self) -> None:
+        ok, message = self.assignment_service.crear_asignacion(
+            {
+                "docente_id": "D1",
+                "asignatura_id": "A2",
+                "curso_id": "C1",
+                "paralelo_id": "P-TA",
+                "periodo_id": "2025-2026",
+            }
+        )
+        self.assertFalse(ok)
+        self.assertIn("solo corresponde", message.lower())
+
+    def test_permita_orientacion_en_8vo(self) -> None:
+        ok, message = self.assignment_service.crear_asignacion(
+            {
+                "docente_id": "D1",
+                "asignatura_id": "A2",
+                "curso_id": "C8",
+                "paralelo_id": "P-TA",
+                "periodo_id": "2025-2026",
+            }
+        )
+        self.assertTrue(ok)
+        self.assertIn("creada", message.lower())
