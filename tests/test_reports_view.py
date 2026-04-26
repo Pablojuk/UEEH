@@ -219,6 +219,7 @@ class TestReportsView(unittest.TestCase):
         self.assertEqual(view.animation_report_view.level_combo.currentData(), "media")
 
         self.assertIn(("AS2", 2, "media"), grade_service.calls)
+        self.assertIn("ANIMACIÓN A LA LECTURA - TRIMESTRE 2", view.animation_report_view._last_preview_html)
 
 
 if __name__ == "__main__":

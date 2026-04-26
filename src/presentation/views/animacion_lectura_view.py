@@ -284,7 +284,8 @@ class AnimacionLecturaView(QWidget):
 
         self.left_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.right_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.center_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.center_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.center_table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.center_table.setItemDelegate(NotaDelegate(self.center_table))
         self.center_table.itemChanged.connect(self._on_grade_item_changed)
         self.center_table.cellDoubleClicked.connect(self._on_center_table_double_clicked)
@@ -392,6 +393,7 @@ class AnimacionLecturaView(QWidget):
                 self.level_combo.setCurrentIndex(idx)
                 return
         self._build_tables()
+        self._refresh_preview_if_reports_mode()
 
     def _setup_table(self, table: QTableWidget, editable: bool) -> None:
         table.verticalHeader().setVisible(False)
@@ -433,6 +435,17 @@ class AnimacionLecturaView(QWidget):
 
     def _on_level_changed(self) -> None:
         self._build_tables()
+        self._refresh_preview_if_reports_mode()
+
+    def _refresh_preview_if_reports_mode(self) -> None:
+        if not self._reports_mode:
+            return
+        try:
+            html = self._render_preview_html()
+        except Exception:  # noqa: BLE001
+            html = ""
+        self._last_preview_html = html
+        self._set_preview_html(html)
 
     def _build_tables(self) -> None:
         level_key = self.level_combo.currentData()
