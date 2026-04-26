@@ -1,6 +1,7 @@
 """Vista funcional para registro de notas por trimestre."""
 
 from __future__ import annotations
+import unicodedata
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QDate, QEvent, Qt
@@ -28,6 +29,7 @@ from src.presentation.app_signals import AppSignals
 
 if TYPE_CHECKING:
     from src.application.services.classroom_accompaniment_service import ClassroomAccompanimentService
+    from src.presentation.views.animacion_lectura_view import AnimacionLecturaView
     from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
 
 
@@ -48,6 +50,7 @@ class GradesView(QWidget):
     ]
 
     ACCOMPANIMENT_SUBJECT_NAME = "acompañamiento integral en el aula"
+    ANIMATION_READING_SUBJECT_NAME = "animacion a la lectura"
 
     def __init__(
         self,
@@ -66,6 +69,8 @@ class GradesView(QWidget):
         self._activity_name_inputs: dict[int, str] = {}
         self._activity_group_columns: list[tuple[int, int, int]] = []
         self._accompaniment_mode = False
+        self._animation_reading_mode = False
+        self._switching_mode = False
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -144,16 +149,29 @@ class GradesView(QWidget):
         root.addWidget(self.filter_card)
         root.addWidget(self.table, 1)
         self.accompaniment_view: "ClassroomAccompanimentView | None" = None
+        self.animation_reading_view: "AnimacionLecturaView | None" = None
         if self.classroom_accompaniment_service is not None:
             from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
+            from src.presentation.views.animacion_lectura_view import AnimacionLecturaView
 
             self.accompaniment_view = ClassroomAccompanimentView(
                 accompaniment_service=self.classroom_accompaniment_service,
                 app_signals=self.app_signals,
             )
             self.accompaniment_view.set_embedded_mode(True)
+            self.accompaniment_view.set_notes_mode(True)
             self.accompaniment_view.hide()
             root.addWidget(self.accompaniment_view, 1)
+            self.animation_reading_view = AnimacionLecturaView(
+                list_signers=self.classroom_accompaniment_service.listar_firmantes_disponibles,
+                get_assignment_context=self.classroom_accompaniment_service.obtener_contexto,
+                get_institution_data=self.classroom_accompaniment_service.obtener_datos_institucion,
+                on_save_payload=self._save_animation_reading_payload,
+            )
+            self.animation_reading_view.set_notes_mode(True)
+            self.animation_reading_view.level_combo.currentIndexChanged.connect(self._on_animation_level_changed)
+            self.animation_reading_view.hide()
+            root.addWidget(self.animation_reading_view, 1)
 
         self.load_contexts()
 
@@ -472,21 +490,40 @@ class GradesView(QWidget):
             self.table.setColumnWidth(col_ref, max(90, self.table.columnWidth(col_ref)))
 
     def _on_assignment_or_trimester_changed(self) -> None:
+        if self._switching_mode:
+            return
         self._toggle_mode_by_assignment()
 
     def _toggle_mode_by_assignment(self) -> None:
-        selected_assignment = self.assignment_combo.currentData()
-        assignment = next((row for row in self._contextos if row.get("id_asignacion") == selected_assignment), None)
-        subject_name = str((assignment or {}).get("asignatura_nombre") or "").strip().lower()
-        use_accompaniment = (
-            self.accompaniment_view is not None and subject_name == self.ACCOMPANIMENT_SUBJECT_NAME
-        )
-        if use_accompaniment == self._accompaniment_mode:
-            if use_accompaniment:
-                self._sync_accompaniment_view()
+        if self._switching_mode:
             return
-        self._accompaniment_mode = use_accompaniment
-        # Widgets exclusivos del modo cuantitativo
+        self._switching_mode = True
+        try:
+            selected_assignment = self.assignment_combo.currentData()
+            assignment = next((row for row in self._contextos if row.get("id_asignacion") == selected_assignment), None)
+            subject_name = self._normalize_subject_name(str((assignment or {}).get("asignatura_nombre") or ""))
+            use_accompaniment = (
+                self.accompaniment_view is not None and subject_name == self._normalize_subject_name(self.ACCOMPANIMENT_SUBJECT_NAME)
+            )
+            use_animation_reading = (
+                self.animation_reading_view is not None
+                and subject_name == self._normalize_subject_name(self.ANIMATION_READING_SUBJECT_NAME)
+            )
+            if use_animation_reading:
+                self._show_animation_reading_view()
+                self._sync_animation_reading_view()
+            elif use_accompaniment:
+                self._show_accompaniment_view()
+                self._sync_accompaniment_view()
+            else:
+                self._show_quantitative_view()
+                self._clear_table()
+        finally:
+            self._switching_mode = False
+
+    def _show_quantitative_view(self) -> None:
+        self._accompaniment_mode = False
+        self._animation_reading_mode = False
         for w in (
             self.activities_count_label,
             self.activities_count_input,
@@ -495,12 +532,48 @@ class GradesView(QWidget):
             self.recalc_button,
             self.save_button,
         ):
-            w.setVisible(not use_accompaniment)
-        self.table.setVisible(not use_accompaniment)
+            w.setVisible(True)
+        self.table.setVisible(True)
         if self.accompaniment_view is not None:
-            self.accompaniment_view.setVisible(use_accompaniment)
-            if use_accompaniment:
-                self._sync_accompaniment_view()
+            self.accompaniment_view.setVisible(False)
+        if self.animation_reading_view is not None:
+            self.animation_reading_view.setVisible(False)
+
+    def _show_accompaniment_view(self) -> None:
+        self._accompaniment_mode = True
+        self._animation_reading_mode = False
+        for w in (
+            self.activities_count_label,
+            self.activities_count_input,
+            self.generate_activities_button,
+            self.load_button,
+            self.recalc_button,
+            self.save_button,
+        ):
+            w.setVisible(False)
+        self.table.setVisible(False)
+        if self.accompaniment_view is not None:
+            self.accompaniment_view.setVisible(True)
+        if self.animation_reading_view is not None:
+            self.animation_reading_view.setVisible(False)
+
+    def _show_animation_reading_view(self) -> None:
+        self._accompaniment_mode = False
+        self._animation_reading_mode = True
+        for w in (
+            self.activities_count_label,
+            self.activities_count_input,
+            self.generate_activities_button,
+            self.load_button,
+            self.recalc_button,
+            self.save_button,
+        ):
+            w.setVisible(False)
+        self.table.setVisible(False)
+        if self.accompaniment_view is not None:
+            self.accompaniment_view.setVisible(False)
+        if self.animation_reading_view is not None:
+            self.animation_reading_view.setVisible(True)
 
     def _sync_accompaniment_view(self) -> None:
         if self.accompaniment_view is None:
@@ -516,3 +589,72 @@ class GradesView(QWidget):
             if idx >= 0:
                 self.accompaniment_view.trimester_combo.setCurrentIndex(idx)
         self.accompaniment_view.load_rows()
+
+    def _sync_animation_reading_view(self) -> None:
+        if self.animation_reading_view is None:
+            return
+        assignment_id = self.assignment_combo.currentData()
+        trimester = self.trimester_combo.currentData()
+        assignment_label = self.assignment_combo.currentText()
+        trimester_label = self.trimester_combo.currentText()
+        self.animation_reading_view.set_context(
+            assignment_id=str(assignment_id) if assignment_id else None,
+            assignment_label=assignment_label,
+            trimester_num=int(trimester) if trimester is not None else None,
+            trimester_label=trimester_label,
+        )
+        students: list[dict[str, str]] = []
+        selected_level: str | None = None
+        if self.animation_reading_view.level_combo.currentData():
+            selected_level = str(self.animation_reading_view.level_combo.currentData())
+
+        if assignment_id and trimester:
+            try:
+                rows = self.grade_registration_service.obtener_animacion_lectura_evaluacion(
+                    str(assignment_id),
+                    int(trimester),
+                    nivel=selected_level,
+                )
+                if rows:
+                    detected_level = str(rows[0].get("nivel") or "") if rows else None
+                    selected_level = selected_level or detected_level
+                    students = [
+                        {
+                            "estudiante_id": str(row.get("estudiante_id") or ""),
+                            "estudiante": str(row.get("estudiante") or ""),
+                            "notas_indicadores": row.get("notas_indicadores") or [],
+                            "valor": row.get("valor"),
+                            "cualitativo": str(row.get("cualitativo") or ""),
+                            "cualitativo_1": str(row.get("cualitativo_1") or ""),
+                        }
+                        for row in rows
+                    ]
+                else:
+                    fallback_rows = self.grade_registration_service.cargar_registro(str(assignment_id), int(trimester))
+                    students = [
+                        {
+                            "estudiante_id": str(row.get("estudiante_id") or ""),
+                            "estudiante": str(row.get("estudiante") or ""),
+                        }
+                        for row in fallback_rows
+                    ]
+            except ValueError:
+                students = []
+        self.animation_reading_view.set_students(students, selected_level=selected_level)
+
+    def _save_animation_reading_payload(self, payload: dict) -> tuple[bool, str]:
+        ok, message = self.grade_registration_service.guardar_animacion_lectura_evaluacion(payload)
+        if ok and self.app_signals:
+            self.app_signals.data_changed.emit("grades")
+        return ok, message
+
+    def _on_animation_level_changed(self) -> None:
+        if not self._animation_reading_mode or self._switching_mode:
+            return
+        self._sync_animation_reading_view()
+
+    @staticmethod
+    def _normalize_subject_name(value: str) -> str:
+        normalized = unicodedata.normalize("NFD", value.strip().lower())
+        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        return " ".join(normalized.split())

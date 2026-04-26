@@ -169,6 +169,50 @@ class TestGradeRegistrationService(unittest.TestCase):
         self.assertEqual(cfg["metadata"][0]["nombre"], "Trabajo grupal")
         self.assertEqual(cfg["metadata"][0]["fecha_refuerzo"], "2026-04-05")
 
+    def test_guardar_y_consultar_animacion_lectura(self) -> None:
+        ok, message = self.service.guardar_animacion_lectura_evaluacion(
+            {
+                "asignacion_id": "AS1",
+                "trimestre_num": 1,
+                "nivel": "media",
+                "filas": [
+                    {
+                        "estudiante_id": "E1",
+                        "estudiante": "Lopez Maria",
+                        "notas_indicadores": [8.5, 9.0],
+                        "promedio": 8.75,
+                        "cualitativo": "A-",
+                        "cualitativo_1": "A",
+                    }
+                ],
+                "has_invalid_notes": False,
+            }
+        )
+        self.assertTrue(ok)
+        self.assertIn("guardadas", message.lower())
+
+        rows = self.service.obtener_animacion_lectura_evaluacion("AS1", 1)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["estudiante_id"], "E1")
+        self.assertEqual(rows[0]["nivel"], "media")
+        self.assertEqual(rows[0]["valor"], 8.75)
+        self.assertEqual(rows[0]["cualitativo"], "A-")
+        self.assertEqual(rows[0]["cualitativo_1"], "A")
+        self.assertEqual(rows[0]["notas_indicadores"], [8.5, 9.0])
+
+    def test_guardado_animacion_lectura_rechaza_payload_invalido(self) -> None:
+        ok, message = self.service.guardar_animacion_lectura_evaluacion(
+            {
+                "asignacion_id": "AS1",
+                "trimestre_num": 1,
+                "nivel": "",
+                "filas": [],
+                "has_invalid_notes": False,
+            }
+        )
+        self.assertFalse(ok)
+        self.assertIn("nivel", message.lower())
+
 
 if __name__ == "__main__":
     unittest.main()
