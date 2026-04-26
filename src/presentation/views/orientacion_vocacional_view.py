@@ -6,7 +6,19 @@ import unicodedata
 from typing import Any, Callable
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class OrientacionVocacionalView(QWidget):
@@ -82,11 +94,11 @@ class OrientacionVocacionalView(QWidget):
             ]
         )
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, header.ResizeToContents)
-        header.setSectionResizeMode(1, header.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         for col in range(2, 7):
-            header.setSectionResizeMode(col, header.ResizeToContents)
-        header.setSectionResizeMode(7, header.ResizeToContents)
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
 
         root.addWidget(header_card)
         root.addWidget(self.table, 1)
