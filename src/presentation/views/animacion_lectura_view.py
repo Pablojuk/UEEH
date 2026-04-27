@@ -270,13 +270,17 @@ class AnimacionLecturaView(QWidget):
         sign_layout.addWidget(self.sign_rector_combo, 1)
 
         self.tables_container = QWidget()
+        self.tables_container.setObjectName("AnimTableShell")
         tables_row = QHBoxLayout(self.tables_container)
         tables_row.setContentsMargins(0, 0, 0, 0)
         tables_row.setSpacing(0)
 
         self.left_table = QTableWidget(0, 2)
+        self.left_table.setObjectName("AnimLeftTable")
         self.center_table = QTableWidget(0, 0)
+        self.center_table.setObjectName("AnimCenterTable")
         self.right_table = QTableWidget(0, 3)
+        self.right_table.setObjectName("AnimRightTable")
 
         self._setup_table(self.left_table, editable=False)
         self._setup_table(self.center_table, editable=True)
@@ -285,7 +289,9 @@ class AnimacionLecturaView(QWidget):
         self.left_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.right_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.center_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.center_table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.left_table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.center_table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.right_table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.center_table.setItemDelegate(NotaDelegate(self.center_table))
         self.center_table.itemChanged.connect(self._on_grade_item_changed)
         self.center_table.cellDoubleClicked.connect(self._on_center_table_double_clicked)
@@ -1180,11 +1186,22 @@ class AnimacionLecturaView(QWidget):
                 border-radius: 6px;
                 background: #FFFFFF;
             }
+            QWidget#AnimTableShell {
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                background: #FFFFFF;
+            }
             QTableWidget {
                 border: 1px solid #CBD5E1;
                 background: #FFFFFF;
                 gridline-color: #E2E8F0;
                 font-size: 12px;
+            }
+            QTableWidget#AnimLeftTable,
+            QTableWidget#AnimCenterTable,
+            QTableWidget#AnimRightTable {
+                border: none;
+                background: transparent;
             }
             """
         )
