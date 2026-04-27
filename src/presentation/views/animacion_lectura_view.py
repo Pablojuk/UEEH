@@ -1008,7 +1008,7 @@ class AnimacionLecturaView(QWidget):
         printer = QPrinter(QPrinter.HighResolution)
         printer.setOutputFormat(QPrinter.PdfFormat)
         printer.setOutputFileName(file_path)
-        document.print(printer)
+        document.print_(printer)
         QMessageBox.information(self, "Exportar PDF", f"PDF generado correctamente:\n{file_path}")
 
     def _export_preview_excel(self) -> None:
