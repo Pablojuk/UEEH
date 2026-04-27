@@ -209,7 +209,6 @@ class AnimacionLecturaView(QWidget):
 
         self._students: list[dict[str, str]] = []
         self._saved_rows_by_student: dict[str, dict[str, Any]] = {}
-        self._syncing_scroll = False
         self._updating_cells = False
         self._assignment_id: str | None = None
         self._trimester_num: int | None = None
@@ -217,6 +216,9 @@ class AnimacionLecturaView(QWidget):
         self._last_preview_html = ""
         self._notes_mode = False
         self._reports_mode = False
+        self._indicator_start_col = 2
+        self._indicator_count = 0
+        self._result_start_col = 2
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -275,31 +277,20 @@ class AnimacionLecturaView(QWidget):
         tables_row.setContentsMargins(0, 0, 0, 0)
         tables_row.setSpacing(0)
 
-        self.left_table = QTableWidget(0, 2)
-        self.left_table.setObjectName("AnimLeftTable")
-        self.center_table = QTableWidget(0, 0)
-        self.center_table.setObjectName("AnimCenterTable")
-        self.right_table = QTableWidget(0, 3)
-        self.right_table.setObjectName("AnimRightTable")
-
-        self._setup_table(self.left_table, editable=False)
-        self._setup_table(self.center_table, editable=True)
-        self._setup_table(self.right_table, editable=False)
-
-        self.left_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.right_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.center_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.left_table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.center_table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.right_table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.center_table.setItemDelegate(NotaDelegate(self.center_table))
-        self.center_table.itemChanged.connect(self._on_grade_item_changed)
-        self.center_table.cellDoubleClicked.connect(self._on_center_table_double_clicked)
-        self.center_table.cellClicked.connect(self._on_center_table_cell_clicked)
-
-        tables_row.addWidget(self.left_table)
-        tables_row.addWidget(self.center_table, 1)
-        tables_row.addWidget(self.right_table)
+        self.matrix_table = QTableWidget(0, 0)
+        self.matrix_table.setObjectName("AnimMatrixTable")
+        self._setup_table(self.matrix_table, editable=True)
+        self.matrix_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.matrix_table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.matrix_table.setItemDelegate(NotaDelegate(self.matrix_table))
+        self.matrix_table.itemChanged.connect(self._on_grade_item_changed)
+        self.matrix_table.cellDoubleClicked.connect(self._on_matrix_header_double_clicked)
+        self.matrix_table.cellClicked.connect(self._on_matrix_table_cell_clicked)
+        tables_row.addWidget(self.matrix_table, 1)
+        # Compatibilidad con pruebas/código existente.
+        self.left_table = self.matrix_table
+        self.center_table = self.matrix_table
+        self.right_table = self.matrix_table
 
         self.tabs = QTabWidget()
         eval_tab = QWidget()
@@ -326,7 +317,6 @@ class AnimacionLecturaView(QWidget):
         root.addWidget(self.sign_card)
         root.addWidget(self.tabs, 1)
 
-        self._connect_scrollbars()
         self._load_signers()
         self._apply_styles()
 
@@ -422,23 +412,6 @@ class AnimacionLecturaView(QWidget):
         else:
             table.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
-    def _connect_scrollbars(self) -> None:
-        for table in (self.left_table, self.center_table, self.right_table):
-            table.verticalScrollBar().valueChanged.connect(self._sync_vertical_scroll)
-
-    def _sync_vertical_scroll(self, value: int) -> None:
-        if self._syncing_scroll:
-            return
-        self._syncing_scroll = True
-        try:
-            sender = self.sender()
-            for table in (self.left_table, self.center_table, self.right_table):
-                bar = table.verticalScrollBar()
-                if bar is not sender:
-                    bar.setValue(value)
-        finally:
-            self._syncing_scroll = False
-
     def _on_level_changed(self) -> None:
         self._build_tables()
         self._refresh_preview_if_reports_mode()
@@ -457,23 +430,17 @@ class AnimacionLecturaView(QWidget):
         level_key = self.level_combo.currentData()
         criterios = self.DATOS_EVALUACION.get(level_key, []) if level_key else []
         indicator_count = sum(len(c.indicadores) for c in criterios)
+        self._indicator_count = indicator_count
         total_rows = 3 + len(self._students)
         self._header_details = {}
+        self._indicator_start_col = 2
+        self._result_start_col = self._indicator_start_col + indicator_count
 
-        self.left_table.clearSpans()
-        self.center_table.clearSpans()
-        self.right_table.clearSpans()
+        self.matrix_table.clearSpans()
 
-        self.left_table.setRowCount(total_rows)
-        self.left_table.setColumnCount(2)
-        self.left_table.setHorizontalHeaderLabels(["", ""])
-        self.center_table.setRowCount(total_rows)
-        self.center_table.setColumnCount(indicator_count)
-        if indicator_count:
-            self.center_table.setHorizontalHeaderLabels([""] * indicator_count)
-        self.right_table.setRowCount(total_rows)
-        self.right_table.setColumnCount(3)
-        self.right_table.setHorizontalHeaderLabels(["", "", ""])
+        self.matrix_table.setRowCount(total_rows)
+        self.matrix_table.setColumnCount(2 + indicator_count + 3)
+        self.matrix_table.setHorizontalHeaderLabels([""] * (2 + indicator_count + 3))
 
         self._populate_headers(criterios, indicator_count)
         self._populate_students(criterios, indicator_count)
@@ -482,7 +449,7 @@ class AnimacionLecturaView(QWidget):
 
     def _apply_saved_rows(self, indicator_count: int) -> None:
         self._updating_cells = True
-        self.center_table.blockSignals(True)
+        self.matrix_table.blockSignals(True)
         try:
             for index, student in enumerate(self._students, start=1):
                 row_idx = 2 + index
@@ -495,7 +462,7 @@ class AnimacionLecturaView(QWidget):
                         value = notas[col]
                         if value is None or str(value).strip() == "":
                             continue
-                        item = self.center_table.item(row_idx, col)
+                        item = self.matrix_table.item(row_idx, self._indicator_start_col + col)
                         if item is not None:
                             item.setText(str(value))
                 has_notes = any(v is not None and str(v).strip() != "" for v in notas) if isinstance(notas, list) else False
@@ -507,24 +474,24 @@ class AnimacionLecturaView(QWidget):
                     cualitativo_1 = str(saved.get("cualitativo_1") or "").strip() or "-"
                     self._set_result_values(row_idx, valor, cualitativo, cualitativo_1)
         finally:
-            self.center_table.blockSignals(False)
+            self.matrix_table.blockSignals(False)
             self._updating_cells = False
 
     def _populate_headers(self, criterios: list[CriterioEvaluacion], indicator_count: int) -> None:
-        self._set_header_item(self.left_table, 0, 0, "N°", "left")
-        self.left_table.setSpan(0, 0, 3, 1)
-        self._set_header_item(self.left_table, 0, 1, "Estudiante", "left")
-        self.left_table.setSpan(0, 1, 3, 1)
+        self._set_header_item(self.matrix_table, 0, 0, "N°", "left")
+        self.matrix_table.setSpan(0, 0, 3, 1)
+        self._set_header_item(self.matrix_table, 0, 1, "Estudiante", "left")
+        self.matrix_table.setSpan(0, 1, 3, 1)
 
         if indicator_count > 0:
-            self._set_header_item(self.center_table, 0, 0, "Criterios e Indicadores de Evaluación", "group")
-            self.center_table.setSpan(0, 0, 1, indicator_count)
+            self._set_header_item(self.matrix_table, 0, self._indicator_start_col, "Criterios e Indicadores de Evaluación", "group")
+            self.matrix_table.setSpan(0, self._indicator_start_col, 1, indicator_count)
 
-            col = 0
+            col = self._indicator_start_col
             for crit_index, criterio in enumerate(criterios, start=1):
                 span = len(criterio.indicadores)
                 self._set_header_item(
-                    self.center_table,
+                    self.matrix_table,
                     1,
                     col,
                     f"Criterio {crit_index}",
@@ -532,10 +499,10 @@ class AnimacionLecturaView(QWidget):
                     criterio.titulo,
                 )
                 self._header_details[(1, col)] = ("Criterio", criterio.titulo)
-                self.center_table.setSpan(1, col, 1, span)
+                self.matrix_table.setSpan(1, col, 1, span)
                 for ind_index, indicador in enumerate(criterio.indicadores, start=1):
                     self._set_header_item(
-                        self.center_table,
+                        self.matrix_table,
                         2,
                         col,
                         f"Ind. {ind_index}",
@@ -545,62 +512,68 @@ class AnimacionLecturaView(QWidget):
                     self._header_details[(2, col)] = ("Indicador", indicador)
                     col += 1
         else:
-            self._set_header_item(self.center_table, 0, 0, "Seleccione nivel", "group")
-            self.center_table.setSpan(0, 0, 3, 1)
+            self._set_header_item(self.matrix_table, 0, self._indicator_start_col, "Seleccione nivel", "group")
+            self.matrix_table.setSpan(0, self._indicator_start_col, 3, 1)
 
-        self._set_header_item(self.right_table, 0, 0, "VALOR\n(Promedio)", "value")
-        self.right_table.setSpan(0, 0, 3, 1)
-        self._set_header_item(self.right_table, 0, 1, "CUALITATIVO", "qual")
-        self.right_table.setSpan(0, 1, 3, 1)
-        self._set_header_item(self.right_table, 0, 2, "CUALITATIVO 1", "qual1")
-        self.right_table.setSpan(0, 2, 3, 1)
+        self._set_header_item(self.matrix_table, 0, self._result_start_col, "VALOR\n(Promedio)", "value")
+        self.matrix_table.setSpan(0, self._result_start_col, 3, 1)
+        self._set_header_item(self.matrix_table, 0, self._result_start_col + 1, "CUALITATIVO", "qual")
+        self.matrix_table.setSpan(0, self._result_start_col + 1, 3, 1)
+        self._set_header_item(self.matrix_table, 0, self._result_start_col + 2, "CUALITATIVO 1", "qual1")
+        self.matrix_table.setSpan(0, self._result_start_col + 2, 3, 1)
 
     def _populate_students(self, criterios: list[CriterioEvaluacion], indicator_count: int) -> None:
         for index, student in enumerate(self._students, start=1):
             row = 2 + index
-            self._set_data_item(self.left_table, row, 0, str(index), editable=False)
-            self._set_data_item(self.left_table, row, 1, student.get("estudiante", ""), editable=False)
+            self._set_data_item(self.matrix_table, row, 0, str(index), editable=False)
+            self._set_data_item(self.matrix_table, row, 1, student.get("estudiante", ""), editable=False)
             for col in range(indicator_count):
-                self._set_data_item(self.center_table, row, col, "", editable=True)
-            self._set_data_item(self.right_table, row, 0, "-", editable=False)
-            self._set_data_item(self.right_table, row, 1, "-", editable=False)
-            self._set_data_item(self.right_table, row, 2, "-", editable=False)
+                self._set_data_item(self.matrix_table, row, self._indicator_start_col + col, "", editable=True)
+            self._set_data_item(self.matrix_table, row, self._result_start_col, "-", editable=False)
+            self._set_data_item(self.matrix_table, row, self._result_start_col + 1, "-", editable=False)
+            self._set_data_item(self.matrix_table, row, self._result_start_col + 2, "-", editable=False)
 
         self._updating_cells = True
         try:
             for row in range(3):
-                for col in range(self.right_table.columnCount()):
-                    if self.right_table.item(row, col) is None:
-                        self._set_header_item(self.right_table, row, col, "", "value")
+                for col in range(self.matrix_table.columnCount()):
+                    if self.matrix_table.item(row, col) is not None:
+                        continue
+                    role = "group" if self._indicator_start_col <= col < self._result_start_col else "left"
+                    if col >= self._result_start_col:
+                        role = "value" if col == self._result_start_col else ("qual" if col == self._result_start_col + 1 else "qual1")
+                    self._set_header_item(self.matrix_table, row, col, "", role)
         finally:
             self._updating_cells = False
 
     def _apply_dimensions(self, criterios: list[CriterioEvaluacion], indicator_count: int) -> None:
-        self.left_table.setColumnWidth(0, 50)
-        self.left_table.setColumnWidth(1, 300)
+        self.matrix_table.setColumnWidth(0, 50)
+        self.matrix_table.setColumnWidth(1, 300)
         for col in range(indicator_count):
-            self.center_table.setColumnWidth(col, 110)
-        self.right_table.setColumnWidth(0, 110)
-        self.right_table.setColumnWidth(1, 100)
-        self.right_table.setColumnWidth(2, 90)
+            self.matrix_table.setColumnWidth(self._indicator_start_col + col, 110)
+        self.matrix_table.setColumnWidth(self._result_start_col, 110)
+        self.matrix_table.setColumnWidth(self._result_start_col + 1, 100)
+        self.matrix_table.setColumnWidth(self._result_start_col + 2, 90)
 
-        total_rows = self.left_table.rowCount()
+        total_rows = self.matrix_table.rowCount()
         for row in range(total_rows):
             height = 36 if row < 3 else 32
-            self.left_table.setRowHeight(row, height)
-            self.center_table.setRowHeight(row, height)
-            self.right_table.setRowHeight(row, height)
+            self.matrix_table.setRowHeight(row, height)
 
-    def _on_center_table_cell_clicked(self, row: int, col: int) -> None:
+    def _on_matrix_table_cell_clicked(self, row: int, col: int) -> None:
         if row < 3:
             return
-        item = self.center_table.item(row, col)
+        if not (self._indicator_start_col <= col < self._result_start_col):
+            return
+        item = self.matrix_table.item(row, col)
         if item is None or not (item.flags() & Qt.ItemIsEditable):
             return
-        self.center_table.editItem(item)
+        self.matrix_table.editItem(item)
 
-    def _on_center_table_double_clicked(self, row: int, col: int) -> None:
+    def _on_matrix_header_double_clicked(self, row: int, col: int) -> None:
         if row not in (1, 2):
+            return
+        if not (self._indicator_start_col <= col < self._result_start_col):
             return
         resolved = self._resolve_header_origin(row, col)
         if resolved is None:
@@ -611,17 +584,17 @@ class AnimacionLecturaView(QWidget):
         QMessageBox.information(self, f"{title} completo", text)
 
     def _resolve_header_origin(self, row: int, col: int) -> tuple[int, int] | None:
-        for origin_col in range(col, -1, -1):
-            item = self.center_table.item(row, origin_col)
+        for origin_col in range(col, self._indicator_start_col - 1, -1):
+            item = self.matrix_table.item(row, origin_col)
             if item is None:
                 continue
-            span = self.center_table.columnSpan(row, origin_col)
+            span = self.matrix_table.columnSpan(row, origin_col)
             if origin_col <= col < origin_col + span:
                 return (row, origin_col)
         return None
 
     def eventFilter(self, obj, event):  # type: ignore[override]
-        if obj is self.center_table and event.type() == QEvent.KeyPress:
+        if obj is self.matrix_table and event.type() == QEvent.KeyPress:
             if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_V:
                 self._paste_from_clipboard()
                 return True
@@ -631,7 +604,7 @@ class AnimacionLecturaView(QWidget):
         return super().eventFilter(obj, event)
 
     def _copy_selected_cells(self) -> None:
-        ranges = self.center_table.selectedRanges()
+        ranges = self.matrix_table.selectedRanges()
         if not ranges:
             return
         selected_range = ranges[0]
@@ -640,8 +613,10 @@ class AnimacionLecturaView(QWidget):
             if row < 3:
                 continue
             cells: list[str] = []
-            for col in range(selected_range.leftColumn(), selected_range.rightColumn() + 1):
-                item = self.center_table.item(row, col)
+            left_col = max(selected_range.leftColumn(), self._indicator_start_col)
+            right_col = min(selected_range.rightColumn(), self._result_start_col - 1)
+            for col in range(left_col, right_col + 1):
+                item = self.matrix_table.item(row, col)
                 cells.append(item.text() if item else "")
             lines.append("\t".join(cells))
         if lines:
@@ -651,9 +626,9 @@ class AnimacionLecturaView(QWidget):
         text = QApplication.clipboard().text()
         if not text.strip():
             return
-        start_row = self.center_table.currentRow()
-        start_col = self.center_table.currentColumn()
-        if start_row < 3 or start_col < 0:
+        start_row = self.matrix_table.currentRow()
+        start_col = self.matrix_table.currentColumn()
+        if start_row < 3 or start_col < self._indicator_start_col or start_col >= self._result_start_col:
             return
 
         rows = [line.split("\t") for line in text.splitlines() if line.strip()]
@@ -662,15 +637,15 @@ class AnimacionLecturaView(QWidget):
         try:
             for row_offset, values in enumerate(rows):
                 target_row = start_row + row_offset
-                if target_row >= self.center_table.rowCount():
+                if target_row >= self.matrix_table.rowCount():
                     break
                 if target_row < 3:
                     continue
                 for col_offset, value in enumerate(values):
                     target_col = start_col + col_offset
-                    if target_col >= self.center_table.columnCount():
+                    if target_col >= self._result_start_col:
                         break
-                    item = self.center_table.item(target_row, target_col)
+                    item = self.matrix_table.item(target_row, target_col)
                     if item is None or not (item.flags() & Qt.ItemIsEditable):
                         continue
                     item.setText(value.strip())
@@ -690,7 +665,7 @@ class AnimacionLecturaView(QWidget):
         self._recalculate_row(row)
 
     def _recalculate_row(self, row: int) -> None:
-        if self.center_table.columnCount() == 0:
+        if self._indicator_count == 0:
             return
 
         values: list[float] = []
@@ -698,8 +673,8 @@ class AnimacionLecturaView(QWidget):
 
         self._updating_cells = True
         try:
-            for col in range(self.center_table.columnCount()):
-                cell = self.center_table.item(row, col)
+            for col in range(self._indicator_start_col, self._result_start_col):
+                cell = self.matrix_table.item(row, col)
                 if cell is None:
                     continue
                 text = cell.text().strip().replace(",", ".")
@@ -735,18 +710,18 @@ class AnimacionLecturaView(QWidget):
 
             if invalid_found:
                 msg = "Existen notas inválidas en esta fila; no se incluirán en el promedio ni en el guardado."
-                current_tip = self.right_table.item(row, 0).toolTip() if self.right_table.item(row, 0) else ""
+                current_tip = self.matrix_table.item(row, self._result_start_col).toolTip() if self.matrix_table.item(row, self._result_start_col) else ""
                 if msg not in current_tip:
-                    self.right_table.item(row, 0).setToolTip(msg)
+                    self.matrix_table.item(row, self._result_start_col).setToolTip(msg)
             else:
-                self.right_table.item(row, 0).setToolTip("")
+                self.matrix_table.item(row, self._result_start_col).setToolTip("")
         finally:
             self._updating_cells = False
 
     def _set_result_values(self, row: int, promedio: str, cualitativo: str, cualitativo_1: str) -> None:
-        value_item = self.right_table.item(row, 0)
-        qual_item = self.right_table.item(row, 1)
-        qual1_item = self.right_table.item(row, 2)
+        value_item = self.matrix_table.item(row, self._result_start_col)
+        qual_item = self.matrix_table.item(row, self._result_start_col + 1)
+        qual1_item = self.matrix_table.item(row, self._result_start_col + 2)
         if value_item is None or qual_item is None or qual1_item is None:
             return
 
@@ -789,7 +764,7 @@ class AnimacionLecturaView(QWidget):
 
     def build_save_payload(self) -> dict[str, Any]:
         level_key = self.level_combo.currentData()
-        indicadores_total = self.center_table.columnCount()
+        indicadores_total = self._indicator_count
         result_rows: list[dict[str, Any]] = []
         has_invalid = False
 
@@ -797,7 +772,7 @@ class AnimacionLecturaView(QWidget):
             row = 2 + idx
             notas: list[float | None] = []
             for col in range(indicadores_total):
-                item = self.center_table.item(row, col)
+                item = self.matrix_table.item(row, self._indicator_start_col + col)
                 text = item.text().strip().replace(",", ".") if item else ""
                 if not text:
                     notas.append(None)
@@ -814,9 +789,9 @@ class AnimacionLecturaView(QWidget):
                     continue
                 notas.append(value)
 
-            promedio = self.right_table.item(row, 0).text() if self.right_table.item(row, 0) else "-"
-            cualitativo = self.right_table.item(row, 1).text() if self.right_table.item(row, 1) else "-"
-            cualitativo_1 = self.right_table.item(row, 2).text() if self.right_table.item(row, 2) else "-"
+            promedio = self.matrix_table.item(row, self._result_start_col).text() if self.matrix_table.item(row, self._result_start_col) else "-"
+            cualitativo = self.matrix_table.item(row, self._result_start_col + 1).text() if self.matrix_table.item(row, self._result_start_col + 1) else "-"
+            cualitativo_1 = self.matrix_table.item(row, self._result_start_col + 2).text() if self.matrix_table.item(row, self._result_start_col + 2) else "-"
             result_rows.append(
                 {
                     "estudiante_id": student.get("estudiante_id"),
@@ -878,9 +853,9 @@ class AnimacionLecturaView(QWidget):
         for index, student in enumerate(self._students, start=1):
             row_idx = 2 + index
             student_name = student.get("estudiante", "")
-            value_item = self.right_table.item(row_idx, 0)
-            qual_item = self.right_table.item(row_idx, 1)
-            qual1_item = self.right_table.item(row_idx, 2)
+            value_item = self.matrix_table.item(row_idx, self._result_start_col)
+            qual_item = self.matrix_table.item(row_idx, self._result_start_col + 1)
+            qual1_item = self.matrix_table.item(row_idx, self._result_start_col + 2)
             valor = value_item.text().strip() if value_item else ""
             cualitativo = qual_item.text().strip() if qual_item else ""
             cualitativo_1 = qual1_item.text().strip() if qual1_item else ""
@@ -1132,10 +1107,10 @@ class AnimacionLecturaView(QWidget):
             flags = flags & ~Qt.ItemIsEditable
         item.setFlags(flags)
         item.setTextAlignment(Qt.AlignCenter if col != 1 else Qt.AlignLeft | Qt.AlignVCenter)
-        if table is self.right_table:
-            if col == 0:
+        if self._result_start_col <= col <= self._result_start_col + 2:
+            if col == self._result_start_col:
                 item.setBackground(QColor("#ECFDF5"))
-            elif col == 1:
+            elif col == self._result_start_col + 1:
                 item.setBackground(QColor("#EFF6FF"))
             else:
                 item.setBackground(QColor("#EEF2FF"))
@@ -1197,9 +1172,7 @@ class AnimacionLecturaView(QWidget):
                 gridline-color: #E2E8F0;
                 font-size: 12px;
             }
-            QTableWidget#AnimLeftTable,
-            QTableWidget#AnimCenterTable,
-            QTableWidget#AnimRightTable {
+            QTableWidget#AnimMatrixTable {
                 border: none;
                 background: transparent;
             }
