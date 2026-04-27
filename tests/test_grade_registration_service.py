@@ -28,8 +28,16 @@ class TestGradeRegistrationService(unittest.TestCase):
                 ("A1", "Matematica", "MAT"),
             )
             self.conn.execute(
+                "INSERT INTO asignaturas (id_asignatura, nombre, codigo) VALUES (?, ?, ?)",
+                ("A2", "Orientación Vocacional y Profesional", "OVP"),
+            )
+            self.conn.execute(
                 "INSERT INTO cursos (id_curso, nombre, nivel) VALUES (?, ?, ?)",
                 ("C1", "Primero", "Basica"),
+            )
+            self.conn.execute(
+                "INSERT INTO cursos (id_curso, nombre, nivel) VALUES (?, ?, ?)",
+                ("C8", "8vo de EGB", "Básica Superior"),
             )
             self.conn.execute("INSERT INTO paralelos (id_paralelo, nombre) VALUES (?, ?)", ("P1", "A"))
             self.conn.execute(
@@ -45,8 +53,16 @@ class TestGradeRegistrationService(unittest.TestCase):
                 ("M1", "E1", "C1", "P1", "2025-2026", 1),
             )
             self.conn.execute(
+                "INSERT INTO matriculas (id_matricula, estudiante_id, curso_id, paralelo_id, periodo_id, numero_lista) VALUES (?, ?, ?, ?, ?, ?)",
+                ("M2", "E1", "C8", "P1", "2025-2026", 1),
+            )
+            self.conn.execute(
                 "INSERT INTO asignaciones_docente (id_asignacion, docente_id, asignatura_id, curso_id, paralelo_id, periodo_id) VALUES (?, ?, ?, ?, ?, ?)",
                 ("AS1", "D1", "A1", "C1", "P1", "2025-2026"),
+            )
+            self.conn.execute(
+                "INSERT INTO asignaciones_docente (id_asignacion, docente_id, asignatura_id, curso_id, paralelo_id, periodo_id) VALUES (?, ?, ?, ?, ?, ?)",
+                ("AS-OVP", "D1", "A2", "C8", "P1", "2025-2026"),
             )
 
     def test_cargar_estudiantes_de_contexto_valido(self) -> None:
@@ -168,6 +184,86 @@ class TestGradeRegistrationService(unittest.TestCase):
         self.assertEqual(cfg["numero_actividades"], 2)
         self.assertEqual(cfg["metadata"][0]["nombre"], "Trabajo grupal")
         self.assertEqual(cfg["metadata"][0]["fecha_refuerzo"], "2026-04-05")
+
+    def test_guardar_y_consultar_animacion_lectura(self) -> None:
+        ok, message = self.service.guardar_animacion_lectura_evaluacion(
+            {
+                "asignacion_id": "AS1",
+                "trimestre_num": 1,
+                "nivel": "media",
+                "filas": [
+                    {
+                        "estudiante_id": "E1",
+                        "estudiante": "Lopez Maria",
+                        "notas_indicadores": [8.5, 9.0],
+                        "promedio": 8.75,
+                        "cualitativo": "A-",
+                        "cualitativo_1": "A",
+                    }
+                ],
+                "has_invalid_notes": False,
+            }
+        )
+        self.assertTrue(ok)
+        self.assertIn("guardadas", message.lower())
+
+        rows = self.service.obtener_animacion_lectura_evaluacion("AS1", 1)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["estudiante_id"], "E1")
+        self.assertEqual(rows[0]["nivel"], "media")
+        self.assertEqual(rows[0]["valor"], 8.75)
+        self.assertEqual(rows[0]["cualitativo"], "A-")
+        self.assertEqual(rows[0]["cualitativo_1"], "A")
+        self.assertEqual(rows[0]["notas_indicadores"], [8.5, 9.0])
+
+    def test_guardado_animacion_lectura_rechaza_payload_invalido(self) -> None:
+        ok, message = self.service.guardar_animacion_lectura_evaluacion(
+            {
+                "asignacion_id": "AS1",
+                "trimestre_num": 1,
+                "nivel": "",
+                "filas": [],
+                "has_invalid_notes": False,
+            }
+        )
+        self.assertFalse(ok)
+        self.assertIn("nivel", message.lower())
+
+    def test_guardar_y_consultar_orientacion_vocacional(self) -> None:
+        ok, message = self.service.guardar_orientacion_vocacional_evaluacion(
+            {
+                "asignacion_id": "AS-OVP",
+                "trimestre_num": 1,
+                "curso_clave": "8",
+                "filas": [
+                    {
+                        "estudiante_id": "E1",
+                        "respuestas": [3, 3, 3, 2, 3],
+                        "puntaje_total": 14,
+                        "calificacion": "A+",
+                    }
+                ],
+            }
+        )
+        self.assertTrue(ok)
+        self.assertIn("orientación vocacional", message.lower())
+
+        rows = self.service.obtener_orientacion_vocacional_evaluacion("AS-OVP", 1)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["curso_clave"], "8")
+        self.assertEqual(rows[0]["respuestas"], [3, 3, 3, 2, 3])
+        self.assertEqual(rows[0]["puntaje_total"], 14)
+        self.assertEqual(rows[0]["calificacion"], "A+")
+
+    def test_detecta_curso_orientacion(self) -> None:
+        self.assertEqual(self.service.detect_orientation_course_key("Décimo de EGB"), "10")
+        self.assertEqual(self.service.detect_orientation_course_key("Noveno"), "9")
+        self.assertEqual(self.service.detect_orientation_course_key("8vo EGB"), "8")
+
+    def test_valida_curso_orientacion_desde_asignacion(self) -> None:
+        valid, course_key, _ = self.service.validar_curso_orientacion_vocacional("AS-OVP")
+        self.assertTrue(valid)
+        self.assertEqual(course_key, "8")
 
 
 if __name__ == "__main__":
