@@ -45,6 +45,26 @@ class TestOrientacionVocacionalReportView(unittest.TestCase):
         self.assertEqual([r["numero"] for r in stats["rows"]], [2, 1, 0])
         self.assertEqual(stats["total_n"], 4)
 
+    def test_nombre_pdf_se_genera_desde_combo_asignacion(self) -> None:
+        from src.presentation.views.orientacion_vocacional_report_view import OrientacionVocacionalReportView
+
+        view = OrientacionVocacionalReportView()
+        view.report_assignment_combo.clear()
+        view.report_assignment_combo.addItem("Orientación Vocacional y Profesional | 8vo EGB-A | Docente | 2026-2027", "AS1")
+        base = view._build_export_filename_base()
+        self.assertIn("Orientación_Vocacional_y_Profesional", base)
+        self.assertNotIn("|", base)
+
+    def test_cambio_firmantes_refresca_vista_previa(self) -> None:
+        from src.presentation.views.orientacion_vocacional_report_view import OrientacionVocacionalReportView
+
+        view = OrientacionVocacionalReportView()
+        calls = {"count": 0}
+        view._refresh_preview = lambda: calls.__setitem__("count", calls["count"] + 1)
+        view.sign_rector_combo.addItem("Rector 1", "Rector 1")
+        view.sign_rector_combo.setCurrentIndex(view.sign_rector_combo.count() - 1)
+        self.assertGreaterEqual(calls["count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

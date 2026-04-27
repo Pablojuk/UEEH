@@ -5,8 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Callable
 
-from PySide6.QtCore import QUrl
-from PySide6.QtGui import QTextDocument
+from PySide6.QtGui import QPageLayout, QPageSize, QTextDocument
 from PySide6.QtPrintSupport import QPrinter
 from PySide6.QtWidgets import (
     QComboBox,
@@ -28,8 +27,14 @@ from openpyxl import Workbook
 
 from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
 try:
+    from PySide6.QtCore import QEventLoop, QMarginsF, QUrl
+    from PySide6.QtWebEngineCore import QWebEnginePage
     from PySide6.QtWebEngineWidgets import QWebEngineView
 except Exception:  # noqa: BLE001
+    QEventLoop = None
+    QMarginsF = None
+    QUrl = None
+    QWebEnginePage = None
     QWebEngineView = None
 
 
@@ -87,6 +92,8 @@ class OrientacionVocacionalReportView(QWidget):
         sign_layout.addWidget(self.sign_docente_combo, 1)
         sign_layout.addWidget(QLabel("Rector"))
         sign_layout.addWidget(self.sign_rector_combo, 1)
+        self.sign_docente_combo.currentIndexChanged.connect(self._on_signers_changed)
+        self.sign_rector_combo.currentIndexChanged.connect(self._on_signers_changed)
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["N°", "Nómina de Estudiantes", "Cualitativo", "Descripción"])
@@ -243,12 +250,43 @@ class OrientacionVocacionalReportView(QWidget):
 
     def _export_preview_pdf(self) -> None:
         html = self._last_preview_html or self._render_preview_html()
-        suggested = f"orientacion_vocacional_{self._assignment_id or 'reporte'}.pdf"
+        suggested = f"{self._build_export_filename_base()}.pdf"
         file_path, _ = QFileDialog.getSaveFileName(self, "Guardar PDF", suggested, "PDF (*.pdf)")
         if not file_path:
             return
         if not file_path.lower().endswith(".pdf"):
             file_path = f"{file_path}.pdf"
+
+        if QWebEnginePage is not None and QEventLoop is not None and QPageLayout is not None and QPageSize is not None and QMarginsF is not None and QUrl is not None:
+            page = QWebEnginePage(self)
+            loop = QEventLoop(self)
+            result = {"ok": False}
+
+            def on_load_finished(ok: bool) -> None:
+                if not ok:
+                    loop.quit()
+                    return
+                page_layout = QPageLayout(
+                    QPageSize(QPageSize.A4),
+                    QPageLayout.Portrait,
+                    QMarginsF(12, 12, 12, 12),
+                    QPageLayout.Millimeter,
+                )
+                page.printToPdf(file_path, page_layout)
+
+            def on_pdf_done(_path: str, success: bool) -> None:
+                result["ok"] = success
+                loop.quit()
+
+            page.loadFinished.connect(on_load_finished)
+            page.pdfPrintingFinished.connect(on_pdf_done)
+            page.setHtml(html, QUrl("about:blank"))
+            loop.exec()
+            if result["ok"]:
+                QMessageBox.information(self, "Exportar PDF", f"PDF generado correctamente:\n{file_path}")
+            else:
+                QMessageBox.warning(self, "Exportar PDF", "No se pudo generar el PDF.")
+            return
 
         document = QTextDocument()
         document.setHtml(html)
@@ -287,6 +325,25 @@ class OrientacionVocacionalReportView(QWidget):
             self.preview_view.setHtml(html_content, QUrl("about:blank"))
         else:
             self.preview_view.setHtml(html_content)
+
+    def _on_signers_changed(self) -> None:
+        self._refresh_preview()
+
+    def _build_export_filename_base(self) -> str:
+        assignment_text = str(self.report_assignment_combo.currentText() or "").strip()
+        if not assignment_text:
+            assignment_text = f"orientacion_vocacional_{self._assignment_id or 'reporte'}"
+        return self._sanitize_filename(assignment_text)
+
+    @staticmethod
+    def _sanitize_filename(text: str) -> str:
+        import re
+
+        normalized = re.sub(r"[|/\\\\:*?\"<>]+", "_", str(text or "").strip())
+        normalized = re.sub(r"\s+", "_", normalized)
+        normalized = re.sub(r"_+", "_", normalized)
+        normalized = normalized.strip(" ._")
+        return normalized or "reporte_orientacion_vocacional"
 
     def _load_signers(self) -> None:
         self.sign_docente_combo.clear()

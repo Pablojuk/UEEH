@@ -270,6 +270,8 @@ class AnimacionLecturaView(QWidget):
         sign_layout.addWidget(self.sign_docente_combo, 1)
         sign_layout.addWidget(QLabel("Rector"))
         sign_layout.addWidget(self.sign_rector_combo, 1)
+        self.sign_docente_combo.currentIndexChanged.connect(self._on_signers_changed)
+        self.sign_rector_combo.currentIndexChanged.connect(self._on_signers_changed)
 
         self.tables_container = QWidget()
         self.tables_container.setObjectName("AnimTableShell")
@@ -965,7 +967,7 @@ class AnimacionLecturaView(QWidget):
             QMessageBox.warning(self, "Exportar PDF", f"No se pudo generar la vista previa:\n{exc}")
             return
 
-        suggested = f"{self._sanitize_filename('animacion_lectura_' + str(self._assignment_id or 'reporte'))}.pdf"
+        suggested = f"{self._build_export_filename_base()}.pdf"
         file_path, _ = QFileDialog.getSaveFileName(self, "Guardar PDF", suggested, "PDF (*.pdf)")
         if not file_path:
             return
@@ -1050,6 +1052,15 @@ class AnimacionLecturaView(QWidget):
             self.preview_view.setHtml(html_content, QUrl("about:blank"))
         else:
             self.preview_view.setHtml(html_content)
+
+    def _on_signers_changed(self) -> None:
+        self._refresh_preview_if_reports_mode()
+
+    def _build_export_filename_base(self) -> str:
+        assignment_text = str(self.report_assignment_combo.currentText() or "").strip()
+        if not assignment_text:
+            assignment_text = f"animacion_lectura_{self._assignment_id or 'reporte'}"
+        return self._sanitize_filename(assignment_text)
 
     @staticmethod
     def _sanitize_filename(text: str) -> str:
