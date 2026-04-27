@@ -147,6 +147,8 @@ class TestHtmlReportRenderer(unittest.TestCase):
         self.assertIn("A-", html)
         self.assertIn("B+", html)
         self.assertIn("TOTAL ESTUDIANTES", html)
+        self.assertIn("@media print", html)
+        self.assertIn("@page { size: A4 portrait; margin: 10mm; }", html)
 
 
 if __name__ == "__main__":
