@@ -20,6 +20,7 @@ class _FakeAcademicSummaryService:
             {"id_asignacion": "AS1", "display": "Matemática | 8vo-A", "asignatura_nombre": "Matemática"},
             {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "  ANIMACIÓN   A   LA   LECTURA  "},
             {"id_asignacion": "AS3", "display": "Acompañamiento | 8vo-A", "asignatura_nombre": "Acompanamiento integral en el aula"},
+            {"id_asignacion": "AS4", "display": "OVP | 10mo-A", "asignatura_nombre": "ORIENTACIÓN VOCACIONAL PROFESIONAL"},
         ]
 
     def obtener_resumen_por_asignacion(self, asignacion_id: str) -> list[dict]:
@@ -55,6 +56,7 @@ class _FakeClassroomAccompanimentService:
             {"id_asignacion": "AS1", "display": "Matemática | 8vo-A", "asignatura_nombre": "Matemática"},
             {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "Animación a la Lectura"},
             {"id_asignacion": "AS3", "display": "Acompañamiento | 8vo-A", "asignatura_nombre": "Acompañamiento integral en el aula"},
+            {"id_asignacion": "AS4", "display": "OVP | 10mo-A", "asignatura_nombre": "Orientacion Vocacional y Profesional"},
         ]
 
     def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
@@ -101,6 +103,7 @@ class _FakeClassroomAccompanimentService:
 class _FakeGradeRegistrationService:
     def __init__(self) -> None:
         self.calls: list[tuple[str, int, str | None]] = []
+        self.orientation_calls: list[tuple[str, int]] = []
 
     def obtener_animacion_lectura_evaluacion(self, asignacion_id: str, trimestre_num: int, nivel: str | None = None) -> list[dict]:
         self.calls.append((asignacion_id, trimestre_num, nivel))
@@ -123,6 +126,16 @@ class _FakeGradeRegistrationService:
                 "nota_trimestral": 8.5,
                 "cualitativo": "B+",
                 "cualitativo_adicional": "B",
+            }
+        ]
+
+    def obtener_orientacion_vocacional_evaluacion(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
+        self.orientation_calls.append((asignacion_id, trimestre_num))
+        return [
+            {
+                "estudiante_id": "E1",
+                "estudiante": "Lopez Maria",
+                "calificacion": "A+",
             }
         ]
 
@@ -220,6 +233,20 @@ class TestReportsView(unittest.TestCase):
 
         self.assertIn(("AS2", 2, "media"), grade_service.calls)
         self.assertIn("ANIMACIÓN A LA LECTURA - TRIMESTRE 2", view.animation_report_view._last_preview_html)
+
+    def test_orientacion_detecta_materia_especial_y_no_usa_resumen_cuantitativo(self) -> None:
+        view, grade_service = self._build_view()
+        summary_combo = view.academic_summary_view.assignment_combo
+        idx_ovp = summary_combo.findData("AS4")
+        self.assertGreaterEqual(idx_ovp, 0)
+        summary_combo.setCurrentIndex(idx_ovp)
+
+        self.assertEqual(view.stack.currentWidget(), view.orientation_report_view)
+        self.assertIn(("AS4", 1), grade_service.orientation_calls)
+        html = view.orientation_report_view._last_preview_html
+        self.assertIn("ORIENTACIÓN VOCACIONAL Y PROFESIONAL - TRIMESTRE 1", html)
+        self.assertIn("Nómina de Estudiantes", html)
+        self.assertNotIn("T1 Calificación", html)
 
 
 if __name__ == "__main__":

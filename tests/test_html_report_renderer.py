@@ -108,6 +108,46 @@ class TestHtmlReportRenderer(unittest.TestCase):
         self.assertIn("id=\"bar-chart\"", html)
         self.assertIn("txtPorcentaje", html)
 
+    def test_render_orientacion_vocacional_tabla_descripcion_y_estadistica(self) -> None:
+        renderer = HtmlReportRenderer()
+        html = renderer.render_orientacion_vocacional(
+            {
+                "reporte_titulo": "ORIENTACIÓN VOCACIONAL Y PROFESIONAL - TRIMESTRE 1",
+                "docente": "Ana Pérez",
+                "curso": "10mo",
+                "paralelo": "A",
+                "nivel": "Básica Superior",
+                "fecha": "2026-04-27",
+                "anio_lectivo": "2025-2026",
+                "trimestre": "TRIMESTRE 1",
+                "logo_institucion": "",
+                "logo_ministerio": "",
+                "rector": "Rector",
+                "stats": {
+                    "rows": [
+                        {"escala": "A+", "numero": 1, "porcentaje": "50,00%"},
+                        {"escala": "A-", "numero": 1, "porcentaje": "50,00%"},
+                        {"escala": "B+", "numero": 0, "porcentaje": "0,00%"},
+                    ],
+                    "total_n": 2,
+                    "total_p": "100,00%",
+                },
+            },
+            [
+                {"nro": "1", "nomina": "Lopez Maria", "cualitativo": "A+", "descripcion": "Siempre"},
+                {"nro": "2", "nomina": "Perez Juan", "cualitativo": "A-", "descripcion": "Frecuentemente"},
+            ],
+        )
+        self.assertIn("ORIENTACIÓN VOCACIONAL Y PROFESIONAL", html)
+        self.assertIn("<th>Cualitativo</th>", html)
+        self.assertIn("<th>Descripción</th>", html)
+        self.assertIn("Siempre", html)
+        self.assertIn("Frecuentemente", html)
+        self.assertIn("A+", html)
+        self.assertIn("A-", html)
+        self.assertIn("B+", html)
+        self.assertIn("TOTAL ESTUDIANTES", html)
+
 
 if __name__ == "__main__":
     unittest.main()
