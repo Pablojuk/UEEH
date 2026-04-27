@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QFrame,
     QHBoxLayout,
@@ -93,12 +94,21 @@ class OrientacionVocacionalView(QWidget):
                 "Calificación",
             ]
         )
+        self.table.verticalHeader().setVisible(False)
         header = self.table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setMinimumSectionSize(70)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         for col in range(2, 7):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.setColumnWidth(1, 320)
+        for col in range(2, 7):
+            self.table.setColumnWidth(col, 220)
 
         root.addWidget(header_card)
         root.addWidget(self.table, 1)
@@ -139,6 +149,10 @@ class OrientacionVocacionalView(QWidget):
             if idx < len(indicators):
                 headers[2 + idx] = str(indicators[idx])
         self.table.setHorizontalHeaderLabels(headers)
+        for col, title in enumerate(headers):
+            item = self.table.horizontalHeaderItem(col)
+            if item is not None:
+                item.setToolTip(title)
 
     def _build_table(self) -> None:
         self.table.setRowCount(0)

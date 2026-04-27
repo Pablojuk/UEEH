@@ -8,10 +8,12 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
+    from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication, QComboBox
 except ImportError:  # pragma: no cover
     QApplication = None
     QComboBox = None
+    Qt = None
 
 
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
@@ -34,6 +36,10 @@ class TestOrientacionVocacionalView(unittest.TestCase):
         view.set_context("AS1", 1, "8vo de EGB")
         view.set_students([{"estudiante_id": "E1", "estudiante": "Lopez Maria"}])
         self.assertIn("fortalezas", view.table.horizontalHeaderItem(2).text().lower())
+        self.assertFalse(view.table.verticalHeader().isVisible())
+        self.assertGreaterEqual(view.table.columnWidth(1), 220)
+        self.assertEqual(view.table.horizontalScrollBarPolicy(), Qt.ScrollBarAsNeeded)
+        self.assertTrue(bool(view.table.horizontalHeaderItem(2).toolTip()))
 
         values = [3, 3, 3, 2, 3]
         for idx, value in enumerate(values):
