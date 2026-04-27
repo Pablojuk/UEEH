@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reporte de Animación a la Lectura - UEEH</title>
+<style>
+  :root {
+    --azul-oscuro: #1F4E79;
+    --azul-medio: #2E75B6;
+    --azul-claro: #9DC3E6;
+    --azul-linea: #1E4DFF;
+    --gris-tabla: #B7B7B7;
+    --fila-impar: #F0F7FF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #C8C8C8;
+    font-family: 'Calibri', 'Trebuchet MS', sans-serif;
+    font-size: 8.5pt;
+    color: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 0 48px;
+  }
+  .hoja {
+    width: 794px;
+    background: white;
+    border: 2.5px solid var(--azul-linea);
+    display: flex;
+    flex-direction: column;
+  }
+  .header-top {
+    background: var(--azul-oscuro);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    min-height: 74px;
+  }
+  .logo-box { width: 78px; height: 62px; display: flex; align-items: center; justify-content: center; }
+  .logo-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .header-center { flex: 1; text-align: center; padding: 0 8px; }
+  .inst-nombre { font-size: 18pt; font-weight: bold; color: white; line-height: 1.15; text-transform: uppercase; }
+  .inst-subtitulo { font-size: 8.5pt; color: rgba(255,255,255,0.88); margin-top: 1px; }
+
+  .meta-bloque {
+    background: var(--azul-claro);
+    padding: 8px 15px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 30px;
+  }
+  .meta-row { display: flex; align-items: baseline; font-size: 9pt; }
+  .meta-label { font-weight: bold; font-style: italic; margin-right: 6px; white-space: nowrap; }
+
+  .tabla-wrap { flex: 1; }
+  table.principal { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8pt; }
+  .c-num { width: 5%; }
+  .c-nomina { width: 35%; }
+  .c-valor { width: 10%; }
+  .c-cual { width: 12%; }
+  .c-cual1 { width: 10%; }
+  .c-desc { width: 28%; }
+  table.principal th, table.principal td {
+    border: 1px solid var(--gris-tabla);
+    text-align: center;
+    padding: 4px 2px;
+    word-wrap: break-word;
+  }
+  table.principal thead tr.head1 th { background: var(--azul-medio); color: white; height: 28px; font-size: 8pt; }
+  table.principal td.nomina { text-align: left; padding-left: 5px; font-weight: bold; }
+  table.principal td.text-desc { text-align: left; padding-left: 4px; font-size: 7.6pt; white-space: normal; }
+  table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); }
+
+  .firmas {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 80px;
+    margin-top: 50px;
+    padding: 0 100px 40px;
+  }
+  .firma-bloque { text-align: center; }
+  .firma-linea { border-top: 1px solid #000; margin-bottom: 5px; width: 100%; }
+  .firma-nombre { font-weight: bold; font-size: 9pt; text-transform: uppercase; }
+  .firma-cargo { font-size: 8.5pt; font-style: italic; }
+  .bloque-inferior { padding: 15px; background: #fff; }
+  .fila-stats { display: flex; gap: 30px; align-items: stretch; justify-content: flex-start; }
+  table.resumen-cualitativo { border-collapse: collapse; width: 350px; font-size: 8pt; margin: 0; }
+  table.resumen-cualitativo th, table.resumen-cualitativo td { border: 1px solid #000; padding: 4px; }
+  table.resumen-cualitativo thead th { background-color: var(--azul-medio); color: white; text-align: center; font-weight: bold; }
+  table.resumen-cualitativo tfoot td { background-color: var(--azul-claro); color: #000; font-weight: bold; }
+  .c-escala { text-align: left; width: 60%; font-weight: bold; padding-left: 10px !important; }
+  .c-cantidad { text-align: center; width: 20%; }
+  .c-pct { text-align: center; width: 20%; }
+  .grafico-box {
+    border: 1px solid #ccc;
+    padding: 15px;
+    background: white;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  }
+  .grafico-titulo {
+    font-size: 9pt;
+    font-weight: bold;
+    color: var(--azul-oscuro);
+    margin-bottom: 10px;
+    text-align: center;
+  }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .hoja { border: none; width: 100%; }
+    @page { size: A4 portrait; margin: 10mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hoja">
+  <div class="header-top">
+    <div class="logo-box"><img src="{{ logo_institucion }}" alt="Logo" onerror="this.style.display='none';"></div>
+    <div class="header-center">
+      <div class="inst-nombre">Unidad Educativa Emiliano Hinostroza</div>
+      <div class="inst-subtitulo">San Salvador de Cañaribamba - Santa Isabel</div>
+      <div class="inst-subtitulo" style="font-weight:bold; margin-top:5px; color:white;">{{ reporte_titulo }}</div>
+    </div>
+    <div class="logo-box"><img src="{{ logo_ministerio }}" alt="MinEdu" onerror="this.style.display='none';"></div>
+  </div>
+
+  <div class="meta-bloque">
+    <div class="meta-row"><span class="meta-label">Docente:</span> {{ docente }}</div>
+    <div class="meta-row"><span class="meta-label">Curso:</span> {{ curso }}</div>
+    <div class="meta-row"><span class="meta-label">Paralelo:</span> {{ paralelo }}</div>
+    <div class="meta-row"><span class="meta-label">Nivel:</span> {{ nivel }}</div>
+    <div class="meta-row"><span class="meta-label">Fecha:</span> {{ fecha }}</div>
+    <div class="meta-row"><span class="meta-label">Periodo:</span> {{ anio_lectivo }}</div>
+    <div class="meta-row"><span class="meta-label">Trimestre:</span> {{ trimestre }}</div>
+  </div>
+
+  <div class="tabla-wrap">
+    <table class="principal">
+      <thead>
+        <tr class="head1">
+          <th class="c-num">N°</th>
+          <th class="c-nomina">Nómina de Estudiantes</th>
+          <th class="c-valor">Valor</th>
+          <th class="c-cual">Cualitativo</th>
+          <th class="c-cual1">Cualitativo 1</th>
+          <th class="c-desc">Descripción</th>
+        </tr>
+      </thead>
+      <tbody>
+        [[estudiantes_rows_html]]
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bloque-inferior">
+    <div class="fila-stats">
+      <table class="resumen-cualitativo" id="tabla-estadistica">
+        <thead><tr><th class="c-escala">ESCALA CUALITATIVA</th><th class="c-cantidad">N°</th><th class="c-pct">%</th></tr></thead>
+        <tbody>
+          [[stats_rows_html]]
+        </tbody>
+        <tfoot><tr><td class="c-escala">TOTAL ESTUDIANTES</td><td class="c-cantidad">{{ stats_total_n }}</td><td class="c-pct">{{ stats_total_p }}</td></tr></tfoot>
+      </table>
+      <div class="grafico-box">
+        <div class="grafico-titulo">Frecuencia por Escala Cualitativa</div>
+        <svg id="bar-chart" width="100%" height="200" viewBox="0 0 380 200"></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="firmas">
+    <div class="firma-bloque">
+      <div class="firma-linea"></div>
+      <div class="firma-nombre">{{ docente }}</div>
+      <div class="firma-cargo">Docente</div>
+    </div>
+    <div class="firma-bloque">
+      <div class="firma-linea"></div>
+      <div class="firma-nombre">{{ rector }}</div>
+      <div class="firma-cargo">Rector / Director</div>
+    </div>
+  </div>
+</div>
+<script>
+  function dibujarGraficoBarras() {
+    const filas = document.querySelectorAll('#tabla-estadistica tbody tr');
+    const datos = [];
+    let maxValor = 0;
+    filas.forEach(fila => {
+      const etiqueta = fila.querySelector('.c-escala').innerText.trim();
+      const cantidad = parseInt((fila.querySelector('.c-cantidad').innerText || '0').replace(/\\D/g, ''), 10) || 0;
+      const porcentaje = fila.querySelector('.c-pct').innerText.trim();
+      datos.push({ etiqueta, cantidad, porcentaje });
+      if (cantidad > maxValor) maxValor = cantidad;
+    });
+    const svg = document.getElementById('bar-chart');
+    if (!svg) return;
+    svg.innerHTML = '';
+    if (maxValor === 0) return;
+
+    const anchoSVG = 380, altoSVG = 200, margenSuperior = 35, margenInferior = 30, margenLateral = 15;
+    const anchoGrafico = anchoSVG - (margenLateral * 2);
+    const altoGrafico = altoSVG - margenSuperior - margenInferior;
+    const pasoBarra = anchoGrafico / datos.length;
+    const anchoBarra = pasoBarra * 0.75;
+
+    datos.forEach((item, indice) => {
+      const alturaBarra = (item.cantidad / maxValor) * altoGrafico;
+      const x = margenLateral + (indice * pasoBarra) + ((pasoBarra - anchoBarra) / 2);
+      const y = altoSVG - margenInferior - alturaBarra;
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", x); rect.setAttribute("y", y);
+      rect.setAttribute("width", anchoBarra); rect.setAttribute("height", alturaBarra);
+      rect.setAttribute("fill", "#2E75B6"); rect.setAttribute("rx", "2");
+      svg.appendChild(rect);
+
+      const txtPorcentaje = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      txtPorcentaje.setAttribute("x", x + (anchoBarra / 2)); txtPorcentaje.setAttribute("y", y - 18);
+      txtPorcentaje.setAttribute("text-anchor", "middle"); txtPorcentaje.setAttribute("font-size", "11px");
+      txtPorcentaje.setAttribute("font-family", "Arial, sans-serif"); txtPorcentaje.setAttribute("font-weight", "bold");
+      txtPorcentaje.setAttribute("fill", "#1F4E79"); txtPorcentaje.textContent = item.porcentaje;
+      svg.appendChild(txtPorcentaje);
+
+      const txtValor = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      txtValor.setAttribute("x", x + (anchoBarra / 2)); txtValor.setAttribute("y", y - 4);
+      txtValor.setAttribute("text-anchor", "middle"); txtValor.setAttribute("font-size", "11px");
+      txtValor.setAttribute("font-family", "Arial, sans-serif"); txtValor.setAttribute("font-weight", "bold");
+      txtValor.setAttribute("fill", "#1F4E79"); txtValor.textContent = item.cantidad;
+      svg.appendChild(txtValor);
+
+      const txtCat = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      txtCat.setAttribute("x", x + (anchoBarra / 2)); txtCat.setAttribute("y", altoSVG - margenInferior + 16);
+      txtCat.setAttribute("text-anchor", "middle"); txtCat.setAttribute("font-size", "12px");
+      txtCat.setAttribute("font-family", "Arial, sans-serif"); txtCat.setAttribute("font-weight", "bold");
+      txtCat.setAttribute("fill", "#333"); txtCat.textContent = item.etiqueta;
+      svg.appendChild(txtCat);
+    });
+  }
+  window.onload = dibujarGraficoBarras;
+</script>
+</body>
+</html>
