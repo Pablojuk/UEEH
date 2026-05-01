@@ -535,6 +535,13 @@ class GradesView(QWidget):
                 self._sync_vocational_orientation_view()
             elif use_accompaniment:
                 self._show_accompaniment_view()
+                if self.accompaniment_view is not None:
+                    variant = (
+                        "behavior"
+                        if subject_name == self._normalize_subject_name(self.BEHAVIOR_SUBJECT_NAME)
+                        else "accompaniment"
+                    )
+                    self.accompaniment_view.set_evaluation_variant(variant)
                 self._sync_accompaniment_view()
             else:
                 self._show_quantitative_view()
