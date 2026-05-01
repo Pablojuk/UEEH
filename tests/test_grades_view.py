@@ -38,11 +38,14 @@ class _FakeGradeRegistrationService:
     def configurar_numero_actividades(self, asignacion_id: str, trimestre_num: int, numero: int) -> tuple[bool, str]:
         return True, "ok"
 
-    def recalcular_fila(self, fila: dict) -> dict:
+    def recalcular_fila(self, fila: dict, numero_actividades: int = 3, usar_logica_basica: bool = False) -> dict:
         salida = dict(fila)
+        try:
+            salida["nota_trimestral"] = float(salida.get("actividad_1")) if salida.get("actividad_1") not in (None, "") else 0.0
+        except Exception:
+            salida["nota_trimestral"] = 0.0
         salida.setdefault("promedio_formativo", 0.0)
         salida.setdefault("promedio_sumativo", 0.0)
-        salida.setdefault("nota_trimestral", 0.0)
         salida.setdefault("cualitativo_adicional", "AA")
         return salida
 
@@ -247,6 +250,18 @@ class TestGradesView(unittest.TestCase):
         view.assignment_combo.setCurrentIndex(0)
         self.assertTrue(view._accompaniment_mode)
         self.assertFalse(view.table.isVisible())
+
+    def test_carga_automatica_en_materia_cuantitativa(self) -> None:
+        from src.presentation.views.grades_view import GradesView
+        service = _FakeGradeRegistrationService(
+            rows=[{"estudiante_id": "E1", "estudiante": "Lopez Maria"}],
+            contexts=[{"id_asignacion": "AS1", "display": "Matemática | 7mo-A", "asignatura_nombre": "Matemática"}],
+        )
+        view = GradesView(service)
+        view.assignment_combo.setCurrentIndex(0)
+        self.assertGreaterEqual(view.table.rowCount(), 1)
+        self.assertFalse(view.load_button.isVisible())
+        self.assertFalse(view.recalc_button.isVisible())
 
 
 if __name__ == "__main__":
