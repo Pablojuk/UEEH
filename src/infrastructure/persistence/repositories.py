@@ -221,3 +221,34 @@ class ClassroomAccompanimentSkillConfigRepository(SQLiteRepository):
         "habilidad_clave",
         "visible",
     )
+
+
+class AnimationReadingEvaluationRepository(SQLiteRepository):
+    table_name = "animacion_lectura_evaluaciones"
+    id_field = "id_evaluacion"
+    fields = (
+        "id_evaluacion",
+        "asignacion_id",
+        "trimestre_num",
+        "nivel",
+        "estudiante_id",
+        "notas_indicadores_json",
+        "valor_promedio",
+        "cualitativo",
+        "cualitativo_1",
+    )
+
+
+class VocationalOrientationEvaluationRepository(SQLiteRepository):
+    table_name = "orientacion_vocacional_evaluaciones"
+    id_field = "id_evaluacion"
+    fields = (
+        "id_evaluacion",
+        "asignacion_id",
+        "trimestre_num",
+        "curso_clave",
+        "estudiante_id",
+        "respuestas_json",
+        "puntaje_total",
+        "calificacion",
+    )
