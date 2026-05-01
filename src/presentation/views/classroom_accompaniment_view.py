@@ -147,6 +147,9 @@ class ClassroomAccompanimentView(QWidget):
         self._responses: dict[str, dict[str, str]] = {}
         self._ultimo_html_vista_previa = ""
         self._firmantes: dict[str, str] = {"docente": "", "rector": ""}
+        self._notes_mode = False
+        self._reports_mode = False
+        self._evaluation_variant = "accompaniment"
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -262,6 +265,62 @@ class ClassroomAccompanimentView(QWidget):
 
         self.load_contexts()
         self._load_signer_options()
+
+
+    def set_evaluation_variant(self, variant: str = "accompaniment") -> None:
+        """Configura el texto de la vista para variantes de evaluación cualitativa."""
+        normalized = (variant or "accompaniment").strip().lower()
+        self._evaluation_variant = "behavior" if normalized == "behavior" else "accompaniment"
+        if self._evaluation_variant == "behavior":
+            self.title_label.setText("Comportamiento")
+            self.subtitle_label.setText("Evaluación cualitativa de comportamiento por estudiante, asignación y trimestre")
+            self.save_button.setText("Guardar evaluación de comportamiento")
+            self.configure_skills_button.setText("Configurar indicadores")
+        else:
+            self.title_label.setText("Acompañamiento Integral en el Aula")
+            self.subtitle_label.setText("Evaluación cualitativa por estudiante, asignación y trimestre")
+            self.save_button.setText("Guardar evaluación")
+            self.configure_skills_button.setText("Configurar habilidades")
+
+    def set_notes_mode(self, enabled: bool = True) -> None:
+        """Modo usado dentro de Notas: solo registro/configuración de evaluación."""
+        self._notes_mode = enabled
+        self.sign_card.setVisible(not enabled)
+        self.btn_vista_previa_cual.setVisible(not enabled)
+        self.btn_exportar_pdf_cual.setVisible(not enabled)
+        self.btn_exportar_excel_cual.setVisible(not enabled)
+        self._set_tab_visible(1, not enabled)
+        if enabled:
+            self.tabs.setCurrentIndex(0)
+
+    def set_reports_mode(self, enabled: bool = True) -> None:
+        """Modo usado dentro de Reportes: solo firmantes + vista previa/exportación."""
+        self._reports_mode = enabled
+        self.title_label.setVisible(enabled)
+        self.subtitle_label.setVisible(enabled)
+        self.assignment_label.setVisible(True)
+        self.assignment_combo.setVisible(True)
+        self.trimester_label.setVisible(True)
+        self.trimester_combo.setVisible(True)
+        self.load_button.setVisible(not enabled)
+        self.save_button.setVisible(not enabled)
+        self.configure_skills_button.setVisible(not enabled)
+        self.skills_reference_card.setVisible(not enabled)
+        self.table.setVisible(not enabled)
+        self.sign_card.setVisible(enabled)
+        self.btn_vista_previa_cual.setVisible(enabled)
+        self.btn_exportar_pdf_cual.setVisible(enabled)
+        self.btn_exportar_excel_cual.setVisible(enabled)
+        self._set_tab_visible(0, not enabled)
+        self._set_tab_visible(1, enabled)
+        if enabled:
+            self.tabs.setCurrentIndex(1)
+
+    def _set_tab_visible(self, index: int, visible: bool) -> None:
+        tab_bar = self.tabs.tabBar()
+        if index < 0 or index >= self.tabs.count():
+            return
+        tab_bar.setTabVisible(index, visible)
 
     def set_embedded_mode(self, embedded: bool) -> None:
         self.title_label.setVisible(not embedded)

@@ -36,6 +36,7 @@ CATALOG_PARALLELS: tuple[dict[str, str], ...] = (
 CATALOG_SUBJECTS: tuple[dict[str, str], ...] = (
     {"id_asignatura": "ASIG-000", "nombre": "Orientación vocacional y profesional", "codigo": "OVP"},
     {"id_asignatura": "ASIG-00A", "nombre": "Acompañamiento integral en el aula", "codigo": "AIA"},
+    {"id_asignatura": "ASIG-00C", "nombre": "Comportamiento", "codigo": "COM"},
     {"id_asignatura": "ASIG-00B", "nombre": "Animación a la Lectura", "codigo": "AL"},
     {"id_asignatura": "ASIG-001", "nombre": "Matemática", "codigo": "MAT"},
     {"id_asignatura": "ASIG-002", "nombre": "Lengua y Literatura", "codigo": "LYL"},

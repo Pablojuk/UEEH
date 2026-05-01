@@ -49,6 +49,38 @@ class _FakeGradeRegistrationService:
     def guardar_registros(self, asignacion_id: str, trimestre_num: int, filas: list[dict]) -> tuple[bool, str]:
         return True, f"Registros guardados: {len(filas)}"
 
+    def validar_curso_orientacion_vocacional(self, asignacion_id: str) -> tuple[bool, str | None, str]:
+        return True, "8", "8vo de EGB"
+
+    def obtener_orientacion_vocacional_evaluacion(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
+        return []
+
+    def guardar_orientacion_vocacional_evaluacion(self, payload: dict) -> tuple[bool, str]:
+        return True, "ok"
+
+
+class _FakeClassroomAccompanimentService:
+    def listar_contextos_disponibles(self) -> list[dict]:
+        return []
+
+    def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
+        return {"students": [], "skill_categories": [], "active_skills": [], "responses": {}, "results": {}}
+
+    def guardar_evaluacion(self, asignacion_id: str, trimestre_num: int, active_skills: list[str], responses: dict) -> tuple[bool, str]:
+        return True, "ok"
+
+    def calcular_resultado_estudiante(self, skill_values: dict[str, str], active_skills: list[str]) -> dict:
+        return {}
+
+    def listar_firmantes_disponibles(self) -> list[str]:
+        return []
+
+    def obtener_contexto(self, asignacion_id: str) -> dict:
+        return {}
+
+    def obtener_datos_institucion(self) -> dict:
+        return {}
+
 
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
 class TestGradesView(unittest.TestCase):
@@ -175,6 +207,43 @@ class TestGradesView(unittest.TestCase):
 
         view.refresh_data()
         self.assertEqual(view.assignment_combo.currentData(), "AS2")
+
+    def test_detecta_orientacion_como_materia_especial(self) -> None:
+        from src.presentation.views.grades_view import GradesView
+
+        service = _FakeGradeRegistrationService(
+            rows=[{"estudiante_id": "E1", "estudiante": "Lopez Maria"}],
+            contexts=[
+                {
+                    "id_asignacion": "AS-OVP",
+                    "display": "Orientación Vocacional | 8vo-A",
+                    "asignatura_nombre": "Orientación Vocacional y Profesional",
+                    "curso_nombre": "8vo de EGB",
+                }
+            ],
+        )
+        view = GradesView(service, classroom_accompaniment_service=_FakeClassroomAccompanimentService())
+        view.assignment_combo.setCurrentIndex(0)
+        self.assertTrue(view._vocational_orientation_mode)
+        self.assertFalse(view.table.isVisible())
+
+    def test_detecta_comportamiento_como_materia_especial_de_acompanamiento(self) -> None:
+        from src.presentation.views.grades_view import GradesView
+
+        service = _FakeGradeRegistrationService(
+            rows=[{"estudiante_id": "E1", "estudiante": "Lopez Maria"}],
+            contexts=[
+                {
+                    "id_asignacion": "AS-COMP",
+                    "display": "Comportamiento | 7mo-A",
+                    "asignatura_nombre": "  COMPORTAMIENTO ",
+                }
+            ],
+        )
+        view = GradesView(service, classroom_accompaniment_service=_FakeClassroomAccompanimentService())
+        view.assignment_combo.setCurrentIndex(0)
+        self.assertTrue(view._accompaniment_mode)
+        self.assertFalse(view.table.isVisible())
 
 
 if __name__ == "__main__":

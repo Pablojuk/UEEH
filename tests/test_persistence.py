@@ -129,9 +129,9 @@ class TestPersistenceSQLite(unittest.TestCase):
             "SELECT COUNT(*) AS c FROM asignaturas"
         ).fetchone()["c"]
 
-        self.assertEqual(cursos_count, 9)
+        self.assertEqual(cursos_count, 12)
         self.assertEqual(paralelos_count, 8)
-        self.assertEqual(asignaturas_count, 13)
+        self.assertEqual(asignaturas_count, 17)
 
     def test_registro_basico_con_relaciones_validas(self) -> None:
         self.connection.execute(

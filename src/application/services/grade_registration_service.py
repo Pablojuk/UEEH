@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+import unicodedata
 from typing import Any
 
 from src.domain.calculations import (
@@ -15,17 +16,26 @@ from src.domain.calculations import (
     calcular_promedio_evaluacion_sumativa,
     redondear_2_decimales,
 )
-from src.infrastructure.persistence.repositories import GradeActivityConfigRepository, GradeRecordsRepository
+from src.infrastructure.persistence.repositories import (
+    AnimationReadingEvaluationRepository,
+    GradeActivityConfigRepository,
+    GradeRecordsRepository,
+    VocationalOrientationEvaluationRepository,
+)
 
 
 class GradeRegistrationService:
     """Casos de uso para carga, cálculo y guardado de notas trimestrales."""
 
     SUMMATIVE_FIELDS = ("proyecto", "evaluacion", "refuerzo", "mejora_sumativa")
+    ORIENTATION_SUBJECT_NAME = "orientacion vocacional y profesional"
+    ORIENTATION_ALLOWED_COURSE_KEYS = {"8", "9", "10"}
 
     def __init__(self, connection: sqlite3.Connection, min_grade: float = 0.0, max_grade: float = 10.0) -> None:
         self.connection = connection
         self.repo = GradeRecordsRepository(connection)
+        self.animation_repo = AnimationReadingEvaluationRepository(connection)
+        self.orientation_repo = VocationalOrientationEvaluationRepository(connection)
         self.activity_config_repo = GradeActivityConfigRepository(connection)
         self.min_grade = min_grade
         self.max_grade = max_grade
@@ -223,6 +233,227 @@ class GradeRegistrationService:
 
         return True, f"Registros guardados: {procesados}"
 
+    def guardar_animacion_lectura_evaluacion(self, payload: dict[str, Any]) -> tuple[bool, str]:
+        asignacion_id = str(payload.get("asignacion_id") or "").strip()
+        trimestre_num = int(payload.get("trimestre_num") or 0)
+        nivel = str(payload.get("nivel") or "").strip()
+        filas = payload.get("filas") or []
+
+        if not asignacion_id:
+            return False, "Seleccione una asignación."
+        if trimestre_num not in (1, 2, 3):
+            return False, "Seleccione un trimestre válido."
+        if not nivel:
+            return False, "Seleccione un nivel educativo."
+        if not isinstance(filas, list) or not filas:
+            return False, "No existen estudiantes para guardar."
+        if payload.get("has_invalid_notes"):
+            return False, "Existen notas inválidas (fuera de 0-10). Corrija antes de guardar."
+
+        with self.connection:
+            self.connection.execute(
+                "DELETE FROM animacion_lectura_evaluaciones WHERE asignacion_id = ? AND trimestre_num = ?",
+                (asignacion_id, trimestre_num),
+            )
+            guardados = 0
+            for row in filas:
+                estudiante_id = str(row.get("estudiante_id") or "").strip()
+                if not estudiante_id:
+                    continue
+                notas = row.get("notas_indicadores") or []
+                self.animation_repo.crear(
+                    {
+                        "id_evaluacion": str(uuid.uuid4()),
+                        "asignacion_id": asignacion_id,
+                        "trimestre_num": trimestre_num,
+                        "nivel": nivel,
+                        "estudiante_id": estudiante_id,
+                        "notas_indicadores_json": json.dumps(notas, ensure_ascii=False),
+                        "valor_promedio": row.get("promedio"),
+                        "cualitativo": str(row.get("cualitativo") or "").strip() or None,
+                        "cualitativo_1": str(row.get("cualitativo_1") or "").strip() or None,
+                    }
+                )
+                guardados += 1
+        return True, f"Evaluaciones de Animación a la Lectura guardadas: {guardados}"
+
+    def obtener_animacion_lectura_evaluacion(
+        self,
+        asignacion_id: str,
+        trimestre_num: int,
+        nivel: str | None = None,
+    ) -> list[dict[str, Any]]:
+        if trimestre_num not in (1, 2, 3):
+            raise ValueError("El trimestre debe ser 1, 2 o 3")
+
+        params: list[Any] = [asignacion_id, trimestre_num]
+        nivel_clause = ""
+        if str(nivel or "").strip():
+            nivel_clause = " AND e.nivel = ? "
+            params.append(str(nivel).strip())
+
+        rows = self.connection.execute(
+            f"""
+            SELECT
+                e.estudiante_id,
+                e.nivel,
+                e.notas_indicadores_json,
+                e.valor_promedio,
+                e.cualitativo,
+                e.cualitativo_1,
+                s.apellidos,
+                s.nombres,
+                m.numero_lista
+            FROM animacion_lectura_evaluaciones e
+            JOIN estudiantes s ON s.id_estudiante = e.estudiante_id
+            LEFT JOIN asignaciones_docente a ON a.id_asignacion = e.asignacion_id
+            LEFT JOIN matriculas m ON m.estudiante_id = e.estudiante_id
+                AND m.curso_id = a.curso_id
+                AND m.paralelo_id = a.paralelo_id
+                AND m.periodo_id = a.periodo_id
+            WHERE e.asignacion_id = ? AND e.trimestre_num = ? {nivel_clause}
+            ORDER BY
+                CASE WHEN m.numero_lista IS NULL THEN 1 ELSE 0 END,
+                m.numero_lista,
+                s.apellidos,
+                s.nombres
+            """,
+            params,
+        ).fetchall()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            out.append(
+                {
+                    "estudiante_id": row["estudiante_id"],
+                    "estudiante": f"{row['apellidos']} {row['nombres']}".strip(),
+                    "nivel": row["nivel"],
+                    "notas_indicadores": self._json_to_list(row["notas_indicadores_json"]),
+                    "valor": row["valor_promedio"],
+                    "cualitativo": str(row["cualitativo"] or ""),
+                    "cualitativo_1": str(row["cualitativo_1"] or ""),
+                }
+            )
+        return out
+
+    def guardar_orientacion_vocacional_evaluacion(self, payload: dict[str, Any]) -> tuple[bool, str]:
+        asignacion_id = str(payload.get("asignacion_id") or "").strip()
+        trimestre_num = int(payload.get("trimestre_num") or 0)
+        curso_clave = str(payload.get("curso_clave") or "").strip()
+        filas = payload.get("filas") or []
+
+        if not asignacion_id:
+            return False, "Seleccione una asignación."
+        if trimestre_num not in (1, 2, 3):
+            return False, "Seleccione un trimestre válido."
+        if curso_clave not in self.ORIENTATION_ALLOWED_COURSE_KEYS:
+            return False, "Curso no válido para Orientación Vocacional y Profesional."
+        if not isinstance(filas, list) or not filas:
+            return False, "No existen estudiantes para guardar."
+
+        with self.connection:
+            self.connection.execute(
+                "DELETE FROM orientacion_vocacional_evaluaciones WHERE asignacion_id = ? AND trimestre_num = ?",
+                (asignacion_id, trimestre_num),
+            )
+            guardados = 0
+            for row in filas:
+                estudiante_id = str(row.get("estudiante_id") or "").strip()
+                if not estudiante_id:
+                    continue
+                respuestas = row.get("respuestas") or []
+                self.orientation_repo.crear(
+                    {
+                        "id_evaluacion": str(uuid.uuid4()),
+                        "asignacion_id": asignacion_id,
+                        "trimestre_num": trimestre_num,
+                        "curso_clave": curso_clave,
+                        "estudiante_id": estudiante_id,
+                        "respuestas_json": json.dumps(respuestas, ensure_ascii=False),
+                        "puntaje_total": row.get("puntaje_total"),
+                        "calificacion": str(row.get("calificacion") or "").strip() or None,
+                    }
+                )
+                guardados += 1
+        return True, f"Evaluaciones de Orientación Vocacional guardadas: {guardados}"
+
+    def obtener_orientacion_vocacional_evaluacion(self, asignacion_id: str, trimestre_num: int) -> list[dict[str, Any]]:
+        if trimestre_num not in (1, 2, 3):
+            raise ValueError("El trimestre debe ser 1, 2 o 3")
+        rows = self.connection.execute(
+            """
+            SELECT
+                e.estudiante_id,
+                e.curso_clave,
+                e.respuestas_json,
+                e.puntaje_total,
+                e.calificacion,
+                s.apellidos,
+                s.nombres,
+                m.numero_lista
+            FROM orientacion_vocacional_evaluaciones e
+            JOIN estudiantes s ON s.id_estudiante = e.estudiante_id
+            LEFT JOIN asignaciones_docente a ON a.id_asignacion = e.asignacion_id
+            LEFT JOIN matriculas m ON m.estudiante_id = e.estudiante_id
+                AND m.curso_id = a.curso_id
+                AND m.paralelo_id = a.paralelo_id
+                AND m.periodo_id = a.periodo_id
+            WHERE e.asignacion_id = ? AND e.trimestre_num = ?
+            ORDER BY
+                CASE WHEN m.numero_lista IS NULL THEN 1 ELSE 0 END,
+                m.numero_lista,
+                s.apellidos,
+                s.nombres
+            """,
+            (asignacion_id, trimestre_num),
+        ).fetchall()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            out.append(
+                {
+                    "estudiante_id": row["estudiante_id"],
+                    "estudiante": f"{row['apellidos']} {row['nombres']}".strip(),
+                    "curso_clave": str(row["curso_clave"] or ""),
+                    "respuestas": self._json_to_list(row["respuestas_json"]),
+                    "puntaje_total": row["puntaje_total"],
+                    "calificacion": str(row["calificacion"] or ""),
+                }
+            )
+        return out
+
+    def validar_curso_orientacion_vocacional(self, asignacion_id: str) -> tuple[bool, str | None, str]:
+        row = self.connection.execute(
+            """
+            SELECT s.nombre AS asignatura_nombre, c.nombre AS curso_nombre
+            FROM asignaciones_docente a
+            LEFT JOIN asignaturas s ON s.id_asignatura = a.asignatura_id
+            LEFT JOIN cursos c ON c.id_curso = a.curso_id
+            WHERE a.id_asignacion = ?
+            """,
+            (asignacion_id,),
+        ).fetchone()
+        if not row:
+            return False, None, ""
+        subject_name = self._normalize_text(str(row["asignatura_nombre"] or ""))
+        if subject_name != self.ORIENTATION_SUBJECT_NAME:
+            return True, None, str(row["curso_nombre"] or "")
+        course_name = str(row["curso_nombre"] or "")
+        course_key = self.detect_orientation_course_key(course_name)
+        if course_key not in self.ORIENTATION_ALLOWED_COURSE_KEYS:
+            return False, None, course_name
+        return True, course_key, course_name
+
+    @classmethod
+    def detect_orientation_course_key(cls, course_name: str) -> str | None:
+        normalized = cls._normalize_text(course_name)
+        tokens = set(normalized.split())
+        if any(t in tokens for t in {"8", "8vo", "octavo"}):
+            return "8"
+        if any(t in tokens for t in {"9", "9no", "noveno"}):
+            return "9"
+        if any(t in tokens for t in {"10", "10mo", "decimo", "decimo"}):
+            return "10"
+        return None
+
     def validar_y_normalizar_fila(self, fila: dict[str, Any], numero_actividades: int = 3) -> dict[str, Any]:
         salida = dict(fila)
         for idx in range(1, numero_actividades + 1):
@@ -396,3 +627,9 @@ class GradeRegistrationService:
                 }
             )
         return out
+
+    @staticmethod
+    def _normalize_text(value: str) -> str:
+        normalized = unicodedata.normalize("NFD", str(value or "").strip().lower())
+        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        return " ".join(normalized.split())
