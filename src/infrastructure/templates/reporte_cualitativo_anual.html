@@ -147,7 +147,7 @@
         <tr class="head1">
           <th class="c-num">N°</th>
           <th class="c-nomina">Nómina de Estudiantes</th>
-          <th class="c-cual">{{ trimestre }} - Cual</th>
+          {% if show_cual_column %}<th class="c-cual">{{ trimestre }} - Cual</th>{% endif %}
           <th class="c-desc">{{ trimestre }} - Descripción</th>
         </tr>
       </thead>
@@ -156,7 +156,7 @@
         <tr>
           <td>{{ loop.index }}</td>
           <td class="nomina">{{ est.nombre }}</td>
-          <td>{{ est.cual }}</td>
+          {% if show_cual_column %}<td>{{ est.cual }}</td>{% endif %}
           <td class="text-desc">{{ est.desc }}</td>
         </tr>
         {% endfor %}
@@ -169,6 +169,11 @@
       <table class="resumen-cualitativo" id="tabla-estadistica">
         <thead><tr><th class="c-escala">ESCALA CUALITATIVA</th><th class="c-cantidad">N°</th><th class="c-pct">%</th></tr></thead>
         <tbody>
+          {% if stats.rows is defined %}
+          {% for row in stats.rows %}
+          <tr><td class="c-escala">{{ row.escala }}</td><td class="c-cantidad">{{ row.numero }}</td><td class="c-pct">{{ row.porcentaje }}</td></tr>
+          {% endfor %}
+          {% else %}
           <tr><td class="c-escala">A+</td><td class="c-cantidad">{{ stats.a_plus_n | default('0') }}</td><td class="c-pct">{{ stats.a_plus_p | default('0,00%') }}</td></tr>
           <tr><td class="c-escala">A-</td><td class="c-cantidad">{{ stats.a_minus_n | default('0') }}</td><td class="c-pct">{{ stats.a_minus_p | default('0,00%') }}</td></tr>
           <tr><td class="c-escala">B+</td><td class="c-cantidad">{{ stats.b_plus_n | default('0') }}</td><td class="c-pct">{{ stats.b_plus_p | default('0,00%') }}</td></tr>
@@ -179,6 +184,7 @@
           <tr><td class="c-escala">D-</td><td class="c-cantidad">{{ stats.d_minus_n | default('0') }}</td><td class="c-pct">{{ stats.d_minus_p | default('0,00%') }}</td></tr>
           <tr><td class="c-escala">E+</td><td class="c-cantidad">{{ stats.e_plus_n | default('0') }}</td><td class="c-pct">{{ stats.e_plus_p | default('0,00%') }}</td></tr>
           <tr><td class="c-escala">E-</td><td class="c-cantidad">{{ stats.e_minus_n | default('0') }}</td><td class="c-pct">{{ stats.e_minus_p | default('0,00%') }}</td></tr>
+          {% endif %}
         </tbody>
         <tfoot><tr><td class="c-escala">TOTAL ESTUDIANTES</td><td class="c-cantidad">{{ stats.total_n | default('0') }}</td><td class="c-pct">{{ stats.total_p | default('0,00%') }}</td></tr></tfoot>
       </table>
@@ -254,9 +260,22 @@
 
       const txtCat = document.createElementNS("http://www.w3.org/2000/svg", "text");
       txtCat.setAttribute("x", x + (anchoBarra / 2)); txtCat.setAttribute("y", altoSVG - margenInferior + 16);
-      txtCat.setAttribute("text-anchor", "middle"); txtCat.setAttribute("font-size", "12px");
+      {% if not show_cual_column %}
+      txtCat.setAttribute("text-anchor", "end");
+      txtCat.setAttribute("transform", `rotate(-90 ${x + (anchoBarra / 2)} ${altoSVG - margenInferior + 16})`);
+      {% else %}
+      txtCat.setAttribute("text-anchor", "middle");
+      {% endif %}
+      txtCat.setAttribute("font-size", "{% if not show_cual_column %}11px{% else %}12px{% endif %}");
       txtCat.setAttribute("font-family", "Arial, sans-serif"); txtCat.setAttribute("font-weight", "bold");
-      txtCat.setAttribute("fill", "#333"); txtCat.textContent = item.etiqueta; svg.appendChild(txtCat);
+      txtCat.setAttribute("fill", "#333");
+      {% if not show_cual_column %}
+      const abreviaturas = { "TRANSFORMA": "TRA", "SE INVOLUCRA": "INV", "DEMUESTRA": "DEM", "MUESTRA": "MUE", "REQUIERE": "REQ" };
+      txtCat.textContent = abreviaturas[item.etiqueta] || item.etiqueta;
+      {% else %}
+      txtCat.textContent = item.etiqueta;
+      {% endif %}
+      svg.appendChild(txtCat);
     });
 
     const lineaBase = document.createElementNS("http://www.w3.org/2000/svg", "line");
