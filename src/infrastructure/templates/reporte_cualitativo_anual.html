@@ -266,7 +266,7 @@
       {% else %}
       txtCat.setAttribute("text-anchor", "middle");
       {% endif %}
-      txtCat.setAttribute("font-size", "12px");
+      txtCat.setAttribute("font-size", "{% if not show_cual_column %}11px{% else %}12px{% endif %}");
       txtCat.setAttribute("font-family", "Arial, sans-serif"); txtCat.setAttribute("font-weight", "bold");
       txtCat.setAttribute("fill", "#333"); txtCat.textContent = item.etiqueta; svg.appendChild(txtCat);
     });
