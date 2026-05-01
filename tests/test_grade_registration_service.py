@@ -37,6 +37,10 @@ class TestGradeRegistrationService(unittest.TestCase):
             )
             self.conn.execute(
                 "INSERT INTO cursos (id_curso, nombre, nivel) VALUES (?, ?, ?)",
+                ("C2", "Segundo de EGB", "Basica"),
+            )
+            self.conn.execute(
+                "INSERT INTO cursos (id_curso, nombre, nivel) VALUES (?, ?, ?)",
                 ("C8", "8vo de EGB", "Básica Superior"),
             )
             self.conn.execute("INSERT INTO paralelos (id_paralelo, nombre) VALUES (?, ?)", ("P1", "A"))
@@ -63,6 +67,10 @@ class TestGradeRegistrationService(unittest.TestCase):
             self.conn.execute(
                 "INSERT INTO asignaciones_docente (id_asignacion, docente_id, asignatura_id, curso_id, paralelo_id, periodo_id) VALUES (?, ?, ?, ?, ?, ?)",
                 ("AS-OVP", "D1", "A2", "C8", "P1", "2025-2026"),
+            )
+            self.conn.execute(
+                "INSERT INTO asignaciones_docente (id_asignacion, docente_id, asignatura_id, curso_id, paralelo_id, periodo_id) VALUES (?, ?, ?, ?, ?, ?)",
+                ("AS-EGB", "D1", "A1", "C2", "P1", "2025-2026"),
             )
 
     def test_cargar_estudiantes_de_contexto_valido(self) -> None:
@@ -258,6 +266,28 @@ class TestGradeRegistrationService(unittest.TestCase):
     def test_detecta_curso_orientacion(self) -> None:
         self.assertEqual(self.service.detect_orientation_course_key("Décimo de EGB"), "10")
         self.assertEqual(self.service.detect_orientation_course_key("Noveno"), "9")
+
+    def test_detecta_logica_cuantitativa_basica_y_excluye_especiales(self) -> None:
+        self.assertTrue(self.service.usar_logica_cuantitativa_basica("AS-EGB"))
+        self.assertFalse(self.service.usar_logica_cuantitativa_basica("AS-OVP"))
+
+    def test_recalculo_logica_cuantitativa_basica(self) -> None:
+        fila = self.service.recalcular_fila(
+            {
+                "estudiante_id": "E1",
+                "actividad_1": 8,
+                "mejora_1": 10,
+                "actividad_2": 7,
+                "mejora_2": 7,
+                "actividad_3": 9,
+                "mejora_3": 9,
+                "proyecto": 10,
+                "evaluacion": 6,
+            },
+            usar_logica_basica=True,
+        )
+        self.assertEqual(fila["nota_trimestral"], 8.2)
+        self.assertEqual(fila["cualitativo_adicional"], "Destreza o aprendizaje alcanzado")
         self.assertEqual(self.service.detect_orientation_course_key("8vo EGB"), "8")
 
     def test_valida_curso_orientacion_desde_asignacion(self) -> None:

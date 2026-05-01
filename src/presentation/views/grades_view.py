@@ -49,6 +49,13 @@ class GradesView(QWidget):
         ("cualitativo", "Cualitativo"),
         ("cualitativo_adicional", "Equivalencia"),
     ]
+    SUMMATIVE_COLUMNS_EGB_BASICA = [
+        ("proyecto", "Proyecto Interdisciplinar"),
+        ("evaluacion", "Evaluación Trimestral"),
+        ("nota_trimestral", "Promedio Trimestral"),
+        ("cualitativo", "Cualitativo"),
+        ("cualitativo_adicional", "Equivalencia"),
+    ]
 
     ACCOMPANIMENT_SUBJECT_NAME = "acompañamiento integral en el aula"
     BEHAVIOR_SUBJECT_NAME = "comportamiento"
@@ -75,6 +82,7 @@ class GradesView(QWidget):
         self._animation_reading_mode = False
         self._vocational_orientation_mode = False
         self._switching_mode = False
+        self._egb_basic_mode = False
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -249,7 +257,13 @@ class GradesView(QWidget):
         recalculadas = []
         try:
             for fila in filas:
-                recalculadas.append(self.grade_registration_service.recalcular_fila(fila, self._numero_actividades))
+                recalculadas.append(
+                    self.grade_registration_service.recalcular_fila(
+                        fila,
+                        self._numero_actividades,
+                        usar_logica_basica=self._egb_basic_mode,
+                    )
+                )
         except ValueError as exc:
             QMessageBox.warning(self, "Validación", str(exc))
             return
@@ -289,7 +303,7 @@ class GradesView(QWidget):
             self._table_columns.append((f"mejora_{idx}", f"Refuerzo {idx}"))
             self._activity_group_columns.append((idx, col_act, col_ref))
             self._table_columns.append((f"promedio_{idx}", f"Promedio {idx}"))
-        self._table_columns.extend(self.SUMMATIVE_COLUMNS)
+        self._table_columns.extend(self.SUMMATIVE_COLUMNS_EGB_BASICA if self._egb_basic_mode else self.SUMMATIVE_COLUMNS)
         self.table.setColumnCount(len(self._table_columns))
         self.table.setHorizontalHeaderLabels([self._format_header_label(title) for _, title in self._table_columns])
 
@@ -545,6 +559,10 @@ class GradesView(QWidget):
                 self._sync_accompaniment_view()
             else:
                 self._show_quantitative_view()
+                self._egb_basic_mode = bool(
+                    selected_assignment
+                    and self.grade_registration_service.usar_logica_cuantitativa_basica(str(selected_assignment))
+                )
                 self._clear_table()
         finally:
             self._switching_mode = False

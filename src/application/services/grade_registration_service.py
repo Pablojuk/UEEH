@@ -29,6 +29,12 @@ class GradeRegistrationService:
 
     SUMMATIVE_FIELDS = ("proyecto", "evaluacion", "refuerzo", "mejora_sumativa")
     ORIENTATION_SUBJECT_NAME = "orientacion vocacional y profesional"
+    EXCLUDED_SPECIAL_SUBJECTS = {
+        "orientacion vocacional y profesional",
+        "comportamiento",
+        "acompanamiento integral en el aula",
+        "animacion a la lectura",
+    }
     ORIENTATION_ALLOWED_COURSE_KEYS = {"8", "9", "10"}
 
     def __init__(self, connection: sqlite3.Connection, min_grade: float = 0.0, max_grade: float = 10.0) -> None:
@@ -182,7 +188,11 @@ class GradeRegistrationService:
             fila = self._fila_base_estudiante(estudiante_row, numero_actividades)
             if registro:
                 fila.update(self._expand_dynamic_fields(registro, numero_actividades))
-            fila = self.recalcular_fila(fila, numero_actividades)
+            fila = self.recalcular_fila(
+                fila,
+                numero_actividades,
+                usar_logica_basica=self.usar_logica_cuantitativa_basica(asignacion_id),
+            )
             resultado.append(fila)
         return resultado
 
@@ -204,7 +214,11 @@ class GradeRegistrationService:
                 continue
 
             validada = self.validar_y_normalizar_fila(fila, numero_actividades)
-            calculada = self.recalcular_fila(validada, numero_actividades)
+            calculada = self.recalcular_fila(
+                validada,
+                numero_actividades,
+                usar_logica_basica=self.usar_logica_cuantitativa_basica(asignacion_id),
+            )
             actividades, mejoras = self._extract_activities(calculada, numero_actividades)
             payload = {
                 "estudiante_id": estudiante_id,
@@ -463,7 +477,7 @@ class GradeRegistrationService:
             salida[campo] = self._normalizar_nota(fila.get(campo), campo)
         return salida
 
-    def recalcular_fila(self, fila: dict[str, Any], numero_actividades: int = 3) -> dict[str, Any]:
+    def recalcular_fila(self, fila: dict[str, Any], numero_actividades: int = 3, usar_logica_basica: bool = False) -> dict[str, Any]:
         data = self.validar_y_normalizar_fila(fila, numero_actividades)
 
         actividades_formativas = []
@@ -482,13 +496,21 @@ class GradeRegistrationService:
         promedio_eval_sumativa = calcular_promedio_evaluacion_sumativa(data.get("proyecto"), data.get("evaluacion"))
         promedio_con_mejora = calcular_promedio_con_mejora(promedio_eval_sumativa, data.get("refuerzo"), data.get("mejora_sumativa"))
         promedio_formativa = calcular_promedio_evaluacion_formativa(promedios_actividades)
-        promedio_formativa_70 = redondear_2_decimales(promedio_formativa * 0.70) if promedio_formativa is not None else None
-        promedio_sumativa_30 = redondear_2_decimales(promedio_con_mejora * 0.30) if promedio_con_mejora is not None else None
-        promedio_trimestral = (
-            redondear_2_decimales(promedio_formativa_70 + promedio_sumativa_30)
-            if promedio_formativa_70 is not None and promedio_sumativa_30 is not None
-            else None
-        )
+        if usar_logica_basica:
+            componentes = [v for v in [*promedios_actividades, data.get("proyecto"), data.get("evaluacion")] if v is not None]
+            promedio_trimestral = redondear_2_decimales(sum(componentes) / len(componentes)) if componentes else None
+            promedio_formativa_70 = None
+            promedio_sumativa_30 = None
+            promedio_con_mejora = None
+            promedio_eval_sumativa = None
+        else:
+            promedio_formativa_70 = redondear_2_decimales(promedio_formativa * 0.70) if promedio_formativa is not None else None
+            promedio_sumativa_30 = redondear_2_decimales(promedio_con_mejora * 0.30) if promedio_con_mejora is not None else None
+            promedio_trimestral = (
+                redondear_2_decimales(promedio_formativa_70 + promedio_sumativa_30)
+                if promedio_formativa_70 is not None and promedio_sumativa_30 is not None
+                else None
+            )
 
         data["promedio_evaluacion_sumativa"] = promedio_eval_sumativa
         data["promedio_con_mejora_sumativa"] = promedio_con_mejora
@@ -498,8 +520,21 @@ class GradeRegistrationService:
         data["promedio_sumativo"] = promedio_con_mejora
         data["nota_trimestral"] = promedio_trimestral
         data["cualitativo"] = calcular_cualitativo_trimestral(promedio_trimestral)
-        data["cualitativo_adicional"] = self._calcular_cualitativo_adicional(promedio_trimestral)
+        data["cualitativo_adicional"] = (
+            self._calcular_equivalencia_egb_basica(data["cualitativo"]) if usar_logica_basica else self._calcular_cualitativo_adicional(promedio_trimestral)
+        )
         return data
+
+    @staticmethod
+    def _calcular_equivalencia_egb_basica(cualitativo: str) -> str:
+        key = str(cualitativo or "").strip().upper()
+        if key in {"A+", "A-", "B+"}:
+            return "Destreza o aprendizaje alcanzado"
+        if key in {"B-", "C+", "C-"}:
+            return "Destreza o aprendizaje en proceso de desarrollo"
+        if key in {"D+", "D-", "E+", "E-"}:
+            return "Destreza o aprendizaje iniciado"
+        return ""
 
     def _normalizar_nota(self, valor: Any, campo: str) -> float | None:
         if valor is None:
@@ -633,3 +668,28 @@ class GradeRegistrationService:
         normalized = unicodedata.normalize("NFD", str(value or "").strip().lower())
         normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
         return " ".join(normalized.split())
+    def usar_logica_cuantitativa_basica(self, asignacion_id: str) -> bool:
+        row = self.connection.execute(
+            """
+            SELECT s.nombre AS asignatura_nombre, c.nombre AS curso_nombre
+            FROM asignaciones_docente a
+            LEFT JOIN asignaturas s ON s.id_asignatura = a.asignatura_id
+            LEFT JOIN cursos c ON c.id_curso = a.curso_id
+            WHERE a.id_asignacion = ?
+            """,
+            (asignacion_id,),
+        ).fetchone()
+        if not row:
+            return False
+        subject_name = self._normalize_text(str(row["asignatura_nombre"] or ""))
+        if subject_name in self.EXCLUDED_SPECIAL_SUBJECTS:
+            return False
+        return self._detectar_segundo_tercero_cuarto_egb(str(row["curso_nombre"] or ""))
+
+    @classmethod
+    def _detectar_segundo_tercero_cuarto_egb(cls, curso_nombre: str) -> bool:
+        normalized = cls._normalize_text(curso_nombre)
+        tokens = set(normalized.split())
+        if "egb" not in tokens:
+            return False
+        return any(t in tokens for t in {"2do", "segundo", "3ro", "tercero", "4to", "cuarto"})

@@ -58,6 +58,9 @@ class _FakeGradeRegistrationService:
     def guardar_orientacion_vocacional_evaluacion(self, payload: dict) -> tuple[bool, str]:
         return True, "ok"
 
+    def usar_logica_cuantitativa_basica(self, asignacion_id: str) -> bool:
+        return str(asignacion_id).startswith("AS-EGB")
+
 
 class _FakeClassroomAccompanimentService:
     def listar_contextos_disponibles(self) -> list[dict]:
