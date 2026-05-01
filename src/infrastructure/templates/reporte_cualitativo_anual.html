@@ -260,7 +260,13 @@
 
       const txtCat = document.createElementNS("http://www.w3.org/2000/svg", "text");
       txtCat.setAttribute("x", x + (anchoBarra / 2)); txtCat.setAttribute("y", altoSVG - margenInferior + 16);
-      txtCat.setAttribute("text-anchor", "middle"); txtCat.setAttribute("font-size", "12px");
+      {% if not show_cual_column %}
+      txtCat.setAttribute("text-anchor", "end");
+      txtCat.setAttribute("transform", `rotate(-90 ${x + (anchoBarra / 2)} ${altoSVG - margenInferior + 16})`);
+      {% else %}
+      txtCat.setAttribute("text-anchor", "middle");
+      {% endif %}
+      txtCat.setAttribute("font-size", "12px");
       txtCat.setAttribute("font-family", "Arial, sans-serif"); txtCat.setAttribute("font-weight", "bold");
       txtCat.setAttribute("fill", "#333"); txtCat.textContent = item.etiqueta; svg.appendChild(txtCat);
     });
