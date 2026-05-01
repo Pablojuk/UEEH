@@ -60,4 +60,5 @@ class TestUISmoke(unittest.TestCase):
         )
 
         self.assertEqual(window.windowTitle(), "Sistema Académico UEEH")
+        self.assertNotIn("classroom_accompaniment", window.sidebar._buttons)
         conn.close()
