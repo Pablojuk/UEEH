@@ -103,6 +103,31 @@ class TestClassroomAccompanimentService(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("hasta 9 habilidades", message)
 
+    def test_valoracion_final_comportamiento_por_puntaje(self) -> None:
+        result = self.service.calcular_resultado_estudiante(
+            {
+                "autoconocimiento": "Siempre",
+                "pensamiento_critico": "Siempre",
+                "manejo_problemas": "Siempre",
+                "toma_decisiones": "Siempre",
+            },
+            ["autoconocimiento", "pensamiento_critico", "manejo_problemas", "toma_decisiones"],
+            variant="behavior",
+        )
+        self.assertEqual(result["puntaje_total_ponderado"], 16)
+        self.assertEqual(
+            result["valoracion_final"],
+            "Transforma los desacuerdos en oportunidades de crecimiento y cooperación.",
+        )
+
+    def test_no_regresion_acompanamiento_en_variante_por_defecto(self) -> None:
+        result = self.service.calcular_resultado_estudiante(
+            {"autoconocimiento": "Siempre", "pensamiento_critico": "Siempre"},
+            ["autoconocimiento", "pensamiento_critico"],
+        )
+        self.assertEqual(result["puntaje_total_ponderado"], 8)
+        self.assertEqual(result["valoracion_final"], "")
+
 
 if __name__ == "__main__":
     unittest.main()
