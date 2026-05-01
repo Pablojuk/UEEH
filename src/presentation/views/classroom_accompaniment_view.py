@@ -274,9 +274,13 @@ class ClassroomAccompanimentView(QWidget):
         if self._evaluation_variant == "behavior":
             self.title_label.setText("Comportamiento")
             self.subtitle_label.setText("Evaluación cualitativa de comportamiento por estudiante, asignación y trimestre")
+            self.save_button.setText("Guardar evaluación de comportamiento")
+            self.configure_skills_button.setText("Configurar indicadores")
         else:
             self.title_label.setText("Acompañamiento Integral en el Aula")
             self.subtitle_label.setText("Evaluación cualitativa por estudiante, asignación y trimestre")
+            self.save_button.setText("Guardar evaluación")
+            self.configure_skills_button.setText("Configurar habilidades")
 
     def set_notes_mode(self, enabled: bool = True) -> None:
         """Modo usado dentro de Notas: solo registro/configuración de evaluación."""

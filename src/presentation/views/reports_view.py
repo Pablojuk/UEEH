@@ -102,6 +102,9 @@ class ReportsView(QWidget):
             trimester = int(trimester_num) if report_type == "trimestral" and trimester_num else 1
             if mode == self.MODE_ACCOMPANIMENT:
                 self.stack.setCurrentWidget(self.accompaniment_report_view)
+                self.accompaniment_report_view.set_evaluation_variant(
+                    self._accompaniment_variant_for_assignment(assignment_id_str)
+                )
                 idx = self.accompaniment_report_view.assignment_combo.findData(assignment_id)
                 if idx >= 0:
                     self.accompaniment_report_view.assignment_combo.setCurrentIndex(idx)
@@ -201,6 +204,16 @@ class ReportsView(QWidget):
             self.academic_summary_view.report_type_combo.setCurrentIndex(idx)
             return
         self._sync_mode_from_summary_assignment()
+
+
+    def _accompaniment_variant_for_assignment(self, assignment_id: str) -> str:
+        if not assignment_id:
+            return "accompaniment"
+        context = self._contexts_by_id.get(assignment_id, {})
+        subject_name = self._normalize_text(str(context.get("asignatura_nombre") or ""))
+        if subject_name == self._normalize_text("comportamiento"):
+            return "behavior"
+        return "accompaniment"
 
     def _is_accompaniment_assignment(self, assignment_id: str) -> bool:
         if not assignment_id:
