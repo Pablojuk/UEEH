@@ -268,7 +268,14 @@
       {% endif %}
       txtCat.setAttribute("font-size", "{% if not show_cual_column %}11px{% else %}12px{% endif %}");
       txtCat.setAttribute("font-family", "Arial, sans-serif"); txtCat.setAttribute("font-weight", "bold");
-      txtCat.setAttribute("fill", "#333"); txtCat.textContent = item.etiqueta; svg.appendChild(txtCat);
+      txtCat.setAttribute("fill", "#333");
+      {% if not show_cual_column %}
+      const abreviaturas = { "TRANSFORMA": "TRA", "SE INVOLUCRA": "INV", "DEMUESTRA": "DEM", "MUESTRA": "MUE", "REQUIERE": "REQ" };
+      txtCat.textContent = abreviaturas[item.etiqueta] || item.etiqueta;
+      {% else %}
+      txtCat.textContent = item.etiqueta;
+      {% endif %}
+      svg.appendChild(txtCat);
     });
 
     const lineaBase = document.createElementNS("http://www.w3.org/2000/svg", "line");
