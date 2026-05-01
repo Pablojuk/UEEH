@@ -21,6 +21,7 @@ class _FakeAcademicSummaryService:
             {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "  ANIMACIÓN   A   LA   LECTURA  "},
             {"id_asignacion": "AS3", "display": "Acompañamiento | 8vo-A", "asignatura_nombre": "Acompanamiento integral en el aula"},
             {"id_asignacion": "AS4", "display": "OVP | 10mo-A", "asignatura_nombre": "ORIENTACIÓN VOCACIONAL PROFESIONAL"},
+            {"id_asignacion": "AS5", "display": "Comportamiento | 7mo-A", "asignatura_nombre": "  COMPORTAMIENTO  "},
         ]
 
     def obtener_resumen_por_asignacion(self, asignacion_id: str) -> list[dict]:
@@ -57,6 +58,7 @@ class _FakeClassroomAccompanimentService:
             {"id_asignacion": "AS2", "display": "Animación | 8vo-A", "asignatura_nombre": "Animación a la Lectura"},
             {"id_asignacion": "AS3", "display": "Acompañamiento | 8vo-A", "asignatura_nombre": "Acompañamiento integral en el aula"},
             {"id_asignacion": "AS4", "display": "OVP | 10mo-A", "asignatura_nombre": "Orientacion Vocacional y Profesional"},
+            {"id_asignacion": "AS5", "display": "Comportamiento | 7mo-A", "asignatura_nombre": "Comportamiento"},
         ]
 
     def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
@@ -211,6 +213,14 @@ class TestReportsView(unittest.TestCase):
         self.assertGreaterEqual(idx_anim, 0)
         summary_combo.setCurrentIndex(idx_anim)
         self.assertEqual(view.stack.currentWidget(), view.animation_report_view)
+
+    def test_comportamiento_usa_reporte_especial_de_acompanamiento(self) -> None:
+        view, _ = self._build_view()
+        summary_combo = view.academic_summary_view.assignment_combo
+        idx_behavior = summary_combo.findData("AS5")
+        self.assertGreaterEqual(idx_behavior, 0)
+        summary_combo.setCurrentIndex(idx_behavior)
+        self.assertEqual(view.stack.currentWidget(), view.accompaniment_report_view)
 
     def test_animacion_conserva_trimestre_y_nivel_en_carga_automatica(self) -> None:
         view, grade_service = self._build_view()

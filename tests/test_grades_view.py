@@ -227,6 +227,24 @@ class TestGradesView(unittest.TestCase):
         self.assertTrue(view._vocational_orientation_mode)
         self.assertFalse(view.table.isVisible())
 
+    def test_detecta_comportamiento_como_materia_especial_de_acompanamiento(self) -> None:
+        from src.presentation.views.grades_view import GradesView
+
+        service = _FakeGradeRegistrationService(
+            rows=[{"estudiante_id": "E1", "estudiante": "Lopez Maria"}],
+            contexts=[
+                {
+                    "id_asignacion": "AS-COMP",
+                    "display": "Comportamiento | 7mo-A",
+                    "asignatura_nombre": "  COMPORTAMIENTO ",
+                }
+            ],
+        )
+        view = GradesView(service, classroom_accompaniment_service=_FakeClassroomAccompanimentService())
+        view.assignment_combo.setCurrentIndex(0)
+        self.assertTrue(view._accompaniment_mode)
+        self.assertFalse(view.table.isVisible())
+
 
 if __name__ == "__main__":
     unittest.main()

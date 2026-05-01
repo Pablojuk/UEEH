@@ -51,6 +51,7 @@ class GradesView(QWidget):
     ]
 
     ACCOMPANIMENT_SUBJECT_NAME = "acompañamiento integral en el aula"
+    BEHAVIOR_SUBJECT_NAME = "comportamiento"
     ANIMATION_READING_SUBJECT_NAME = "animacion a la lectura"
     VOCATIONAL_ORIENTATION_SUBJECT_NAME = "orientacion vocacional y profesional"
 
@@ -513,7 +514,10 @@ class GradesView(QWidget):
             assignment = next((row for row in self._contextos if row.get("id_asignacion") == selected_assignment), None)
             subject_name = self._normalize_subject_name(str((assignment or {}).get("asignatura_nombre") or ""))
             use_accompaniment = (
-                self.accompaniment_view is not None and subject_name == self._normalize_subject_name(self.ACCOMPANIMENT_SUBJECT_NAME)
+                self.accompaniment_view is not None and subject_name in {
+                    self._normalize_subject_name(self.ACCOMPANIMENT_SUBJECT_NAME),
+                    self._normalize_subject_name(self.BEHAVIOR_SUBJECT_NAME),
+                }
             )
             use_animation_reading = (
                 self.animation_reading_view is not None

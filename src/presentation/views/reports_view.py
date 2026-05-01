@@ -207,7 +207,11 @@ class ReportsView(QWidget):
             return False
         context = self._contexts_by_id.get(assignment_id, {})
         subject_name = self._normalize_text(str(context.get("asignatura_nombre") or ""))
-        return subject_name == self._normalize_text("acompañamiento integral en el aula")
+        aliases = {
+            self._normalize_text("acompañamiento integral en el aula"),
+            self._normalize_text("comportamiento"),
+        }
+        return subject_name in aliases
 
     def _is_animation_assignment(self, assignment_id: str) -> bool:
         if not assignment_id:
