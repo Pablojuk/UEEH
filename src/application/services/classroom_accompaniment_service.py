@@ -284,7 +284,26 @@ class ClassroomAccompanimentService:
 
         return True, f"Evaluaciones guardadas: {guardados}"
 
-    def calcular_resultado_estudiante(self, skill_values: dict[str, str], active_skills: list[str]) -> dict[str, Any]:
+    @staticmethod
+    def calcular_valoracion_comportamiento_desde_puntaje(puntaje_total: int) -> str:
+        if puntaje_total == 16:
+            return "Transforma los desacuerdos en oportunidades de crecimiento y cooperación."
+        if puntaje_total in {14, 15}:
+            return "Se involucra y participa en iniciativas que favorecen la convivencia pacífica."
+        if puntaje_total == 13:
+            return "Demuestra habilidades para llegar a acuerdos y asumir compromisos."
+        if 6 <= puntaje_total <= 12:
+            return "Muestra limitaciones para llegar a acuerdos y asumir compromisos."
+        if 4 <= puntaje_total <= 5:
+            return "Requiere acompañamiento comportamental."
+        return ""
+
+    def calcular_resultado_estudiante(
+        self,
+        skill_values: dict[str, str],
+        active_skills: list[str],
+        variant: str = "accompaniment",
+    ) -> dict[str, Any]:
         if len(active_skills) > MAX_ACTIVE_SKILLS:
             return {
                 "total_siempre": 0,
@@ -307,11 +326,15 @@ class ClassroomAccompanimentService:
             + (counts["Ocasionalmente"] * 2)
             + (counts["Nunca"] * 1)
         )
-        final = calcular_valoracion_acompanamiento(
-            total_siempre=counts["Siempre"],
-            total_frecuentemente=counts["Frecuentemente"],
-            total_ocasionalmente=counts["Ocasionalmente"],
-            total_nunca=counts["Nunca"],
+        final = (
+            self.calcular_valoracion_comportamiento_desde_puntaje(puntaje_total)
+            if variant == "behavior"
+            else calcular_valoracion_acompanamiento(
+                total_siempre=counts["Siempre"],
+                total_frecuentemente=counts["Frecuentemente"],
+                total_ocasionalmente=counts["Ocasionalmente"],
+                total_nunca=counts["Nunca"],
+            )
         )
         return {
             "total_siempre": counts["Siempre"],

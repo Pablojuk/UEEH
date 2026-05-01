@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import re
+import unicodedata
 from datetime import datetime
 from typing import Any
 
@@ -126,6 +128,14 @@ class SkillConfigDialog(QDialog):
 
 
 class ClassroomAccompanimentView(QWidget):
+    BEHAVIOR_SUBJECT_NAME = "comportamiento"
+    BEHAVIOR_SCALE_LABELS = (
+        ("TRANSFORMA", "Transforma los desacuerdos en oportunidades de crecimiento y cooperación."),
+        ("SE INVOLUCRA", "Se involucra y participa en iniciativas que favorecen la convivencia pacífica."),
+        ("DEMUESTRA", "Demuestra habilidades para llegar a acuerdos y asumir compromisos."),
+        ("MUESTRA", "Muestra limitaciones para llegar a acuerdos y asumir compromisos."),
+        ("REQUIERE", "Requiere acompañamiento comportamental."),
+    )
     """Pantalla de registro cualitativo de acompañamiento integral."""
 
     TRIMESTERS = (
@@ -492,6 +502,7 @@ class ClassroomAccompanimentView(QWidget):
         result = self.accompaniment_service.calcular_resultado_estudiante(
             self._responses.get(student_id, {}),
             self._active_skills,
+            variant="behavior" if self._is_behavior_assignment() else "accompaniment",
         )
         base_col = 2 + len(self._active_skills)
         self.table.setItem(row_idx, base_col, QTableWidgetItem(str(result["total_siempre"])))
@@ -583,8 +594,9 @@ class ClassroomAccompanimentView(QWidget):
         trimestre_actual = int(self.trimester_combo.currentData() or 1)
         trimestre_texto = str(self.trimester_combo.currentText() or f"Trimestre {trimestre_actual}").upper()
         datos_trim_actual = self._get_datos_trimestre(trimestre_actual)
-        estudiantes = self._construir_estudiantes_trimestrales(datos_trim_actual)
-        stats = self._calcular_stats_cualitativas(datos_trim_actual)
+        is_behavior = self._is_behavior_assignment(contexto)
+        estudiantes = self._construir_estudiantes_trimestrales(datos_trim_actual, is_behavior=is_behavior)
+        stats = self._calcular_stats_cualitativas(datos_trim_actual, is_behavior=is_behavior)
 
         institucion = self.accompaniment_service.obtener_datos_institucion()
         logo_institucional = HtmlReportRenderer._build_logo_source(institucion.get("logo_path"), "institucional")
@@ -599,7 +611,8 @@ class ClassroomAccompanimentView(QWidget):
             "fecha": datetime.now().strftime("%Y-%m-%d"),
             "anio_lectivo": contexto.get("periodo_id", ""),
             "trimestre": trimestre_texto,
-            "reporte_titulo": f"ACOMPAÑAMIENTO INTEGRAL EN EL AULA - {trimestre_texto} - PERIODO {contexto.get('periodo_id', '')}",
+            "reporte_titulo": f"{str(contexto.get('asignatura_nombre') or 'Acompañamiento Integral en el Aula').upper()} - {trimestre_texto} - PERIODO {contexto.get('periodo_id', '')}",
+            "show_cual_column": not is_behavior,
             "rector": self._firmantes.get("rector") or institucion.get("rector", ""),
             "logo_institucion": logo_institucional,
             "logo_ministerio": logo_mineduc,
@@ -622,7 +635,11 @@ class ClassroomAccompanimentView(QWidget):
         active_skills = payload.get("active_skills", [])
         for student in students:
             sid = student.get("student_id", "")
-            result = self.accompaniment_service.calcular_resultado_estudiante(responses.get(sid, {}), active_skills)
+            result = self.accompaniment_service.calcular_resultado_estudiante(
+                responses.get(sid, {}),
+                active_skills,
+                variant="behavior" if self._is_behavior_assignment() else "accompaniment",
+            )
             rows.append(
                 {
                     "nombre": student.get("name", ""),
@@ -647,7 +664,7 @@ class ClassroomAccompanimentView(QWidget):
             )
         return rows
 
-    def _construir_estudiantes_trimestrales(self, datos_trimestre: list[dict[str, str]]) -> list[dict[str, str]]:
+    def _construir_estudiantes_trimestrales(self, datos_trimestre: list[dict[str, str]], *, is_behavior: bool = False) -> list[dict[str, str]]:
         estudiantes = []
         for item in sorted(datos_trimestre, key=lambda x: str(x.get("nombre", "")).strip().lower()):
             cual = str(item.get("valoracion_final", "")).strip()
@@ -655,7 +672,7 @@ class ClassroomAccompanimentView(QWidget):
                 {
                     "nombre": str(item.get("nombre", "")).strip(),
                     "cual": cual,
-                    "desc": self._obtener_descripcion_cualitativa(cual),
+                    "desc": cual if is_behavior else self._obtener_descripcion_cualitativa(cual),
                 }
             )
         return estudiantes
@@ -676,7 +693,28 @@ class ClassroomAccompanimentView(QWidget):
         }
         return descripciones.get(str(cual).strip(), "")
 
-    def _calcular_stats_cualitativas(self, estudiantes_trimestre: list[dict[str, str]]) -> dict[str, Any]:
+    def _calcular_stats_cualitativas(self, estudiantes_trimestre: list[dict[str, str]], *, is_behavior: bool = False) -> dict[str, Any]:
+        if is_behavior:
+            total = len(estudiantes_trimestre)
+            counts = {label: 0 for label, _ in self.BEHAVIOR_SCALE_LABELS}
+            desc_to_label = {desc: label for label, desc in self.BEHAVIOR_SCALE_LABELS}
+            for row in estudiantes_trimestre:
+                cual = str(row.get("valoracion_final", "")).strip()
+                label = desc_to_label.get(cual)
+                if label:
+                    counts[label] += 1
+
+            def pct(value: int) -> str:
+                if total == 0:
+                    return "0,00%"
+                return f"{(value * 100 / total):.2f}%".replace(".", ",")
+
+            return {
+                "rows": [{"escala": label, "numero": counts[label], "porcentaje": pct(counts[label])} for label, _ in self.BEHAVIOR_SCALE_LABELS],
+                "total_n": total,
+                "total_p": "100,00%" if total > 0 else "0,00%",
+            }
+
         labels = [("A+", "a_plus"), ("A-", "a_minus"), ("B+", "b_plus"), ("B-", "b_minus"), ("C+", "c_plus"), ("C-", "c_minus"), ("D+", "d_plus"), ("D-", "d_minus"), ("E+", "e_plus"), ("E-", "e_minus")]
         total = len(estudiantes_trimestre)
         counts = {label: 0 for label, _ in labels}
@@ -780,14 +818,27 @@ class ClassroomAccompanimentView(QWidget):
         headers = ["Nómina"] + [self._skills_by_key[key]["label"] for key in self._active_skills if key in self._skills_by_key]
         wb = Workbook()
         ws = wb.active
-        ws.title = "Acom. Inte. Aula."
-        ws.append(headers)
-        for student in self._students:
+        is_behavior = self._is_behavior_assignment()
+        ws.title = "Comportamiento" if is_behavior else "Acom. Inte. Aula."
+        if is_behavior:
+            trimestre_texto = str(self.trimester_combo.currentText() or "Trimestre").upper()
+            ws.append(["N°", "Nómina de Estudiantes", f"{trimestre_texto} - Descripción"])
+        else:
+            ws.append(headers)
+        for idx, student in enumerate(self._students, start=1):
             sid = student.get("student_id", "")
-            row = [student.get("name", "")]
-            skill_values = self._responses.get(sid, {})
-            for skill_key in self._active_skills:
-                row.append(skill_values.get(skill_key, ""))
+            if is_behavior:
+                result = self.accompaniment_service.calcular_resultado_estudiante(
+                    self._responses.get(sid, {}),
+                    self._active_skills,
+                    variant="behavior",
+                )
+                row = [idx, student.get("name", ""), result.get("valoracion_final", "")]
+            else:
+                row = [student.get("name", "")]
+                skill_values = self._responses.get(sid, {})
+                for skill_key in self._active_skills:
+                    row.append(skill_values.get(skill_key, ""))
             ws.append(row)
         wb.save(file_path)
         QMessageBox.information(self, "Exportar Excel", f"Excel generado correctamente:\n{file_path}")
@@ -844,6 +895,16 @@ class ClassroomAccompanimentView(QWidget):
             self.preview_view.setHtml(html_content)
         else:
             self.preview_view.setHtml(html_content)
+
+    @staticmethod
+    def _normalize_text(value: str) -> str:
+        base = unicodedata.normalize("NFD", str(value or ""))
+        base = "".join(char for char in base if unicodedata.category(char) != "Mn")
+        return re.sub(r"\s+", " ", base).strip().lower()
+
+    def _is_behavior_assignment(self, contexto: dict[str, Any] | None = None) -> bool:
+        info = contexto or (self.accompaniment_service.obtener_contexto(str(self.assignment_combo.currentData() or "")) or {})
+        return self._normalize_text(str(info.get("asignatura_nombre") or "")) == self.BEHAVIOR_SUBJECT_NAME
 
 
 class VistaPreviaCualitativaDialog(QDialog):
