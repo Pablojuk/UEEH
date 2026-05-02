@@ -211,6 +211,20 @@ class HtmlReportRenderer:
         return "".join(parts)
 
     def _build_trimestral_rows_html(self, rows: list[dict[str, Any]]) -> str:
+        if rows and "promedio_trimestral" in rows[0]:
+            html_rows: list[str] = []
+            for idx, row in enumerate(rows, start=1):
+                html_rows.append(
+                    "<tr>"
+                    f"<td>{idx}</td>"
+                    f"<td class='nomina'>{html.escape(str(row.get('estudiante', '')))}</td>"
+                    f"{self._build_numeric_cell(row.get('promedio_trimestral'), extra_classes='prom-bold')}"
+                    f"<td>{html.escape(str(row.get('cualitativa', '')))}</td>"
+                    f"<td>{html.escape(str(row.get('equivalencia', '')))}</td>"
+                    f"<td class='{self._observation_class(str(row.get('observacion','')))}'>{html.escape(str(row.get('observacion', '')))}</td>"
+                    "</tr>"
+                )
+            return "".join(html_rows)
         html_rows: list[str] = []
         for idx, row in enumerate(rows, start=1):
             promedio_final = self._build_numeric_cell(row.get("promedio_final"), extra_classes="prom-bold")
@@ -235,6 +249,23 @@ class HtmlReportRenderer:
         return "".join(html_rows)
 
     def _build_anual_rows_html(self, rows: list[dict[str, Any]]) -> str:
+        if rows and "equivalencia" in rows[0] and rows[0].get("supletorio") is None:
+            html_rows: list[str] = []
+            for idx, row in enumerate(rows, start=1):
+                html_rows.append(
+                    "<tr>"
+                    f"<td>{idx}</td>"
+                    f"<td class='nomina'>{html.escape(str(row.get('estudiante', '')))}</td>"
+                    f"{self._build_numeric_cell(row.get('trimestre_1'))}<td>{html.escape(str(row.get('equivalencia_t1', '')))}</td>"
+                    f"{self._build_numeric_cell(row.get('trimestre_2'))}<td>{html.escape(str(row.get('equivalencia_t2', '')))}</td>"
+                    f"{self._build_numeric_cell(row.get('trimestre_3'))}<td>{html.escape(str(row.get('equivalencia_t3', '')))}</td>"
+                    f"{self._build_numeric_cell(row.get('promedio'), extra_classes='prom-bold')}"
+                    f"<td>{html.escape(str(row.get('cualitativa_anual', '')))}</td>"
+                    f"<td>{html.escape(str(row.get('equivalencia', '')))}</td>"
+                    f"<td class='{self._observation_class(str(row.get('observacion','')))}'>{html.escape(str(row.get('observacion', '')))}</td>"
+                    "</tr>"
+                )
+            return "".join(html_rows)
         html_rows: list[str] = []
         for idx, row in enumerate(rows, start=1):
             observacion_raw = str(row.get("observacion", ""))

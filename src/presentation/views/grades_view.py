@@ -49,6 +49,13 @@ class GradesView(QWidget):
         ("cualitativo", "Cualitativo"),
         ("cualitativo_adicional", "Equivalencia"),
     ]
+    SUMMATIVE_COLUMNS_EGB_BASICA = [
+        ("proyecto", "Proyecto Interdisciplinar"),
+        ("evaluacion", "Evaluación Trimestral"),
+        ("nota_trimestral", "Promedio Trimestral"),
+        ("cualitativo", "Cualitativo"),
+        ("cualitativo_adicional", "Equivalencia"),
+    ]
 
     ACCOMPANIMENT_SUBJECT_NAME = "acompañamiento integral en el aula"
     BEHAVIOR_SUBJECT_NAME = "comportamiento"
@@ -75,6 +82,7 @@ class GradesView(QWidget):
         self._animation_reading_mode = False
         self._vocational_orientation_mode = False
         self._switching_mode = False
+        self._egb_basic_mode = False
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -143,6 +151,7 @@ class GradesView(QWidget):
             """
         )
         self.table.installEventFilter(self)
+        self.table.itemChanged.connect(self._on_table_item_changed)
         self.copy_shortcut = QShortcut("Ctrl+C", self.table)
         self.copy_shortcut.activated.connect(self._copy_selected_cells)
         self.paste_shortcut = QShortcut("Ctrl+V", self.table)
@@ -185,6 +194,7 @@ class GradesView(QWidget):
             root.addWidget(self.vocational_orientation_view, 1)
 
         self.load_contexts()
+        self._updating_calculations = False
 
     def load_contexts(self, selected_assignment_id: str | None = None) -> None:
         self.assignment_combo.clear()
@@ -215,8 +225,8 @@ class GradesView(QWidget):
             self._numero_actividades = numero
             self._build_activity_metadata_inputs()
             self._save_activity_metadata()
-            self._setup_columns()
             self._save_activity_names()
+            self.load_rows()
         else:
             QMessageBox.warning(self, "Validación", message)
 
@@ -249,7 +259,13 @@ class GradesView(QWidget):
         recalculadas = []
         try:
             for fila in filas:
-                recalculadas.append(self.grade_registration_service.recalcular_fila(fila, self._numero_actividades))
+                recalculadas.append(
+                    self.grade_registration_service.recalcular_fila(
+                        fila,
+                        self._numero_actividades,
+                        usar_logica_basica=self._egb_basic_mode,
+                    )
+                )
         except ValueError as exc:
             QMessageBox.warning(self, "Validación", str(exc))
             return
@@ -289,7 +305,7 @@ class GradesView(QWidget):
             self._table_columns.append((f"mejora_{idx}", f"Refuerzo {idx}"))
             self._activity_group_columns.append((idx, col_act, col_ref))
             self._table_columns.append((f"promedio_{idx}", f"Promedio {idx}"))
-        self._table_columns.extend(self.SUMMATIVE_COLUMNS)
+        self._table_columns.extend(self.SUMMATIVE_COLUMNS_EGB_BASICA if self._egb_basic_mode else self.SUMMATIVE_COLUMNS)
         self.table.setColumnCount(len(self._table_columns))
         self.table.setHorizontalHeaderLabels([self._format_header_label(title) for _, title in self._table_columns])
 
@@ -413,6 +429,7 @@ class GradesView(QWidget):
         if current_row == 0:
             return
 
+        touched_rows: set[int] = set()
         rows = [line.split("\t") for line in text.splitlines()]
         for row_offset, values in enumerate(rows):
             target_row = current_row + row_offset
@@ -429,6 +446,47 @@ class GradesView(QWidget):
                 if item.flags() & Qt.ItemIsEditable:
                     field = self._table_columns[target_col][0] if target_col < len(self._table_columns) else ""
                     item.setText(self._normalize_clipboard_value(value, field))
+                    touched_rows.add(target_row)
+        self._recalculate_rows_in_table(sorted(touched_rows))
+
+    def _on_table_item_changed(self, item: QTableWidgetItem) -> None:
+        if self._updating_calculations:
+            return
+        row = item.row()
+        if row <= 0 or row >= self.table.rowCount():
+            return
+        if item.column() >= len(self._table_columns):
+            return
+        field = self._table_columns[item.column()][0]
+        if field in {"estudiante", "cualitativo", "cualitativo_adicional"}:
+            return
+        self._recalculate_rows_in_table([row])
+
+    def _recalculate_rows_in_table(self, rows: list[int]) -> None:
+        valid_rows = [r for r in rows if 1 <= r < self.table.rowCount()]
+        if not valid_rows:
+            return
+        self._updating_calculations = True
+        try:
+            row_data = self._collect_rows_from_table()
+            for row in valid_rows:
+                idx = row - 1
+                recalculada = self.grade_registration_service.recalcular_fila(
+                    row_data[idx],
+                    self._numero_actividades,
+                    usar_logica_basica=self._egb_basic_mode,
+                )
+                for col, (field, _) in enumerate(self._table_columns):
+                    value = recalculada.get(field)
+                    text = "" if value is None else str(value)
+                    item = self.table.item(row, col) or QTableWidgetItem("")
+                    item.setText(text)
+                    if field.startswith("promedio_") or field in {"estudiante", "nota_trimestral", "cualitativo", "cualitativo_adicional"}:
+                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    self._apply_item_colors(item, field, value)
+                    self.table.setItem(row, col, item)
+        finally:
+            self._updating_calculations = False
 
     def _normalize_clipboard_value(self, value: str, field: str) -> str:
         text = str(value).strip()
@@ -545,7 +603,11 @@ class GradesView(QWidget):
                 self._sync_accompaniment_view()
             else:
                 self._show_quantitative_view()
-                self._clear_table()
+                self._egb_basic_mode = bool(
+                    selected_assignment
+                    and self.grade_registration_service.usar_logica_cuantitativa_basica(str(selected_assignment))
+                )
+                self.load_rows()
         finally:
             self._switching_mode = False
 
@@ -553,15 +615,10 @@ class GradesView(QWidget):
         self._accompaniment_mode = False
         self._animation_reading_mode = False
         self._vocational_orientation_mode = False
-        for w in (
-            self.activities_count_label,
-            self.activities_count_input,
-            self.generate_activities_button,
-            self.load_button,
-            self.recalc_button,
-            self.save_button,
-        ):
+        for w in (self.activities_count_label, self.activities_count_input, self.generate_activities_button, self.save_button):
             w.setVisible(True)
+        self.load_button.setVisible(False)
+        self.recalc_button.setVisible(False)
         self.table.setVisible(True)
         if self.accompaniment_view is not None:
             self.accompaniment_view.setVisible(False)

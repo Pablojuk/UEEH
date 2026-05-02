@@ -92,12 +92,16 @@ class ExcelReportExporter:
 
         start_row = 10
         if context.get("report_type") == "trimestral":
-            headers = [
-                "N°", "Nómina",
-                "Aportes/Insumos Calificación", "Aportes/Insumos 70%",
-                "Evaluaciones sumativas Calificación", "Evaluaciones sumativas 30%",
-                "Promedio Final", "Cualitativa", "Equivalencia", "Observación",
-            ]
+            is_egb = bool(filtered_rows and "promedio_trimestral" in filtered_rows[0])
+            if is_egb:
+                headers = ["N°", "Nómina", "Promedio Trimestral", "Cualitativo", "Equivalencia", "Observación"]
+            else:
+                headers = [
+                    "N°", "Nómina",
+                    "Aportes/Insumos Calificación", "Aportes/Insumos 70%",
+                    "Evaluaciones sumativas Calificación", "Evaluaciones sumativas 30%",
+                    "Promedio Final", "Cualitativa", "Equivalencia", "Observación",
+                ]
             for col, title in enumerate(headers, start=1):
                 cell = ws.cell(row=start_row, column=col, value=title)
                 cell.font = Font(bold=True, color=self.COLOR_HEADER_FG, size=9)
@@ -107,18 +111,14 @@ class ExcelReportExporter:
 
             for idx, row in enumerate(filtered_rows, start=1):
                 r = start_row + idx
-                values = [
-                    idx,
-                    row.get("estudiante", ""),
-                    row.get("aportes_calificacion"),
-                    row.get("aportes_70"),
-                    row.get("sumativas_calificacion"),
-                    row.get("sumativas_30"),
-                    row.get("promedio_final"),
-                    row.get("cualitativa", ""),
-                    row.get("equivalencia", ""),
-                    row.get("observacion", ""),
-                ]
+                values = [idx, row.get("estudiante", "")]
+                if is_egb:
+                    values.extend([row.get("promedio_trimestral"), row.get("cualitativa", ""), row.get("equivalencia", ""), row.get("observacion", "")])
+                else:
+                    values.extend([
+                        row.get("aportes_calificacion"), row.get("aportes_70"), row.get("sumativas_calificacion"), row.get("sumativas_30"),
+                        row.get("promedio_final"), row.get("cualitativa", ""), row.get("equivalencia", ""), row.get("observacion", ""),
+                    ])
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
                     cell.alignment = Alignment(horizontal="left" if cidx == 2 else "center", vertical="center")
@@ -130,18 +130,25 @@ class ExcelReportExporter:
                 obs_text = str(row.get("observacion", "")).strip().upper()
                 obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
                 if obs_color:
-                    obs_cell = ws.cell(row=r, column=10)
+                    obs_cell = ws.cell(row=r, column=(6 if is_egb else 10))
                     obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
-            widths = [5, 34, 14, 12, 15, 12, 10, 10, 10, 12]
+            widths = [5, 34, 14, 12, 12, 14] if is_egb else [5, 34, 14, 12, 15, 12, 10, 10, 10, 12]
             signatures_row = max(start_row + len(filtered_rows) + 3, 39)
         else:
-            headers = [
-                "N°", "Nómina",
-                "Trimestre Cali", "Trimestre Cuali",
-                "Trimestre Cali", "Trimestre Cuali",
-                "Trimestre Cali", "Trimestre Cuali",
-                "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo", "Observación",
-            ]
+            is_egb = bool(filtered_rows and filtered_rows[0].get("supletorio") is None and "equivalencia" in filtered_rows[0])
+            if is_egb:
+                headers = [
+                    "N°", "Nómina", "T1 Calificación", "T1 Cualitativa", "T2 Calificación", "T2 Cualitativa",
+                    "T3 Calificación", "T3 Cualitativa", "Promedio", "Cualitativa", "Equivalencia", "Observación",
+                ]
+            else:
+                headers = [
+                    "N°", "Nómina",
+                    "Trimestre Cali", "Trimestre Cuali",
+                    "Trimestre Cali", "Trimestre Cuali",
+                    "Trimestre Cali", "Trimestre Cuali",
+                    "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo", "Observación",
+                ]
             for col, title in enumerate(headers, start=1):
                 cell = ws.cell(row=start_row, column=col, value=title)
                 cell.font = Font(bold=True, color=self.COLOR_HEADER_FG, size=9)
@@ -150,22 +157,11 @@ class ExcelReportExporter:
                 cell.border = border
             for idx, row in enumerate(filtered_rows, start=1):
                 r = start_row + idx
-                values = [
-                    idx,
-                    row.get("estudiante", ""),
-                    row.get("trimestre_1"),
-                    row.get("equivalencia_t1", ""),
-                    row.get("trimestre_2"),
-                    row.get("equivalencia_t2", ""),
-                    row.get("trimestre_3"),
-                    row.get("equivalencia_t3", ""),
-                    row.get("promedio"),
-                    row.get("cualitativa_anual", ""),
-                    row.get("supletorio"),
-                    row.get("promedio_final"),
-                    row.get("cualitativo_final", ""),
-                    row.get("observacion", ""),
-                ]
+                values = [idx, row.get("estudiante", ""), row.get("trimestre_1"), row.get("equivalencia_t1", ""), row.get("trimestre_2"), row.get("equivalencia_t2", ""), row.get("trimestre_3"), row.get("equivalencia_t3", ""), row.get("promedio"), row.get("cualitativa_anual", "")]
+                if is_egb:
+                    values.extend([row.get("equivalencia", ""), row.get("observacion", "")])
+                else:
+                    values.extend([row.get("supletorio"), row.get("promedio_final"), row.get("cualitativo_final", ""), row.get("observacion", "")])
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
                     cell.alignment = Alignment(horizontal="left" if cidx == 2 else "center", vertical="center")
@@ -177,9 +173,9 @@ class ExcelReportExporter:
                 obs_text = str(row.get("observacion", "")).strip().upper()
                 obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
                 if obs_color:
-                    obs_cell = ws.cell(row=r, column=14)
+                    obs_cell = ws.cell(row=r, column=(12 if is_egb else 14))
                     obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
-            widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
+            widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 16, 12] if is_egb else [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
             last_student_row = start_row + len(filtered_rows)
             stats_start = max(last_student_row + 4, 39)
             signatures_row = self._draw_annual_statistics(ws, stats_start, border, filtered_rows, last_student_row)

@@ -13,6 +13,7 @@ from src.domain.calculations import (
     calcular_promedio_anual,
     calcular_resultado_con_supletorio,
 )
+from src.application.services.grade_registration_service import GradeRegistrationService
 from src.infrastructure.persistence.repositories import FinalSupplementaryRepository
 
 
@@ -100,6 +101,35 @@ class AcademicSummaryService:
         ).fetchone()
         if not asignacion:
             return []
+
+        if self._usar_reporte_egb_basica(asignacion_id):
+            rows = self.connection.execute(
+                """
+                SELECT
+                    e.id_estudiante AS estudiante_id,
+                    e.apellidos || ' ' || e.nombres AS estudiante,
+                    m.numero_lista,
+                    g.nota_trimestral AS promedio_trimestral,
+                    g.cualitativo AS cualitativa,
+                    g.cualitativo_1 AS equivalencia
+                FROM matriculas m
+                JOIN estudiantes e ON e.id_estudiante = m.estudiante_id
+                LEFT JOIN grade_records g ON g.estudiante_id = e.id_estudiante
+                    AND g.asignacion_id = ? AND g.trimestre_num = ?
+                WHERE m.curso_id = ? AND m.paralelo_id = ? AND m.periodo_id = ?
+                ORDER BY CASE WHEN m.numero_lista IS NULL THEN 1 ELSE 0 END, m.numero_lista, e.apellidos, e.nombres
+                """,
+                (asignacion_id, trimestre_num, asignacion["curso_id"], asignacion["paralelo_id"], asignacion["periodo_id"]),
+            ).fetchall()
+            out: list[dict[str, Any]] = []
+            for row in rows:
+                item = dict(row)
+                item["promedio_final"] = item.get("promedio_trimestral")
+                item["cualitativa"] = str(item.get("cualitativa") or "")
+                item["equivalencia"] = str(item.get("equivalencia") or "")
+                item["observacion"] = calcular_observacion_final(item["promedio_final"]) if item["promedio_final"] is not None else ""
+                out.append(item)
+            return out
 
         rows = self.connection.execute(
             """
@@ -206,10 +236,7 @@ class AcademicSummaryService:
             t3 = tri_map.get((student_id, 3))
             promedio = self._calcular_promedio_anual_seguro(t1, t2, t3)
             supletorio = supp_map.get(student_id)
-            if promedio is None:
-                promedio_final = supletorio
-            else:
-                promedio_final = calcular_resultado_con_supletorio(promedio, supletorio)
+            promedio_final = promedio if usar_egb_basica else (supletorio if promedio is None else calcular_resultado_con_supletorio(promedio, supletorio))
 
             resumenes.append(
                 {
@@ -220,13 +247,14 @@ class AcademicSummaryService:
                     "trimestre_1": t1,
                     "trimestre_2": t2,
                     "trimestre_3": t3,
-                    "equivalencia_t1": self._calcular_equivalencia(t1),
-                    "equivalencia_t2": self._calcular_equivalencia(t2),
-                    "equivalencia_t3": self._calcular_equivalencia(t3),
+                    "equivalencia_t1": calcular_cualitativo_trimestral(t1) if t1 is not None else "",
+                    "equivalencia_t2": calcular_cualitativo_trimestral(t2) if t2 is not None else "",
+                    "equivalencia_t3": calcular_cualitativo_trimestral(t3) if t3 is not None else "",
                     "promedio": promedio,
-                    "cualitativa_anual": self._calcular_equivalencia(promedio),
-                    "supletorio": supletorio,
-                    "promedio_final": promedio_final,
+                    "cualitativa_anual": calcular_cualitativo(promedio) if promedio is not None else "",
+                    "equivalencia": self._calcular_equivalencia(promedio),
+                    "supletorio": None if usar_egb_basica else supletorio,
+                    "promedio_final": None if usar_egb_basica else promedio_final,
                     "cualitativo": calcular_cualitativo(promedio) if promedio is not None else "",
                     "cualitativo_final": self._calcular_equivalencia(promedio_final),
                     "observacion": calcular_observacion_final(promedio_final) if promedio_final is not None else "",
@@ -235,6 +263,26 @@ class AcademicSummaryService:
             )
 
         return resumenes
+
+    def _usar_reporte_egb_basica(self, asignacion_id: str) -> bool:
+        row = self.connection.execute(
+            """
+            SELECT s.nombre AS asignatura_nombre, c.nombre AS curso_nombre
+            FROM asignaciones_docente a
+            LEFT JOIN asignaturas s ON s.id_asignatura = a.asignatura_id
+            LEFT JOIN cursos c ON c.id_curso = a.curso_id
+            WHERE a.id_asignacion = ?
+            """,
+            (asignacion_id,),
+        ).fetchone()
+        if not row:
+            return False
+        subject = self._normalize_text(str(row["asignatura_nombre"] or ""))
+        if subject in self.EXCLUDED_SPECIAL_SUBJECTS:
+            return False
+        normalized = self._normalize_text(str(row["curso_nombre"] or ""))
+        tokens = set(normalized.split())
+        return "egb" in tokens and any(t in tokens for t in {"2do", "segundo", "3ro", "tercero", "4to", "cuarto"})
 
     def recalcular_resumenes(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         recalculados: list[dict[str, Any]] = []
@@ -341,3 +389,5 @@ class AcademicSummaryService:
         if nota >= 5:
             return "PA"
         return "NA"
+    EXCLUDED_SPECIAL_SUBJECTS = GradeRegistrationService.EXCLUDED_SPECIAL_SUBJECTS
+        usar_egb_basica = self._usar_reporte_egb_basica(asignacion_id)

@@ -83,6 +83,7 @@ class AcademicSummaryView(QWidget):
             "tutor_curso": "",
         }
         self._suppress_auto_refresh = False
+        self._egb_basic_report_mode = False
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -230,6 +231,10 @@ class AcademicSummaryView(QWidget):
 
     def load_summary(self) -> None:
         asignacion_id = self.assignment_combo.currentData()
+        self._egb_basic_report_mode = bool(
+            asignacion_id and self.academic_summary_service._usar_reporte_egb_basica(str(asignacion_id))
+        )
+        self._update_controls_for_mode()
         if not asignacion_id:
             self._fill_table([])
             self._refresh_preview_silent()
@@ -390,15 +395,45 @@ class AcademicSummaryView(QWidget):
         report_type, _ = self.report_type_combo.currentData()
         if report_type == "trimestral":
             self._table_columns = list(self.TRIMESTRAL_COLUMNS)
-            self.save_button.setEnabled(False)
         else:
             self._table_columns = list(self.ANNUAL_COLUMNS)
-            self.save_button.setEnabled(True)
+        if self._egb_basic_report_mode and report_type == "trimestral":
+            self._table_columns = [
+                ("numero_lista", "N°"),
+                ("estudiante", "Nómina"),
+                ("promedio_trimestral", "Promedio Trimestral"),
+                ("cualitativa", "Cualitativo"),
+                ("equivalencia", "Equivalencia"),
+                ("observacion", "Observación"),
+            ]
+        if self._egb_basic_report_mode and report_type == "anual":
+            self._table_columns = [
+                ("numero_lista", "N°"),
+                ("estudiante", "Nómina"),
+                ("trimestre_1", "T1 Calificación"),
+                ("equivalencia_t1", "T1 Cualitativa"),
+                ("trimestre_2", "T2 Calificación"),
+                ("equivalencia_t2", "T2 Cualitativa"),
+                ("trimestre_3", "T3 Calificación"),
+                ("equivalencia_t3", "T3 Cualitativa"),
+                ("promedio", "Promedio"),
+                ("cualitativa_anual", "Cualitativa"),
+                ("equivalencia", "Equivalencia"),
+                ("observacion", "Observación"),
+            ]
+        self.save_button.setEnabled(report_type == "anual" and not self._egb_basic_report_mode)
         self.table.setColumnCount(len(self._table_columns))
         self.table.setHorizontalHeaderLabels([label for _, label in self._table_columns])
         self.table.setRowCount(0)
         self._rows_meta = []
         self._on_filters_changed()
+
+    def _update_controls_for_mode(self) -> None:
+        hide = self._egb_basic_report_mode
+        self.load_button.setVisible(not hide)
+        self.recalc_button.setVisible(not hide)
+        self.save_button.setVisible(not hide)
+        self.table.setVisible(not hide)
 
     def _set_preview_html(self, html_content: str) -> None:
         self.btn_toggle_filas.setChecked(False)
