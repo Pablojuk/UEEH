@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -132,6 +133,9 @@ class ReportExportService:
         context["report_type"] = report_type
         context["trimestre_num"] = trimestre_num
         context["firmantes"] = firmantes or {}
+        context["is_simplified_trimestral"] = bool(
+            report_type == "trimestral" and self._use_simplified_trimestral(context)
+        )
         context["template_data"] = self._build_template_data(context, report_type, trimestre_num)
         rows = (
             self.academic_summary_service.obtener_reporte_trimestral(asignacion_id, trimestre_num or 1)
@@ -192,7 +196,10 @@ class ReportExportService:
     @staticmethod
     def _hay_datos_exportables(rows: list[dict[str, Any]], report_type: str) -> bool:
         if report_type == "trimestral":
-            return any(row.get("promedio_final") is not None for row in rows)
+            return any(
+                (row.get("promedio_trimestral") is not None) or (row.get("promedio_final") is not None)
+                for row in rows
+            )
         for row in rows:
             if any(
                 row.get(k) is not None
@@ -224,3 +231,26 @@ class ReportExportService:
             "firma_rector": context.get("firmantes", {}).get("rector", ""),
             "firma_tutor": context.get("firmantes", {}).get("tutor_curso", ""),
         }
+
+    def _use_simplified_trimestral(self, context: dict[str, Any]) -> bool:
+        subject = self._normalize_text(context.get("asignatura_nombre", ""))
+        if subject in self.SPECIAL_SUBJECTS:
+            return False
+        return self._normalize_text(context.get("curso_nombre", "")) in self.SIMPLIFIED_COURSES
+
+    @staticmethod
+    def _normalize_text(value: Any) -> str:
+        normalized = unicodedata.normalize("NFD", str(value or "").strip().lower())
+        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        return " ".join(normalized.split())
+    SPECIAL_SUBJECTS = {
+        "orientacion vocacional y profesional",
+        "comportamiento",
+        "acompanamiento integral en el aula",
+        "animacion a la lectura",
+    }
+    SIMPLIFIED_COURSES = {
+        "2do de egb", "2do egb", "segundo de egb", "segundo egb",
+        "3ro de egb", "3ro egb", "tercero de egb", "tercero egb",
+        "4to de egb", "4to egb", "cuarto de egb", "cuarto egb",
+    }
