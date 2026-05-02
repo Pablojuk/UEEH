@@ -146,6 +146,8 @@ class AcademicSummaryService:
             item["sumativas_30"] = sumativas_30
             item["promedio_final"] = promedio
             item["cualitativa"] = calcular_cualitativo_trimestral(promedio)
+            item["promedio_trimestral"] = promedio
+            item["cualitativo"] = item["cualitativa"]
             item["equivalencia"] = self._calcular_equivalencia(item.get("promedio_final"))
             item["observacion"] = (
                 calcular_observacion_final(item.get("promedio_final")) if item.get("promedio_final") is not None else ""
