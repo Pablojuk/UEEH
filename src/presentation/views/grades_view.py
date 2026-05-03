@@ -83,6 +83,7 @@ class GradesView(QWidget):
         self._vocational_orientation_mode = False
         self._switching_mode = False
         self._egb_basic_mode = False
+        self._updating_calculations = False
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -194,7 +195,6 @@ class GradesView(QWidget):
             root.addWidget(self.vocational_orientation_view, 1)
 
         self.load_contexts()
-        self._updating_calculations = False
 
     def load_contexts(self, selected_assignment_id: str | None = None) -> None:
         self.assignment_combo.clear()

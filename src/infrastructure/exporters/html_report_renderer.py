@@ -15,40 +15,7 @@ class HtmlReportRenderer:
     def render(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         simplified_trimestral = bool(context.get("report_type") == "trimestral" and context.get("is_simplified_trimestral"))
         if simplified_trimestral:
-            stats = self._build_simplified_stats(rows)
-            return self.render_animacion_lectura(
-                {
-                    "reporte_titulo": f"REPORTE TRIMESTRAL - {context.get('asignatura_nombre', '')}",
-                    "docente": context.get("docente_nombre", ""),
-                    "curso": context.get("curso_nombre", ""),
-                    "paralelo": context.get("paralelo_nombre", ""),
-                    "nivel": context.get("curso_nivel", ""),
-                    "fecha": datetime.now().strftime("%Y-%m-%d"),
-                    "anio_lectivo": context.get("periodo_id", ""),
-                    "trimestre": f"TRIMESTRE {context.get('trimestre_num')}",
-                    "logo_institucion": self._build_logo_source(context.get("logo_path"), "institucional"),
-                    "logo_ministerio": self._build_logo_source(context.get("logo_ministerio_path"), "ministerio"),
-                    "rector": context.get("firmantes", {}).get("rector", ""),
-                    "stats": {
-                        "rows": stats["rows"],
-                        "total_n": len(rows),
-                        "total_p": "100,00%" if rows else "0,00%",
-                    },
-                },
-                [
-                    {
-                        "nro": idx,
-                        "nomina": row.get("estudiante", ""),
-                        "valor": self._fmt(row.get("promedio_trimestral", row.get("promedio_final"))),
-                        "cualitativo": row.get("cualitativo", row.get("cualitativa", "")),
-                        "cualitativo_1": row.get("equivalencia", ""),
-                        "descripcion": row.get("observacion", ""),
-                    }
-                    for idx, row in enumerate(rows, start=1)
-                ],
-            )
-        if simplified_trimestral:
-            template_name = "reporte_animacion_lectura.html"
+            template_name = "reporte_trimestral_simplificado.html"
         else:
             template_name = "reporte_trimestral.html" if context.get("report_type") == "trimestral" else "reporte_anual.html"
         template_path = Path(__file__).resolve().parent.parent / "templates" / template_name
@@ -127,19 +94,19 @@ class HtmlReportRenderer:
         return sum(values) / len(values)
 
     def _build_simplified_trimestral_rows_html(self, rows: list[dict[str, Any]]) -> str:
-        mapped = []
+        parts: list[str] = []
         for idx, row in enumerate(rows, start=1):
-            mapped.append(
-                {
-                    "nro": idx,
-                    "nomina": row.get("estudiante", ""),
-                    "valor": self._fmt(row.get("promedio_trimestral", row.get("promedio_final"))),
-                    "cualitativo": row.get("cualitativo", row.get("cualitativa", "")),
-                    "cualitativo_1": row.get("equivalencia", ""),
-                    "descripcion": row.get("observacion", ""),
-                }
+            parts.append(
+                "<tr>"
+                f"<td>{idx}</td>"
+                f"<td class='nomina'>{html.escape(str(row.get('estudiante', '')))}</td>"
+                f"{self._build_numeric_cell(row.get('promedio_trimestral', row.get('promedio_final')), extra_classes='prom-bold')}"
+                f"<td>{html.escape(str(row.get('cualitativo', row.get('cualitativa', ''))))}</td>"
+                f"<td>{html.escape(str(row.get('equivalencia', '')))}</td>"
+                f"<td class='{self._observation_class(str(row.get('observacion', '')))}'>{html.escape(str(row.get('observacion', '')))}</td>"
+                "</tr>"
             )
-        return self._build_animacion_rows_html(mapped)
+        return "".join(parts)
 
     def _build_simplified_stats_rows_html(self, rows: list[dict[str, Any]]) -> str:
         stats = self._build_simplified_stats(rows)
@@ -154,6 +121,14 @@ class HtmlReportRenderer:
             '<div id="bar-chart" data-categories="' + ",".join(categories) + '" '
             'data-percentages="' + ",".join(f"{p:.2f}" for p in pcts) + '" '
             'data-frequencies="' + ",".join(str(n) for n in nums) + '"></div>'
+            "<script>(function(){const el=document.getElementById('bar-chart');if(!el)return;"
+            "const cats=el.dataset.categories.split(',');const p=el.dataset.percentages.split(',').map(Number);"
+            "const n=el.dataset.frequencies.split(',').map(Number);"
+            "let h='<div style=\"display:flex;gap:8px;align-items:flex-end;height:180px;\">';"
+            "for(let i=0;i<cats.length;i++){const bh=Math.max(2,p[i]*1.4);h+=`<div style=\"flex:1;text-align:center\">"
+            "<div style='font-size:10px'>${String(p[i].toFixed(2)).replace('.',',')}%</div>"
+            "<div style='background:#2E75B6;height:${bh}px'></div><div style='font-size:10px'>${n[i]}</div>"
+            "<div style='font-size:10px'>${cats[i]}</div></div>`;}h+='</div>';el.innerHTML=h;})();</script>"
         )
 
     def _build_simplified_stats(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
