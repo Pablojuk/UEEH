@@ -21,7 +21,26 @@ class _FakeAcademicSummaryService:
         self.anual_calls = 0
 
     def listar_contextos_disponibles(self) -> list[dict]:
-        return [{"id_asignacion": "AS1", "display": "Contexto demo"}]
+        return [
+            {
+                "id_asignacion": "AS1",
+                "display": "Contexto demo",
+                "curso_nombre": "2do de EGB",
+                "asignatura_nombre": "Matemática",
+            },
+            {
+                "id_asignacion": "AS2",
+                "display": "Contexto especial",
+                "curso_nombre": "2do de EGB",
+                "asignatura_nombre": "Comportamiento",
+            },
+            {
+                "id_asignacion": "AS3",
+                "display": "Contexto general",
+                "curso_nombre": "8vo de EGB",
+                "asignatura_nombre": "Matemática",
+            },
+        ]
 
     def obtener_resumen_por_asignacion(self, asignacion_id: str) -> list[dict]:
         return list(self.rows)
@@ -167,6 +186,35 @@ class TestAcademicSummaryView(unittest.TestCase):
         service.signers.append({"id_docente": "D2", "firma": "Msc. Ana Perez"})
         view.refresh_data()
         self.assertGreater(view.signer_docente_combo.count(), initial_count)
+
+    def test_modo_simplificado_oculta_controles_supletorio_en_2do_egb(self) -> None:
+        from src.presentation.views.academic_summary_view import AcademicSummaryView
+
+        view = AcademicSummaryView(_FakeAcademicSummaryService(rows=[]), report_export_service=_FakeReportExportService())
+        idx = view.assignment_combo.findData("AS1")
+        self.assertGreaterEqual(idx, 0)
+        view.assignment_combo.setCurrentIndex(idx)
+
+        self.assertFalse(view.load_button.isVisible())
+        self.assertFalse(view.recalc_button.isVisible())
+        self.assertFalse(view.save_button.isVisible())
+        self.assertFalse(view.tabs.isTabVisible(0))
+        self.assertTrue(view.preview_button.isVisible())
+        self.assertTrue(view.export_pdf_button.isVisible())
+        self.assertTrue(view.export_excel_button.isVisible())
+
+    def test_materia_especial_no_aplica_modo_simplificado(self) -> None:
+        from src.presentation.views.academic_summary_view import AcademicSummaryView
+
+        view = AcademicSummaryView(_FakeAcademicSummaryService(rows=[]), report_export_service=_FakeReportExportService())
+        idx = view.assignment_combo.findData("AS2")
+        self.assertGreaterEqual(idx, 0)
+        view.assignment_combo.setCurrentIndex(idx)
+
+        self.assertTrue(view.load_button.isVisible())
+        self.assertTrue(view.recalc_button.isVisible())
+        self.assertTrue(view.save_button.isVisible())
+        self.assertTrue(view.tabs.isTabVisible(0))
 
 
 if __name__ == "__main__":

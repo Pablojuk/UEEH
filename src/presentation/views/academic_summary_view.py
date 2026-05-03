@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QShortcut
@@ -64,6 +65,26 @@ class AcademicSummaryView(QWidget):
     ]
 
     EDITABLE_COLUMNS = {"supletorio"}
+    SPECIAL_SUBJECTS = {
+        "orientacion vocacional y profesional",
+        "comportamiento",
+        "acompanamiento integral en el aula",
+        "animacion a la lectura",
+    }
+    SIMPLIFIED_COURSES = {
+        "2do de egb",
+        "2do egb",
+        "segundo de egb",
+        "segundo egb",
+        "3ro de egb",
+        "3ro egb",
+        "tercero de egb",
+        "tercero egb",
+        "4to de egb",
+        "4to egb",
+        "cuarto de egb",
+        "cuarto egb",
+    }
 
     def __init__(
         self,
@@ -83,6 +104,7 @@ class AcademicSummaryView(QWidget):
             "tutor_curso": "",
         }
         self._suppress_auto_refresh = False
+        self._simplified_mode = False
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -398,6 +420,7 @@ class AcademicSummaryView(QWidget):
         self.table.setHorizontalHeaderLabels([label for _, label in self._table_columns])
         self.table.setRowCount(0)
         self._rows_meta = []
+        self._apply_summary_mode_visibility()
         self._on_filters_changed()
 
     def _set_preview_html(self, html_content: str) -> None:
@@ -489,9 +512,39 @@ class AcademicSummaryView(QWidget):
         self._refresh_preview_silent()
 
     def _on_filters_changed(self) -> None:
+        self._apply_summary_mode_visibility()
         if self._suppress_auto_refresh:
             return
         self.load_summary()
+
+    def _apply_summary_mode_visibility(self) -> None:
+        simplified = self._should_use_simplified_mode()
+        self._simplified_mode = simplified
+        self.load_button.setVisible(not simplified)
+        self.recalc_button.setVisible(not simplified)
+        self.save_button.setVisible(not simplified)
+        resumen_index = self.tabs.indexOf(self.table.parentWidget())
+        if resumen_index >= 0:
+            self.tabs.setTabVisible(resumen_index, not simplified)
+        if simplified:
+            self.tabs.setCurrentIndex(1)
+
+    def _should_use_simplified_mode(self) -> bool:
+        asignacion_id = str(self.assignment_combo.currentData() or "")
+        if not asignacion_id:
+            return False
+        context = self._contexts_by_id.get(asignacion_id, {})
+        subject = self._normalize_text(str(context.get("asignatura_nombre") or ""))
+        if subject in self.SPECIAL_SUBJECTS:
+            return False
+        course_name = self._normalize_text(str(context.get("curso_nombre") or ""))
+        return any(alias in course_name for alias in self.SIMPLIFIED_COURSES)
+
+    @staticmethod
+    def _normalize_text(value: str) -> str:
+        normalized = unicodedata.normalize("NFD", str(value or "").strip().lower())
+        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        return " ".join(normalized.split())
 
     def _refresh_preview_silent(self) -> None:
         if self.report_export_service is None:

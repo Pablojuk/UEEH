@@ -92,12 +92,16 @@ class ExcelReportExporter:
 
         start_row = 10
         if context.get("report_type") == "trimestral":
-            headers = [
-                "N°", "Nómina",
-                "Aportes/Insumos Calificación", "Aportes/Insumos 70%",
-                "Evaluaciones sumativas Calificación", "Evaluaciones sumativas 30%",
-                "Promedio Final", "Cualitativa", "Equivalencia", "Observación",
-            ]
+            simplified = bool(context.get("is_simplified_trimestral"))
+            if simplified:
+                headers = ["N°", "Nómina", "Promedio Trimestral", "Cualitativo", "Equivalencia", "Observación"]
+            else:
+                headers = [
+                    "N°", "Nómina",
+                    "Aportes/Insumos Calificación", "Aportes/Insumos 70%",
+                    "Evaluaciones sumativas Calificación", "Evaluaciones sumativas 30%",
+                    "Promedio Final", "Cualitativa", "Equivalencia", "Observación",
+                ]
             for col, title in enumerate(headers, start=1):
                 cell = ws.cell(row=start_row, column=col, value=title)
                 cell.font = Font(bold=True, color=self.COLOR_HEADER_FG, size=9)
@@ -107,18 +111,29 @@ class ExcelReportExporter:
 
             for idx, row in enumerate(filtered_rows, start=1):
                 r = start_row + idx
-                values = [
-                    idx,
-                    row.get("estudiante", ""),
-                    row.get("aportes_calificacion"),
-                    row.get("aportes_70"),
-                    row.get("sumativas_calificacion"),
-                    row.get("sumativas_30"),
-                    row.get("promedio_final"),
-                    row.get("cualitativa", ""),
-                    row.get("equivalencia", ""),
-                    row.get("observacion", ""),
-                ]
+                values = (
+                    [
+                        idx,
+                        row.get("estudiante", ""),
+                        row.get("promedio_trimestral", row.get("promedio_final")),
+                        row.get("cualitativo", row.get("cualitativa", "")),
+                        row.get("equivalencia", ""),
+                        row.get("observacion", ""),
+                    ]
+                    if simplified else
+                    [
+                        idx,
+                        row.get("estudiante", ""),
+                        row.get("aportes_calificacion"),
+                        row.get("aportes_70"),
+                        row.get("sumativas_calificacion"),
+                        row.get("sumativas_30"),
+                        row.get("promedio_final"),
+                        row.get("cualitativa", ""),
+                        row.get("equivalencia", ""),
+                        row.get("observacion", ""),
+                    ]
+                )
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
                     cell.alignment = Alignment(horizontal="left" if cidx == 2 else "center", vertical="center")
@@ -130,12 +145,23 @@ class ExcelReportExporter:
                 obs_text = str(row.get("observacion", "")).strip().upper()
                 obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
                 if obs_color:
-                    obs_cell = ws.cell(row=r, column=10)
+                    obs_cell = ws.cell(row=r, column=6 if simplified else 10)
                     obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
-            widths = [5, 34, 14, 12, 15, 12, 10, 10, 10, 12]
-            signatures_row = max(start_row + len(filtered_rows) + 3, 39)
+            if simplified:
+                widths = [5, 34, 16, 12, 12, 12]
+                signatures_row = self._draw_trimester_stats(ws, max(start_row + len(filtered_rows) + 4, 18), border, filtered_rows)
+            else:
+                widths = [5, 34, 14, 12, 15, 12, 10, 10, 10, 12]
+                signatures_row = max(start_row + len(filtered_rows) + 3, 39)
         else:
+            simplified_anual = bool(context.get("is_simplified_anual"))
             headers = [
+                "N°", "Nómina",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Promedio", "Cualitativa", "Equivalencia", "Observación",
+            ] if simplified_anual else [
                 "N°", "Nómina",
                 "Trimestre Cali", "Trimestre Cuali",
                 "Trimestre Cali", "Trimestre Cuali",
@@ -161,10 +187,13 @@ class ExcelReportExporter:
                     row.get("equivalencia_t3", ""),
                     row.get("promedio"),
                     row.get("cualitativa_anual", ""),
-                    row.get("supletorio"),
-                    row.get("promedio_final"),
                     row.get("cualitativo_final", ""),
                     row.get("observacion", ""),
+                ] if simplified_anual else [
+                    idx,row.get("estudiante",""),row.get("trimestre_1"),row.get("equivalencia_t1",""),
+                    row.get("trimestre_2"),row.get("equivalencia_t2",""),row.get("trimestre_3"),row.get("equivalencia_t3",""),
+                    row.get("promedio"),row.get("cualitativa_anual",""),row.get("supletorio"),row.get("promedio_final"),
+                    row.get("cualitativo_final",""),row.get("observacion",""),
                 ]
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
@@ -177,9 +206,9 @@ class ExcelReportExporter:
                 obs_text = str(row.get("observacion", "")).strip().upper()
                 obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
                 if obs_color:
-                    obs_cell = ws.cell(row=r, column=14)
+                    obs_cell = ws.cell(row=r, column=12 if simplified_anual else 14)
                     obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
-            widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
+            widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 12] if simplified_anual else [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
             last_student_row = start_row + len(filtered_rows)
             stats_start = max(last_student_row + 4, 39)
             signatures_row = self._draw_annual_statistics(ws, stats_start, border, filtered_rows, last_student_row)
@@ -196,6 +225,30 @@ class ExcelReportExporter:
         self._draw_signatures(ws, signatures_row, len(widths), context.get("firmantes", {}))
         wb.save(str(path))
         return str(path)
+
+    def _draw_trimester_stats(self, ws, start_row: int, border, rows: list[dict[str, Any]]) -> int:
+        from openpyxl.styles import Alignment, Font
+        labels = ["A+", "A-", "B+", "B-", "C+", "C-", "D+", "D-", "E+", "E-"]
+        total = len(rows)
+        counts = {k: 0 for k in labels}
+        for row in rows:
+            c = str(row.get("cualitativo", row.get("cualitativa", ""))).strip().upper()
+            if c in counts:
+                counts[c] += 1
+        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=3)
+        ws.cell(row=start_row, column=1, value="ESCALA CUALITATIVA").font = Font(bold=True)
+        ws.cell(row=start_row, column=2, value="N°").font = Font(bold=True)
+        ws.cell(row=start_row, column=3, value="%").font = Font(bold=True)
+        for idx, label in enumerate(labels, start=1):
+            r = start_row + idx
+            ws.cell(r, 1, label)
+            ws.cell(r, 2, counts[label])
+            ws.cell(r, 3, ((counts[label] / total) if total else 0))
+            ws.cell(r, 3).number_format = "0.00%"
+            for c in range(1, 4):
+                ws.cell(r, c).border = border
+                ws.cell(r, c).alignment = Alignment(horizontal="center")
+        return start_row + len(labels) + 2
 
     @staticmethod
     def _apply_print_settings(ws, max_cols: int, max_rows: int) -> None:

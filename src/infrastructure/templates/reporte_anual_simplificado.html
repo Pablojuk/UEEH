@@ -1,0 +1,9 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte Anual Simplificado</title>
+<style>body{font-family:Calibri,sans-serif;font-size:12px}.principal,.stats{width:100%;border-collapse:collapse}.principal th,.principal td,.stats th,.stats td{border:1px solid #777;padding:4px;text-align:center}.nomina{text-align:left}</style>
+</head><body>
+<h2>{{ institucion_nombre }}</h2>
+<p><b>Docente:</b> {{ docente_nombre }} | <b>Curso:</b> {{ curso_nombre }} | <b>Paralelo:</b> {{ paralelo_nombre }}</p>
+<table class="principal"><thead><tr><th>N°</th><th>Nómina</th><th>T1 Calificación</th><th>T1 Cualitativa</th><th>T2 Calificación</th><th>T2 Cualitativa</th><th>T3 Calificación</th><th>T3 Cualitativa</th><th>Promedio</th><th>Cualitativa</th><th>Equivalencia</th><th>Observación</th></tr></thead><tbody>[[ rows_html ]]</tbody></table>
+<h3>ESCALA CUALITATIVA</h3><table class="stats"><thead><tr><th>ESCALA CUALITATIVA</th><th>N°</th><th>%</th></tr></thead><tbody>[[ logros_rows_html ]]</tbody></table>
+[[ chart_svg ]]
+</body></html>
