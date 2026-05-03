@@ -154,7 +154,14 @@ class ExcelReportExporter:
                 widths = [5, 34, 14, 12, 15, 12, 10, 10, 10, 12]
                 signatures_row = max(start_row + len(filtered_rows) + 3, 39)
         else:
+            simplified_anual = bool(context.get("is_simplified_anual"))
             headers = [
+                "N°", "Nómina",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Promedio", "Cualitativa", "Equivalencia", "Observación",
+            ] if simplified_anual else [
                 "N°", "Nómina",
                 "Trimestre Cali", "Trimestre Cuali",
                 "Trimestre Cali", "Trimestre Cuali",
@@ -180,10 +187,13 @@ class ExcelReportExporter:
                     row.get("equivalencia_t3", ""),
                     row.get("promedio"),
                     row.get("cualitativa_anual", ""),
-                    row.get("supletorio"),
-                    row.get("promedio_final"),
                     row.get("cualitativo_final", ""),
                     row.get("observacion", ""),
+                ] if simplified_anual else [
+                    idx,row.get("estudiante",""),row.get("trimestre_1"),row.get("equivalencia_t1",""),
+                    row.get("trimestre_2"),row.get("equivalencia_t2",""),row.get("trimestre_3"),row.get("equivalencia_t3",""),
+                    row.get("promedio"),row.get("cualitativa_anual",""),row.get("supletorio"),row.get("promedio_final"),
+                    row.get("cualitativo_final",""),row.get("observacion",""),
                 ]
                 for cidx, value in enumerate(values, start=1):
                     cell = ws.cell(row=r, column=cidx, value=value)
@@ -196,9 +206,9 @@ class ExcelReportExporter:
                 obs_text = str(row.get("observacion", "")).strip().upper()
                 obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
                 if obs_color:
-                    obs_cell = ws.cell(row=r, column=14)
+                    obs_cell = ws.cell(row=r, column=12 if simplified_anual else 14)
                     obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
-            widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
+            widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 12] if simplified_anual else [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
             last_student_row = start_row + len(filtered_rows)
             stats_start = max(last_student_row + 4, 39)
             signatures_row = self._draw_annual_statistics(ws, stats_start, border, filtered_rows, last_student_row)

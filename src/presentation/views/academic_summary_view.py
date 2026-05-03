@@ -538,7 +538,7 @@ class AcademicSummaryView(QWidget):
         if subject in self.SPECIAL_SUBJECTS:
             return False
         course_name = self._normalize_text(str(context.get("curso_nombre") or ""))
-        return course_name in self.SIMPLIFIED_COURSES
+        return any(alias in course_name for alias in self.SIMPLIFIED_COURSES)
 
     @staticmethod
     def _normalize_text(value: str) -> str:

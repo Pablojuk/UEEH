@@ -43,6 +43,26 @@ class TestHtmlReportRenderer(unittest.TestCase):
         self.assertIn("class='nomina'", html)
         self.assertIn("<svg", html)
 
+    def test_render_anual_simplificado_no_muestra_supletorio(self) -> None:
+        renderer = HtmlReportRenderer()
+        html = renderer.render(
+            {
+                "report_type": "anual",
+                "is_simplified_anual": True,
+                "institucion_nombre": "UEEH",
+                "docente_nombre": "Ana Perez",
+                "asignatura_nombre": "Matemática",
+                "curso_nombre": "3ro de EGB-A",
+                "paralelo_nombre": "A",
+                "firmantes": {},
+                "institucion": {},
+            },
+            [{"estudiante": "Lopez Maria", "trimestre_1": 8, "equivalencia_t1": "A-", "trimestre_2": 9, "equivalencia_t2": "A+", "trimestre_3": 8, "equivalencia_t3": "A-", "promedio": 8.33, "cualitativa_anual": "A-", "cualitativo_final": "A-", "observacion": "APB"}],
+        )
+        self.assertNotIn("Supletorio", html)
+        self.assertNotIn("Promedio Final", html)
+        self.assertIn("Equivalencia", html)
+
     def test_estadistica_anual_trata_spl_como_reprobado(self) -> None:
         renderer = HtmlReportRenderer()
         stats = renderer._build_estadistica_rows_html([

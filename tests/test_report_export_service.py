@@ -59,7 +59,7 @@ class TestReportExportService(unittest.TestCase):
                 ("D1", "Ana", "Perez", "123", 1),
             )
             self.conn.execute("INSERT INTO asignaturas (id_asignatura, nombre, codigo) VALUES (?, ?, ?)", ("A1", "Mat", "MAT"))
-            self.conn.execute("INSERT INTO cursos (id_curso, nombre, nivel) VALUES (?, ?, ?)", ("C1", "Primero", "Basica"))
+            self.conn.execute("INSERT INTO cursos (id_curso, nombre, nivel) VALUES (?, ?, ?)", ("C1", "3ro de EGB-A", "Basica"))
             self.conn.execute("INSERT INTO paralelos (id_paralelo, nombre) VALUES (?, ?)", ("P1", "A"))
             self.conn.execute(
                 "INSERT INTO periodos_lectivos (id_periodo, anio_inicio, anio_fin, fecha_inicio, fecha_fin) VALUES (?, ?, ?, ?, ?)",
@@ -182,6 +182,15 @@ class TestReportExportService(unittest.TestCase):
     def test_corrige_subtitulo_con_santa_isabel(self) -> None:
         cleaned = ReportExportService._sanitize_institucion({"ciudad": "Santa Isabale", "parroquia": "Cañaribamba"})
         self.assertEqual(cleaned["ciudad"], "Santa Isabel")
+
+    def test_detecta_simplificado_en_curso_con_paralelo(self) -> None:
+        service = ReportExportService(
+            connection=self.conn,
+            academic_summary_service=self.academic_summary_service,
+            institution_service=self.institution_service,
+        )
+        context, _ = service._prepare_report_context("AS1", "anual", None, None)
+        self.assertTrue(context["is_simplified_anual"])
 
 
 

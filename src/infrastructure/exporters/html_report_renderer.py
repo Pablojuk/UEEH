@@ -14,8 +14,11 @@ from typing import Any
 class HtmlReportRenderer:
     def render(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         simplified_trimestral = bool(context.get("report_type") == "trimestral" and context.get("is_simplified_trimestral"))
+        simplified_anual = bool(context.get("report_type") == "anual" and context.get("is_simplified_anual"))
         if simplified_trimestral:
             template_name = "reporte_trimestral_simplificado.html"
+        elif simplified_anual:
+            template_name = "reporte_anual_simplificado.html"
         else:
             template_name = "reporte_trimestral.html" if context.get("report_type") == "trimestral" else "reporte_anual.html"
         template_path = Path(__file__).resolve().parent.parent / "templates" / template_name
@@ -25,13 +28,15 @@ class HtmlReportRenderer:
         template = template_path.read_text(encoding="utf-8")
         is_trimestral = context.get("report_type") == "trimestral"
         body_rows = self._build_simplified_trimestral_rows_html(rows) if simplified_trimestral else (
-            self._build_trimestral_rows_html(rows) if is_trimestral else self._build_anual_rows_html(rows)
+            self._build_trimestral_rows_html(rows) if is_trimestral else (
+                self._build_simplified_anual_rows_html(rows) if simplified_anual else self._build_anual_rows_html(rows)
+            )
         )
-        logros_rows = self._build_simplified_stats_rows_html(rows) if simplified_trimestral else (
+        logros_rows = self._build_simplified_stats_rows_html(rows, use_anual=bool(simplified_anual)) if (simplified_trimestral or simplified_anual) else (
             self._build_logros_rows_html(rows) if is_trimestral else ""
         )
         estadistica_rows = self._build_estadistica_rows_html(rows) if not is_trimestral else ""
-        chart_svg = self._build_simplified_trimestral_chart_html(rows) if simplified_trimestral else (
+        chart_svg = self._build_simplified_trimestral_chart_html(rows, use_anual=bool(simplified_anual)) if (simplified_trimestral or simplified_anual) else (
             self._build_trimestral_chart_svg(rows) if is_trimestral else self._build_anual_chart_svg(rows)
         )
         promedio_general = self._fmt(
@@ -108,12 +113,29 @@ class HtmlReportRenderer:
             )
         return "".join(parts)
 
-    def _build_simplified_stats_rows_html(self, rows: list[dict[str, Any]]) -> str:
-        stats = self._build_simplified_stats(rows)
+    def _build_simplified_anual_rows_html(self, rows: list[dict[str, Any]]) -> str:
+        parts: list[str] = []
+        for idx, row in enumerate(rows, start=1):
+            parts.append(
+                "<tr>"
+                f"<td>{idx}</td><td class='nomina'>{html.escape(str(row.get('estudiante', '')))}</td>"
+                f"{self._build_numeric_cell(row.get('trimestre_1'))}<td>{html.escape(str(row.get('equivalencia_t1', '')))}</td>"
+                f"{self._build_numeric_cell(row.get('trimestre_2'))}<td>{html.escape(str(row.get('equivalencia_t2', '')))}</td>"
+                f"{self._build_numeric_cell(row.get('trimestre_3'))}<td>{html.escape(str(row.get('equivalencia_t3', '')))}</td>"
+                f"{self._build_numeric_cell(row.get('promedio'), extra_classes='prom-bold')}"
+                f"<td>{html.escape(str(row.get('cualitativa_anual', '')))}</td>"
+                f"<td>{html.escape(str(row.get('cualitativo_final', '')))}</td>"
+                f"<td class='{self._observation_class(str(row.get('observacion', '')))}'>{html.escape(str(row.get('observacion', '')))}</td>"
+                "</tr>"
+            )
+        return "".join(parts)
+
+    def _build_simplified_stats_rows_html(self, rows: list[dict[str, Any]], use_anual: bool = False) -> str:
+        stats = self._build_simplified_stats(rows, use_anual=use_anual)
         return self._build_animacion_stats_rows_html({"rows": stats["rows"]})
 
-    def _build_simplified_trimestral_chart_html(self, rows: list[dict[str, Any]]) -> str:
-        stats = self._build_simplified_stats(rows)
+    def _build_simplified_trimestral_chart_html(self, rows: list[dict[str, Any]], use_anual: bool = False) -> str:
+        stats = self._build_simplified_stats(rows, use_anual=use_anual)
         categories = [r["escala"] for r in stats["rows"]]
         pcts = [float(str(r["porcentaje"]).replace("%", "").replace(",", ".")) for r in stats["rows"]]
         nums = [int(r["numero"]) for r in stats["rows"]]
@@ -131,12 +153,13 @@ class HtmlReportRenderer:
             "<div style='font-size:10px'>${cats[i]}</div></div>`;}h+='</div>';el.innerHTML=h;})();</script>"
         )
 
-    def _build_simplified_stats(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    def _build_simplified_stats(self, rows: list[dict[str, Any]], use_anual: bool = False) -> dict[str, Any]:
         categories = ["A+", "A-", "B+", "B-", "C+", "C-", "D+", "D-", "E+", "E-"]
         total = len(rows)
         counts = {k: 0 for k in categories}
         for row in rows:
-            value = str(row.get("cualitativo", row.get("cualitativa", ""))).strip().upper()
+            source = row.get("cualitativo_final") if use_anual else row.get("cualitativo", row.get("cualitativa", ""))
+            value = str(source or "").strip().upper()
             if value in counts:
                 counts[value] += 1
         data_rows = []

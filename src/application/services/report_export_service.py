@@ -133,9 +133,10 @@ class ReportExportService:
         context["report_type"] = report_type
         context["trimestre_num"] = trimestre_num
         context["firmantes"] = firmantes or {}
-        context["is_simplified_trimestral"] = bool(
-            report_type == "trimestral" and self._use_simplified_trimestral(context)
-        )
+        simplified_egb = self._use_simplified_egb(context)
+        context["is_simplified_egb"] = simplified_egb
+        context["is_simplified_trimestral"] = bool(report_type == "trimestral" and simplified_egb)
+        context["is_simplified_anual"] = bool(report_type == "anual" and simplified_egb)
         context["template_data"] = self._build_template_data(context, report_type, trimestre_num)
         rows = (
             self.academic_summary_service.obtener_reporte_trimestral(asignacion_id, trimestre_num or 1)
@@ -232,11 +233,12 @@ class ReportExportService:
             "firma_tutor": context.get("firmantes", {}).get("tutor_curso", ""),
         }
 
-    def _use_simplified_trimestral(self, context: dict[str, Any]) -> bool:
+    def _use_simplified_egb(self, context: dict[str, Any]) -> bool:
         subject = self._normalize_text(context.get("asignatura_nombre", ""))
         if subject in self.SPECIAL_SUBJECTS:
             return False
-        return self._normalize_text(context.get("curso_nombre", "")) in self.SIMPLIFIED_COURSES
+        course = self._normalize_text(context.get("curso_nombre", ""))
+        return any(alias in course for alias in self.SIMPLIFIED_COURSES)
 
     @staticmethod
     def _normalize_text(value: Any) -> str:
