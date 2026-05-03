@@ -13,17 +13,27 @@ from typing import Any
 
 class HtmlReportRenderer:
     def render(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
-        template_name = "reporte_trimestral.html" if context.get("report_type") == "trimestral" else "reporte_anual.html"
+        simplified_trimestral = bool(context.get("report_type") == "trimestral" and context.get("is_simplified_trimestral"))
+        if simplified_trimestral:
+            template_name = "reporte_trimestral_simplificado.html"
+        else:
+            template_name = "reporte_trimestral.html" if context.get("report_type") == "trimestral" else "reporte_anual.html"
         template_path = Path(__file__).resolve().parent.parent / "templates" / template_name
         if not template_path.exists():
             return ""
 
         template = template_path.read_text(encoding="utf-8")
         is_trimestral = context.get("report_type") == "trimestral"
-        body_rows = self._build_trimestral_rows_html(rows) if is_trimestral else self._build_anual_rows_html(rows)
-        logros_rows = self._build_logros_rows_html(rows) if is_trimestral else ""
+        body_rows = self._build_simplified_trimestral_rows_html(rows) if simplified_trimestral else (
+            self._build_trimestral_rows_html(rows) if is_trimestral else self._build_anual_rows_html(rows)
+        )
+        logros_rows = self._build_simplified_stats_rows_html(rows) if simplified_trimestral else (
+            self._build_logros_rows_html(rows) if is_trimestral else ""
+        )
         estadistica_rows = self._build_estadistica_rows_html(rows) if not is_trimestral else ""
-        chart_svg = self._build_trimestral_chart_svg(rows) if is_trimestral else self._build_anual_chart_svg(rows)
+        chart_svg = self._build_simplified_trimestral_chart_html(rows) if simplified_trimestral else (
+            self._build_trimestral_chart_svg(rows) if is_trimestral else self._build_anual_chart_svg(rows)
+        )
         promedio_general = self._fmt(
             sum((float(r.get("promedio_final")) for r in rows if not self._is_empty_value(r.get("promedio_final"))), 0.0)
             / max(sum(1 for r in rows if not self._is_empty_value(r.get("promedio_final"))), 1)
@@ -50,7 +60,7 @@ class HtmlReportRenderer:
             "logros_rows_html": logros_rows,
             "estadistica_rows_html": estadistica_rows,
             "chart_svg": chart_svg,
-            "promedio_general": promedio_general,
+            "promedio_general": self._fmt(self._average_trimestral(rows) if simplified_trimestral else float(promedio_general or 0)),
             "firma_docente": context.get("firmantes", {}).get("docente", ""),
             "firma_coordinador": context.get("firmantes", {}).get("coordinador_area", ""),
             "firma_rector": context.get("firmantes", {}).get("rector", ""),
@@ -67,6 +77,74 @@ class HtmlReportRenderer:
             return str(value) if key in raw_keys else html.escape(str(value))
 
         return pattern.sub(replace_token, rendered)
+
+    @staticmethod
+    def _average_trimestral(rows: list[dict[str, Any]]) -> float:
+        values = []
+        for row in rows:
+            value = row.get("promedio_trimestral", row.get("promedio_final"))
+            if value is None:
+                continue
+            try:
+                values.append(float(value))
+            except Exception:  # noqa: BLE001
+                continue
+        if not values:
+            return 0.0
+        return sum(values) / len(values)
+
+    def _build_simplified_trimestral_rows_html(self, rows: list[dict[str, Any]]) -> str:
+        parts: list[str] = []
+        for idx, row in enumerate(rows, start=1):
+            parts.append(
+                "<tr>"
+                f"<td>{idx}</td>"
+                f"<td class='nomina'>{html.escape(str(row.get('estudiante', '')))}</td>"
+                f"{self._build_numeric_cell(row.get('promedio_trimestral', row.get('promedio_final')), extra_classes='prom-bold')}"
+                f"<td>{html.escape(str(row.get('cualitativo', row.get('cualitativa', ''))))}</td>"
+                f"<td>{html.escape(str(row.get('equivalencia', '')))}</td>"
+                f"<td class='{self._observation_class(str(row.get('observacion', '')))}'>{html.escape(str(row.get('observacion', '')))}</td>"
+                "</tr>"
+            )
+        return "".join(parts)
+
+    def _build_simplified_stats_rows_html(self, rows: list[dict[str, Any]]) -> str:
+        stats = self._build_simplified_stats(rows)
+        return self._build_animacion_stats_rows_html({"rows": stats["rows"]})
+
+    def _build_simplified_trimestral_chart_html(self, rows: list[dict[str, Any]]) -> str:
+        stats = self._build_simplified_stats(rows)
+        categories = [r["escala"] for r in stats["rows"]]
+        pcts = [float(str(r["porcentaje"]).replace("%", "").replace(",", ".")) for r in stats["rows"]]
+        nums = [int(r["numero"]) for r in stats["rows"]]
+        return (
+            '<div id="bar-chart" data-categories="' + ",".join(categories) + '" '
+            'data-percentages="' + ",".join(f"{p:.2f}" for p in pcts) + '" '
+            'data-frequencies="' + ",".join(str(n) for n in nums) + '"></div>'
+            "<script>(function(){const el=document.getElementById('bar-chart');if(!el)return;"
+            "const cats=el.dataset.categories.split(',');const p=el.dataset.percentages.split(',').map(Number);"
+            "const n=el.dataset.frequencies.split(',').map(Number);"
+            "let h='<div style=\"display:flex;gap:8px;align-items:flex-end;height:180px;\">';"
+            "for(let i=0;i<cats.length;i++){const bh=Math.max(2,p[i]*1.4);h+=`<div style=\"flex:1;text-align:center\">"
+            "<div style='font-size:10px'>${String(p[i].toFixed(2)).replace('.',',')}%</div>"
+            "<div style='background:#2E75B6;height:${bh}px'></div><div style='font-size:10px'>${n[i]}</div>"
+            "<div style='font-size:10px'>${cats[i]}</div></div>`;}h+='</div>';el.innerHTML=h;})();</script>"
+        )
+
+    def _build_simplified_stats(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
+        categories = ["A+", "A-", "B+", "B-", "C+", "C-", "D+", "D-", "E+", "E-"]
+        total = len(rows)
+        counts = {k: 0 for k in categories}
+        for row in rows:
+            value = str(row.get("cualitativo", row.get("cualitativa", ""))).strip().upper()
+            if value in counts:
+                counts[value] += 1
+        data_rows = []
+        for cat in categories:
+            pct = (counts[cat] / total * 100) if total else 0
+            data_rows.append({"escala": cat, "numero": counts[cat], "porcentaje": f"{pct:.2f}".replace(".", ",") + "%"})
+        data_rows.append({"escala": "TOTAL ESTUDIANTES", "numero": total, "porcentaje": "100,00%" if total else "0,00%"})
+        return {"rows": data_rows}
 
     def render_animacion_lectura(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         template_path = Path(__file__).resolve().parent.parent / "templates" / "reporte_animacion_lectura.html"
