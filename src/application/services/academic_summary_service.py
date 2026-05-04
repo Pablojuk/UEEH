@@ -109,7 +109,9 @@ class AcademicSummaryService:
                 m.numero_lista,
                 g.promedio_formativo AS aportes_calificacion,
                 g.promedio_sumativo AS sumativas_calificacion,
-                g.nota_trimestral AS promedio_original
+                g.nota_trimestral AS promedio_original,
+                g.nota_trimestral AS nota_trimestral,
+                g.cualitativo_adicional AS cualitativo_adicional
             FROM matriculas m
             JOIN estudiantes e ON e.id_estudiante = m.estudiante_id
             LEFT JOIN grade_records g
@@ -148,7 +150,7 @@ class AcademicSummaryService:
             item["cualitativa"] = calcular_cualitativo_trimestral(promedio)
             item["promedio_trimestral"] = promedio
             item["cualitativo"] = item["cualitativa"]
-            item["equivalencia"] = self._calcular_equivalencia(item.get("promedio_final"))
+            item["equivalencia"] = item.get("cualitativo_adicional") or self._calcular_equivalencia(item.get("promedio_final"))
             item["observacion"] = (
                 calcular_observacion_final(item.get("promedio_final")) if item.get("promedio_final") is not None else ""
             )
