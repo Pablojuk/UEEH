@@ -107,8 +107,7 @@ class HtmlReportRenderer:
                 else row.get("nota_trimestral", row.get("promedio_final"))
             )
             cualitativo = row.get("cualitativo", row.get("cualitativa", ""))
-            equivalencia = row.get("cualitativo_adicional") or row.get("equivalencia") or ""
-            equivalencia = self._normalize_egb_basic_equivalencia(cualitativo, equivalencia)
+            equivalencia = self._equivalencia_egb_basica_desde_cualitativo(cualitativo)
             parts.append(
                 "<tr>"
                 f"<td>{idx}</td>"
@@ -121,11 +120,7 @@ class HtmlReportRenderer:
         return "".join(parts)
 
     @staticmethod
-    def _normalize_egb_basic_equivalencia(cualitativo: Any, equivalencia: Any) -> str:
-        text = str(equivalencia or "").strip()
-        if text and text.upper() not in {"DA", "AA", "PA", "NA"}:
-            return text
-
+    def _equivalencia_egb_basica_desde_cualitativo(cualitativo: object) -> str:
         key = str(cualitativo or "").strip().upper()
         if key in {"A+", "A-", "B+"}:
             return "Destreza o aprendizaje alcanzado"
@@ -133,7 +128,7 @@ class HtmlReportRenderer:
             return "Destreza o aprendizaje en proceso de desarrollo"
         if key in {"D+", "D-", "E+", "E-"}:
             return "Destreza o aprendizaje iniciado"
-        return text
+        return ""
 
     def _build_simplified_anual_rows_html(self, rows: list[dict[str, Any]]) -> str:
         parts: list[str] = []
