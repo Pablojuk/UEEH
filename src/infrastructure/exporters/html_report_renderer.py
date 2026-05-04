@@ -88,7 +88,7 @@ class HtmlReportRenderer:
         values = []
         for row in rows:
             value = row.get("promedio_trimestral", row.get("promedio_final"))
-            if value is None:
+            if HtmlReportRenderer._is_empty_value(value):
                 continue
             try:
                 values.append(float(value))
@@ -101,17 +101,34 @@ class HtmlReportRenderer:
     def _build_simplified_trimestral_rows_html(self, rows: list[dict[str, Any]]) -> str:
         parts: list[str] = []
         for idx, row in enumerate(rows, start=1):
+            promedio = (
+                row.get("promedio_trimestral")
+                if row.get("promedio_trimestral") is not None
+                else row.get("nota_trimestral", row.get("promedio_final"))
+            )
+            cualitativo = row.get("cualitativo", row.get("cualitativa", ""))
+            equivalencia = self._equivalencia_egb_basica_desde_cualitativo(cualitativo)
             parts.append(
                 "<tr>"
                 f"<td>{idx}</td>"
                 f"<td class='nomina'>{html.escape(str(row.get('estudiante', '')))}</td>"
-                f"{self._build_numeric_cell(row.get('promedio_trimestral', row.get('promedio_final')), extra_classes='prom-bold')}"
-                f"<td>{html.escape(str(row.get('cualitativo', row.get('cualitativa', ''))))}</td>"
-                f"<td>{html.escape(str(row.get('equivalencia', '')))}</td>"
-                f"<td class='{self._observation_class(str(row.get('observacion', '')))}'>{html.escape(str(row.get('observacion', '')))}</td>"
+                f"{self._build_numeric_cell(promedio, extra_classes='prom-bold')}"
+                f"<td>{html.escape(str(cualitativo or ''))}</td>"
+                f"<td>{html.escape(str(equivalencia or ''))}</td>"
                 "</tr>"
             )
         return "".join(parts)
+
+    @staticmethod
+    def _equivalencia_egb_basica_desde_cualitativo(cualitativo: object) -> str:
+        key = str(cualitativo or "").strip().upper()
+        if key in {"A+", "A-", "B+"}:
+            return "Destreza o aprendizaje alcanzado"
+        if key in {"B-", "C+", "C-"}:
+            return "Destreza o aprendizaje en proceso de desarrollo"
+        if key in {"D+", "D-", "E+", "E-"}:
+            return "Destreza o aprendizaje iniciado"
+        return ""
 
     def _build_simplified_anual_rows_html(self, rows: list[dict[str, Any]]) -> str:
         parts: list[str] = []
@@ -132,7 +149,18 @@ class HtmlReportRenderer:
 
     def _build_simplified_stats_rows_html(self, rows: list[dict[str, Any]], use_anual: bool = False) -> str:
         stats = self._build_simplified_stats(rows, use_anual=use_anual)
-        return self._build_animacion_stats_rows_html({"rows": stats["rows"]})
+        parts: list[str] = []
+        for row in stats["rows"]:
+            escala = str(row.get("escala", ""))
+            row_class = " class='total'" if escala == "TOTAL ESTUDIANTES" else ""
+            parts.append(
+                f"<tr{row_class}>"
+                f"<td class='c-escala'>{html.escape(escala)}</td>"
+                f"<td class='c-cantidad'>{html.escape(str(row.get('numero', 0)))}</td>"
+                f"<td class='c-pct'>{html.escape(str(row.get('porcentaje', '0,00%')))}</td>"
+                "</tr>"
+            )
+        return "".join(parts)
 
     def _build_simplified_trimestral_chart_html(self, rows: list[dict[str, Any]], use_anual: bool = False) -> str:
         stats = self._build_simplified_stats(rows, use_anual=use_anual)
