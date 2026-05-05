@@ -479,12 +479,14 @@ class GradesView(QWidget):
                 for col, (field, _) in enumerate(self._table_columns):
                     value = recalculada.get(field)
                     text = "" if value is None else str(value)
-                    item = self.table.item(row, col) or QTableWidgetItem("")
+                    item = self.table.item(row, col)
+                    if item is None:
+                        item = QTableWidgetItem("")
+                        self.table.setItem(row, col, item)
                     item.setText(text)
                     if field.startswith("promedio_") or field in {"estudiante", "nota_trimestral", "cualitativo", "cualitativo_adicional"}:
                         item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                     self._apply_item_colors(item, field, value)
-                    self.table.setItem(row, col, item)
         finally:
             self._updating_calculations = False
 
