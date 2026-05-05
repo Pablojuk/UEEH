@@ -109,7 +109,8 @@ class AcademicSummaryService:
                 m.numero_lista,
                 g.promedio_formativo AS aportes_calificacion,
                 g.promedio_sumativo AS sumativas_calificacion,
-                g.nota_trimestral AS promedio_original
+                g.nota_trimestral AS promedio_original,
+                g.nota_trimestral AS nota_trimestral
             FROM matriculas m
             JOIN estudiantes e ON e.id_estudiante = m.estudiante_id
             LEFT JOIN grade_records g
