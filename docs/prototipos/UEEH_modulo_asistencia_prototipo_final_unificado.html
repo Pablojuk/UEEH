@@ -1,0 +1,2525 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UEEH — Módulo completo de Asistencia</title>
+<style>
+  :root {
+    --azul-oscuro: #1F4E79;
+    --azul-medio: #2E75B6;
+    --azul-claro: #EAF3FB;
+    --gris-fondo: #F3F6FA;
+    --gris-borde: #D7DEE8;
+    --texto: #0F172A;
+    --muted: #64748B;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: var(--texto);
+    background: var(--gris-fondo);
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: white;
+    border-bottom: 1px solid var(--gris-borde);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .05);
+  }
+
+  .topbar-inner {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 280px;
+  }
+
+  .brand-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--azul-oscuro);
+    color: white;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+  }
+
+  .brand-text strong {
+    display: block;
+    font-size: 15px;
+    line-height: 1.1;
+  }
+
+  .brand-text span {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  .main-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .main-tab {
+    border: 1px solid var(--gris-borde);
+    background: #F8FAFC;
+    color: #334155;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all .16s ease;
+  }
+
+  .main-tab:hover {
+    transform: translateY(-1px);
+    background: var(--azul-claro);
+  }
+
+  .main-tab.active {
+    background: var(--azul-oscuro);
+    color: white;
+    border-color: var(--azul-oscuro);
+    box-shadow: 0 6px 15px rgba(31, 78, 121, .22);
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 240px;
+  }
+
+  .action-note {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  .workspace {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 14px 18px 22px;
+  }
+
+  .prototype {
+    display: none;
+    border: 1px solid var(--gris-borde);
+    border-radius: 14px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, .06);
+  }
+
+  .prototype.active {
+    display: block;
+  }
+
+  iframe {
+    display: block;
+    width: 100%;
+    height: calc(100vh - 105px);
+    min-height: 760px;
+    border: none;
+    background: white;
+  }
+
+  .footer-note {
+    margin: 12px 2px 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 900px) {
+    .topbar-inner {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .brand,
+    .actions {
+      min-width: 0;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .action-note {
+      text-align: center;
+    }
+
+    iframe {
+      height: calc(100vh - 180px);
+      min-height: 680px;
+    }
+  }
+
+  @media print {
+    .topbar, .footer-note {
+      display: none;
+    }
+
+    .workspace {
+      padding: 0;
+      max-width: none;
+    }
+
+    .prototype {
+      display: none !important;
+      border: none;
+      box-shadow: none;
+      border-radius: 0;
+    }
+
+    .prototype.active {
+      display: block !important;
+    }
+
+    iframe {
+      width: 100vw;
+      height: 100vh;
+    }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-logo">UE</div>
+        <div class="brand-text">
+          <strong>UEEH — Módulo completo de Asistencia</strong>
+          <span>Sábana mensual · informe trimestral · informe anual</span>
+        </div>
+      </div>
+
+      <nav class="main-tabs" aria-label="Navegación de prototipos de asistencia">
+        <button class="main-tab active" data-target="mensual" onclick="showPrototype('mensual')">Sábana mensual</button>
+        <button class="main-tab" data-target="trimestral" onclick="showPrototype('trimestral')">Informe trimestral</button>
+        <button class="main-tab" data-target="anual" onclick="showPrototype('anual')">Informe anual</button>
+      </nav>
+
+      <div class="actions">
+        <div class="action-note">Archivo único HTML para revisión final antes de implementar en PySide6.</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section id="mensual" class="prototype active">
+      <iframe title="Sábana mensual de asistencia" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;es&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot; /&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot; /&gt;
+&lt;title&gt;UEEH — Prototipo Asistencia Mensual&lt;/title&gt;
+&lt;style&gt;
+  :root {
+    --azul-oscuro: #1F4E79;
+    --azul-medio: #2E75B6;
+    --azul-claro: #EAF3FB;
+    --gris-fondo: #F3F6FA;
+    --gris-borde: #D7DEE8;
+    --texto: #0F172A;
+    --muted: #64748B;
+    --verde: #22C55E;
+    --amarillo: #F59E0B;
+    --rojo: #EF4444;
+    --morado: #8B5CF6;
+    --blanco: #FFFFFF;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: &quot;Segoe UI&quot;, Arial, sans-serif;
+    color: var(--texto);
+    background: var(--gris-fondo);
+  }
+
+  .app-shell {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    background: #FFFFFF;
+    border-right: 1px solid var(--gris-borde);
+    padding: 18px 14px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding: 8px;
+  }
+
+  .brand-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--azul-oscuro);
+    color: white;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+  }
+
+  .brand-text { line-height: 1.15; }
+  .brand-text strong { font-size: 14px; }
+  .brand-text span { display: block; color: var(--muted); font-size: 12px; }
+
+  .nav-button {
+    width: 100%;
+    border: none;
+    background: var(--azul-oscuro);
+    color: white;
+    padding: 12px 14px;
+    border-radius: 9px;
+    margin: 5px 0;
+    cursor: pointer;
+    font-size: 14px;
+    text-align: center;
+    transition: all .18s ease;
+  }
+
+  .nav-button:hover { filter: brightness(1.08); transform: translateX(2px); }
+  .nav-button.active {
+    background: var(--azul-medio);
+    box-shadow: 0 7px 15px rgba(46, 117, 182, .25);
+  }
+
+  .main { padding: 20px 22px; }
+
+  .panel {
+    background: white;
+    border: 1px solid var(--gris-borde);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, .04);
+  }
+
+  .page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  h1 { margin: 0; font-size: 25px; letter-spacing: -.4px; }
+  .subtitle { margin-top: 4px; color: var(--muted); font-size: 14px; }
+
+  .header-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .btn {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-weight: 600;
+    background: #E2E8F0;
+    color: #0F172A;
+  }
+
+  .btn.primary { background: var(--azul-oscuro); color: white; }
+  .btn.success { background: var(--verde); color: white; }
+  .btn.warning { background: var(--amarillo); color: white; }
+  .btn.danger { background: var(--rojo); color: white; }
+  .btn.ghost { background: #EFF6FF; color: var(--azul-oscuro); }
+
+  .filters {
+    display: grid;
+    grid-template-columns: 1.6fr .55fr .55fr .65fr .65fr;
+    gap: 12px;
+    background: #F8FAFC;
+    border: 1px solid var(--gris-borde);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+
+  label {
+    font-size: 12px;
+    color: #475569;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  select, input[type=&quot;text&quot;] {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    background: white;
+    color: #0F172A;
+    font-size: 13px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--gris-borde);
+    margin: 10px 0 14px;
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    border: 1px solid transparent;
+    border-bottom: none;
+    background: transparent;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-radius: 10px 10px 0 0;
+    font-weight: 700;
+    color: #475569;
+  }
+
+  .tab.active {
+    background: white;
+    border-color: var(--gris-borde);
+    color: var(--azul-oscuro);
+    position: relative;
+    top: 1px;
+  }
+
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(120px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .stat-card {
+    border: 1px solid var(--gris-borde);
+    border-radius: 12px;
+    padding: 12px;
+    background: white;
+  }
+
+  .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-size: 23px; font-weight: 800; }
+
+  .stat-card.presente { border-left: 5px solid var(--verde); }
+  .stat-card.atraso { border-left: 5px solid var(--amarillo); }
+  .stat-card.falta { border-left: 5px solid var(--rojo); }
+  .stat-card.justificada { border-left: 5px solid var(--morado); }
+  .stat-card.total { border-left: 5px solid var(--azul-medio); }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .search-box { max-width: 340px; }
+
+  .month-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: var(--azul-claro);
+    border: 1px solid #BFDBFE;
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+
+  .month-title strong { color: var(--azul-oscuro); }
+  .legend { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: #E2E8F0;
+  }
+
+  .badge.ok { background: #DCFCE7; color: #166534; }
+  .badge.warn { background: #FEF3C7; color: #92400E; }
+  .badge.bad { background: #FEE2E2; color: #991B1B; }
+  .badge.info { background: #EDE9FE; color: #5B21B6; }
+
+  .table-wrap {
+    border: 1px solid var(--gris-borde);
+    border-radius: 12px;
+    overflow: auto;
+    max-height: 580px;
+    background: white;
+  }
+
+  table {
+    width: 100%;
+    min-width: 1450px;
+    border-collapse: collapse;
+    background: white;
+  }
+
+  th {
+    background: var(--azul-medio);
+    color: white;
+    font-size: 12px;
+    padding: 8px 6px;
+    text-align: center;
+    white-space: nowrap;
+    border-right: 1px solid rgba(255,255,255,.35);
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+
+  th.week {
+    background: var(--azul-oscuro);
+    font-size: 12px;
+  }
+
+  th.day {
+    background: var(--azul-medio);
+    min-width: 52px;
+  }
+
+  th.weekend-placeholder {
+    background: #CBD5E1;
+    color: #334155;
+  }
+
+  td {
+    border-bottom: 1px solid #E2E8F0;
+    border-right: 1px solid #E2E8F0;
+    padding: 6px;
+    font-size: 12px;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  tbody tr:nth-child(even) td { background: #F8FBFF; }
+
+  .sticky-num {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: white;
+    min-width: 44px;
+  }
+
+  .sticky-name {
+    position: sticky;
+    left: 44px;
+    z-index: 2;
+    background: white;
+    min-width: 270px;
+    text-align: left;
+    font-weight: 600;
+  }
+
+  th.sticky-num, th.sticky-name {
+    z-index: 4;
+  }
+
+  tbody tr:nth-child(even) .sticky-num,
+  tbody tr:nth-child(even) .sticky-name {
+    background: #F8FBFF;
+  }
+
+  .attendance-cell {
+    width: 52px;
+    min-width: 52px;
+  }
+
+  .status-chip {
+    width: 34px;
+    height: 28px;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 800;
+    color: white;
+    transition: transform .12s ease, filter .12s ease;
+  }
+
+  .status-chip:hover { transform: scale(1.06); filter: brightness(1.05); }
+  .status-chip.p { background: var(--verde); }
+  .status-chip.a { background: var(--amarillo); }
+  .status-chip.f { background: var(--rojo); }
+  .status-chip.j { background: var(--morado); }
+  .status-chip.vacio { background: #CBD5E1; color: #475569; }
+
+  .summary-cell {
+    font-weight: 800;
+    min-width: 44px;
+  }
+
+  .summary-cell.p { color: #166534; }
+  .summary-cell.a { color: #92400E; }
+  .summary-cell.f { color: #991B1B; }
+  .summary-cell.j { color: #5B21B6; }
+
+  .help-box {
+    background: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    border-radius: 12px;
+    padding: 12px;
+    color: #1E3A8A;
+    font-size: 13px;
+    margin-top: 12px;
+    line-height: 1.45;
+  }
+
+  .cards-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .mini-panel {
+    border: 1px solid var(--gris-borde);
+    border-radius: 12px;
+    padding: 14px;
+    background: #FFFFFF;
+  }
+
+  .mini-panel h3 { margin: 0 0 10px; font-size: 16px; }
+
+  .calendar-preview {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+
+  .calendar-day {
+    border: 1px solid var(--gris-borde);
+    border-radius: 10px;
+    padding: 10px;
+    background: #F8FAFC;
+  }
+
+  .calendar-day strong { display: block; color: var(--azul-oscuro); margin-bottom: 6px; }
+  .calendar-day span { color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 1000px) {
+    .app-shell { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .filters { grid-template-columns: 1fr 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .cards-2 { grid-template-columns: 1fr; }
+  }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div class=&quot;app-shell&quot;&gt;
+  &lt;aside class=&quot;sidebar&quot;&gt;
+    &lt;div class=&quot;brand&quot;&gt;
+      &lt;div class=&quot;brand-logo&quot;&gt;UE&lt;/div&gt;
+      &lt;div class=&quot;brand-text&quot;&gt;
+        &lt;strong&gt;Sistema Académico UEEH&lt;/strong&gt;
+        &lt;span&gt;Prototipo Asistencia Mensual&lt;/span&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;button class=&quot;nav-button&quot;&gt;Inicio&lt;/button&gt;
+    &lt;button class=&quot;nav-button&quot;&gt;Institución&lt;/button&gt;
+    &lt;button class=&quot;nav-button&quot;&gt;Docentes&lt;/button&gt;
+    &lt;button class=&quot;nav-button&quot;&gt;Catálogos&lt;/button&gt;
+    &lt;button class=&quot;nav-button&quot;&gt;Estudiantes&lt;/button&gt;
+    &lt;button class=&quot;nav-button&quot;&gt;Matrículas&lt;/button&gt;
+    &lt;button class=&quot;nav-button&quot;&gt;Asignaciones&lt;/button&gt;
+    &lt;button class=&quot;nav-button&quot;&gt;Notas&lt;/button&gt;
+    &lt;button class=&quot;nav-button&quot;&gt;Reportes&lt;/button&gt;
+    &lt;button class=&quot;nav-button active&quot;&gt;Asistencia&lt;/button&gt;
+    &lt;button class=&quot;nav-button&quot;&gt;Utilidades&lt;/button&gt;
+  &lt;/aside&gt;
+
+  &lt;main class=&quot;main&quot;&gt;
+    &lt;section class=&quot;panel&quot;&gt;
+      &lt;div class=&quot;page-header&quot;&gt;
+        &lt;div&gt;
+          &lt;h1&gt;Asistencia&lt;/h1&gt;
+          &lt;div class=&quot;subtitle&quot;&gt;Sábana mensual de asistencia, organizada por semanas y días laborables.&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;header-actions&quot;&gt;
+          &lt;button class=&quot;btn ghost&quot; onclick=&quot;showTab(&#x27;resumen&#x27;)&quot;&gt;Ver resumen&lt;/button&gt;
+          &lt;button class=&quot;btn primary&quot; onclick=&quot;alert(&#x27;Diseño: aquí se guardará la sábana mensual en SQLite.&#x27;)&quot;&gt;Guardar asistencia&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+
+      &lt;div class=&quot;filters&quot;&gt;
+        &lt;div&gt;
+          &lt;label&gt;Asignación&lt;/label&gt;
+          &lt;select id=&quot;assignment&quot;&gt;
+            &lt;option&gt;Matemática | 3ro de EGB-A | Juca Farfan Pablo Hernan | 2026-2027&lt;/option&gt;
+            &lt;option&gt;Lengua y Literatura | 2do de EGB-A | Juca Farfan Pablo Hernan | 2026-2027&lt;/option&gt;
+            &lt;option&gt;Ciencias Naturales | 4to de EGB-B | Juca Farfan Pablo Hernan | 2026-2027&lt;/option&gt;
+          &lt;/select&gt;
+        &lt;/div&gt;
+        &lt;div&gt;
+          &lt;label&gt;Mes&lt;/label&gt;
+          &lt;select id=&quot;month&quot; onchange=&quot;changeMonthTitle()&quot;&gt;
+            &lt;option value=&quot;Mayo 2026&quot;&gt;Mayo&lt;/option&gt;
+            &lt;option value=&quot;Junio 2026&quot;&gt;Junio&lt;/option&gt;
+            &lt;option value=&quot;Julio 2026&quot;&gt;Julio&lt;/option&gt;
+          &lt;/select&gt;
+        &lt;/div&gt;
+        &lt;div&gt;
+          &lt;label&gt;Año lectivo&lt;/label&gt;
+          &lt;select&gt;
+            &lt;option&gt;2026-2027&lt;/option&gt;
+            &lt;option&gt;2027-2028&lt;/option&gt;
+          &lt;/select&gt;
+        &lt;/div&gt;
+        &lt;div&gt;
+          &lt;label&gt;Jornada&lt;/label&gt;
+          &lt;select&gt;
+            &lt;option&gt;Matutina&lt;/option&gt;
+            &lt;option&gt;Vespertina&lt;/option&gt;
+          &lt;/select&gt;
+        &lt;/div&gt;
+        &lt;div&gt;
+          &lt;label&gt;Estado&lt;/label&gt;
+          &lt;select&gt;
+            &lt;option&gt;Borrador&lt;/option&gt;
+            &lt;option&gt;Guardado&lt;/option&gt;
+            &lt;option&gt;Cerrado&lt;/option&gt;
+          &lt;/select&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+
+      &lt;div class=&quot;tabs&quot;&gt;
+        &lt;button class=&quot;tab active&quot; data-tab=&quot;sabana&quot; onclick=&quot;showTab(&#x27;sabana&#x27;)&quot;&gt;Sábana mensual&lt;/button&gt;
+        &lt;button class=&quot;tab&quot; data-tab=&quot;justificaciones&quot; onclick=&quot;showTab(&#x27;justificaciones&#x27;)&quot;&gt;Justificaciones&lt;/button&gt;
+        &lt;button class=&quot;tab&quot; data-tab=&quot;resumen&quot; onclick=&quot;showTab(&#x27;resumen&#x27;)&quot;&gt;Resumen mensual&lt;/button&gt;
+        &lt;button class=&quot;tab&quot; data-tab=&quot;configuracion&quot; onclick=&quot;showTab(&#x27;configuracion&#x27;)&quot;&gt;Configuración&lt;/button&gt;
+      &lt;/div&gt;
+
+      &lt;section id=&quot;sabana&quot; class=&quot;tab-pane active&quot;&gt;
+        &lt;div class=&quot;stats-grid&quot;&gt;
+          &lt;div class=&quot;stat-card total&quot;&gt;
+            &lt;div class=&quot;stat-label&quot;&gt;Estudiantes&lt;/div&gt;
+            &lt;div class=&quot;stat-value&quot; id=&quot;statTotal&quot;&gt;12&lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;stat-card presente&quot;&gt;
+            &lt;div class=&quot;stat-label&quot;&gt;Presentes&lt;/div&gt;
+            &lt;div class=&quot;stat-value&quot; id=&quot;statP&quot;&gt;0&lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;stat-card atraso&quot;&gt;
+            &lt;div class=&quot;stat-label&quot;&gt;Atrasos&lt;/div&gt;
+            &lt;div class=&quot;stat-value&quot; id=&quot;statA&quot;&gt;0&lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;stat-card falta&quot;&gt;
+            &lt;div class=&quot;stat-label&quot;&gt;Faltas&lt;/div&gt;
+            &lt;div class=&quot;stat-value&quot; id=&quot;statF&quot;&gt;0&lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;stat-card justificada&quot;&gt;
+            &lt;div class=&quot;stat-label&quot;&gt;Justificadas&lt;/div&gt;
+            &lt;div class=&quot;stat-value&quot; id=&quot;statJ&quot;&gt;0&lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class=&quot;month-title&quot;&gt;
+          &lt;div&gt;
+            &lt;strong id=&quot;monthTitle&quot;&gt;Mayo 2026&lt;/strong&gt;
+            &lt;span style=&quot;color: var(--muted); font-size: 13px;&quot;&gt; · 4 semanas visibles · lunes a viernes&lt;/span&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;legend&quot;&gt;
+            &lt;span class=&quot;badge ok&quot;&gt;P Presente&lt;/span&gt;
+            &lt;span class=&quot;badge warn&quot;&gt;A Atraso&lt;/span&gt;
+            &lt;span class=&quot;badge bad&quot;&gt;F Falta&lt;/span&gt;
+            &lt;span class=&quot;badge info&quot;&gt;J Justificada&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class=&quot;toolbar&quot;&gt;
+          &lt;div class=&quot;quick-actions&quot;&gt;
+            &lt;button class=&quot;btn success&quot; onclick=&quot;markVisible(&#x27;p&#x27;)&quot;&gt;Marcar todo visible P&lt;/button&gt;
+            &lt;button class=&quot;btn warning&quot; onclick=&quot;markVisible(&#x27;a&#x27;)&quot;&gt;Marcar todo visible A&lt;/button&gt;
+            &lt;button class=&quot;btn danger&quot; onclick=&quot;markVisible(&#x27;f&#x27;)&quot;&gt;Marcar todo visible F&lt;/button&gt;
+            &lt;button class=&quot;btn&quot; onclick=&quot;clearMarks()&quot;&gt;Limpiar sábana&lt;/button&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;search-box&quot;&gt;
+            &lt;input type=&quot;text&quot; id=&quot;search&quot; placeholder=&quot;Buscar estudiante...&quot; oninput=&quot;filterStudents()&quot;&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class=&quot;table-wrap&quot;&gt;
+          &lt;table id=&quot;attendanceTable&quot;&gt;
+            &lt;thead&gt;
+              &lt;tr&gt;
+                &lt;th class=&quot;sticky-num&quot; rowspan=&quot;2&quot;&gt;N°&lt;/th&gt;
+                &lt;th class=&quot;sticky-name&quot; rowspan=&quot;2&quot;&gt;Nómina de estudiantes&lt;/th&gt;
+                &lt;th class=&quot;week&quot; colspan=&quot;5&quot;&gt;Semana 1&lt;/th&gt;
+                &lt;th class=&quot;week&quot; colspan=&quot;5&quot;&gt;Semana 2&lt;/th&gt;
+                &lt;th class=&quot;week&quot; colspan=&quot;5&quot;&gt;Semana 3&lt;/th&gt;
+                &lt;th class=&quot;week&quot; colspan=&quot;5&quot;&gt;Semana 4&lt;/th&gt;
+                &lt;th class=&quot;week&quot; colspan=&quot;4&quot;&gt;Resumen&lt;/th&gt;
+              &lt;/tr&gt;
+              &lt;tr&gt;
+                &lt;th class=&quot;day&quot;&gt;L 04&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;M 05&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;X 06&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;J 07&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;V 08&lt;/th&gt;
+                &lt;th class=&quot;day&quot;&gt;L 11&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;M 12&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;X 13&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;J 14&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;V 15&lt;/th&gt;
+                &lt;th class=&quot;day&quot;&gt;L 18&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;M 19&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;X 20&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;J 21&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;V 22&lt;/th&gt;
+                &lt;th class=&quot;day&quot;&gt;L 25&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;M 26&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;X 27&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;J 28&lt;/th&gt;&lt;th class=&quot;day&quot;&gt;V 29&lt;/th&gt;
+                &lt;th&gt;P&lt;/th&gt;&lt;th&gt;A&lt;/th&gt;&lt;th&gt;F&lt;/th&gt;&lt;th&gt;J&lt;/th&gt;
+              &lt;/tr&gt;
+            &lt;/thead&gt;
+            &lt;tbody id=&quot;studentRows&quot;&gt;&lt;/tbody&gt;
+          &lt;/table&gt;
+        &lt;/div&gt;
+
+        &lt;div class=&quot;help-box&quot;&gt;
+          Este diseño funciona como una &lt;strong&gt;sábana mensual&lt;/strong&gt;: cada estudiante tiene columnas para las 4 semanas del mes, solo de lunes a viernes. Cada celda cambia con clic: vacío → P → A → F → J → vacío. Así no se registra día por día en un campo de fecha, sino directamente en el mes completo.
+        &lt;/div&gt;
+      &lt;/section&gt;
+
+      &lt;section id=&quot;justificaciones&quot; class=&quot;tab-pane&quot;&gt;
+        &lt;div class=&quot;cards-2&quot;&gt;
+          &lt;div class=&quot;mini-panel&quot;&gt;
+            &lt;h3&gt;Registrar justificación&lt;/h3&gt;
+            &lt;label&gt;Estudiante&lt;/label&gt;
+            &lt;select&gt;
+              &lt;option&gt;Gutama Chavez Estalin Mateo&lt;/option&gt;
+              &lt;option&gt;Guaillasaca Velepucha Britany Sulay&lt;/option&gt;
+            &lt;/select&gt;
+            &lt;br&gt;&lt;br&gt;
+            &lt;label&gt;Día de la justificación&lt;/label&gt;
+            &lt;select&gt;
+              &lt;option&gt;Semana 1 · Miércoles 06&lt;/option&gt;
+              &lt;option&gt;Semana 2 · Viernes 15&lt;/option&gt;
+              &lt;option&gt;Semana 4 · Lunes 25&lt;/option&gt;
+            &lt;/select&gt;
+            &lt;br&gt;&lt;br&gt;
+            &lt;label&gt;Motivo&lt;/label&gt;
+            &lt;select&gt;
+              &lt;option&gt;Certificado médico&lt;/option&gt;
+              &lt;option&gt;Calamidad doméstica&lt;/option&gt;
+              &lt;option&gt;Representante justifica&lt;/option&gt;
+              &lt;option&gt;Actividad institucional&lt;/option&gt;
+            &lt;/select&gt;
+            &lt;br&gt;&lt;br&gt;
+            &lt;label&gt;Observación&lt;/label&gt;
+            &lt;input type=&quot;text&quot; placeholder=&quot;Detalle breve de la justificación&quot;&gt;
+            &lt;br&gt;&lt;br&gt;
+            &lt;button class=&quot;btn primary&quot;&gt;Guardar justificación&lt;/button&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;mini-panel&quot;&gt;
+            &lt;h3&gt;Justificaciones del mes&lt;/h3&gt;
+            &lt;div class=&quot;calendar-preview&quot;&gt;
+              &lt;div class=&quot;calendar-day&quot;&gt;&lt;strong&gt;J 07&lt;/strong&gt;&lt;span&gt;Gutama Chávez · Certificado médico&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;calendar-day&quot;&gt;&lt;strong&gt;V 15&lt;/strong&gt;&lt;span&gt;Britany Sulay · Representante&lt;/span&gt;&lt;/div&gt;
+              &lt;div class=&quot;calendar-day&quot;&gt;&lt;strong&gt;L 25&lt;/strong&gt;&lt;span&gt;Neymar Josue · Atraso justificado&lt;/span&gt;&lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+
+      &lt;section id=&quot;resumen&quot; class=&quot;tab-pane&quot;&gt;
+        &lt;div class=&quot;cards-2&quot;&gt;
+          &lt;div class=&quot;mini-panel&quot;&gt;
+            &lt;h3&gt;Resumen por estudiante&lt;/h3&gt;
+            &lt;div class=&quot;table-wrap&quot; style=&quot;max-height: 360px;&quot;&gt;
+              &lt;table style=&quot;min-width: 700px;&quot;&gt;
+                &lt;thead&gt;
+                  &lt;tr&gt;&lt;th&gt;N°&lt;/th&gt;&lt;th&gt;Estudiante&lt;/th&gt;&lt;th&gt;P&lt;/th&gt;&lt;th&gt;A&lt;/th&gt;&lt;th&gt;F&lt;/th&gt;&lt;th&gt;J&lt;/th&gt;&lt;th&gt;% asistencia&lt;/th&gt;&lt;/tr&gt;
+                &lt;/thead&gt;
+                &lt;tbody id=&quot;summaryRows&quot;&gt;&lt;/tbody&gt;
+              &lt;/table&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;mini-panel&quot;&gt;
+            &lt;h3&gt;Acciones de reporte&lt;/h3&gt;
+            &lt;p style=&quot;color: var(--muted); font-size: 13px; line-height: 1.5;&quot;&gt;
+              Este bloque permitirá generar la sábana mensual en PDF/Excel y también un resumen por estudiante.
+            &lt;/p&gt;
+            &lt;div class=&quot;quick-actions&quot;&gt;
+              &lt;button class=&quot;btn primary&quot;&gt;Vista previa&lt;/button&gt;
+              &lt;button class=&quot;btn ghost&quot;&gt;Exportar PDF&lt;/button&gt;
+              &lt;button class=&quot;btn ghost&quot;&gt;Exportar Excel&lt;/button&gt;
+            &lt;/div&gt;
+            &lt;br&gt;
+            &lt;span class=&quot;badge ok&quot;&gt;Sábana mensual&lt;/span&gt;
+            &lt;span class=&quot;badge warn&quot;&gt;Solo lunes a viernes&lt;/span&gt;
+            &lt;span class=&quot;badge info&quot;&gt;4 semanas visibles&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+
+      &lt;section id=&quot;configuracion&quot; class=&quot;tab-pane&quot;&gt;
+        &lt;div class=&quot;cards-2&quot;&gt;
+          &lt;div class=&quot;mini-panel&quot;&gt;
+            &lt;h3&gt;Configuración del mes&lt;/h3&gt;
+            &lt;label&gt;Número de semanas visibles&lt;/label&gt;
+            &lt;select&gt;
+              &lt;option&gt;4 semanas&lt;/option&gt;
+              &lt;option&gt;5 semanas&lt;/option&gt;
+            &lt;/select&gt;
+            &lt;br&gt;&lt;br&gt;
+            &lt;label&gt;Días incluidos&lt;/label&gt;
+            &lt;select&gt;
+              &lt;option&gt;Lunes a viernes&lt;/option&gt;
+              &lt;option&gt;Lunes a sábado&lt;/option&gt;
+            &lt;/select&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;mini-panel&quot;&gt;
+            &lt;h3&gt;Reglas de asistencia&lt;/h3&gt;
+            &lt;div&gt;
+              &lt;span class=&quot;badge ok&quot;&gt;P Presente&lt;/span&gt;
+              &lt;span class=&quot;badge warn&quot;&gt;A Atraso&lt;/span&gt;
+              &lt;span class=&quot;badge bad&quot;&gt;F Falta&lt;/span&gt;
+              &lt;span class=&quot;badge info&quot;&gt;J Justificada&lt;/span&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+
+    &lt;/section&gt;
+  &lt;/main&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+  const students = [
+    &quot;Benalcazar Coronel Angely Yuleidi&quot;,
+    &quot;Cedillo Mena Neymar Josue&quot;,
+    &quot;Delgado Guaillasaca Keysi Fiorela&quot;,
+    &quot;Guaillasaca Velepucha Britany Sulay&quot;,
+    &quot;Guaman Guaman Jessenia Fernanda&quot;,
+    &quot;Gutama Chavez Estalin Mateo&quot;,
+    &quot;Merchan Pizarro Zoila Veronica&quot;,
+    &quot;Orellana Guaillasaca Johny Danilo&quot;,
+    &quot;Pando Orellana Yesli Anai&quot;,
+    &quot;Pomaquiza Lalvay Sofia Daniela&quot;,
+    &quot;Sanchez Guerrero Jostin Jose&quot;,
+    &quot;Cedillo Aucay Martin Alejandro&quot;
+  ];
+
+  const statusCycle = [&quot;&quot;, &quot;p&quot;, &quot;a&quot;, &quot;f&quot;, &quot;j&quot;];
+  const statusText = { &quot;&quot;: &quot;&quot;, p: &quot;P&quot;, a: &quot;A&quot;, f: &quot;F&quot;, j: &quot;J&quot; };
+
+  function buildRows() {
+    const tbody = document.getElementById(&quot;studentRows&quot;);
+    tbody.innerHTML = &quot;&quot;;
+
+    students.forEach((name, index) =&gt; {
+      const tr = document.createElement(&quot;tr&quot;);
+      tr.dataset.student = name.toLowerCase();
+
+      const num = document.createElement(&quot;td&quot;);
+      num.className = &quot;sticky-num&quot;;
+      num.textContent = index + 1;
+      tr.appendChild(num);
+
+      const nomina = document.createElement(&quot;td&quot;);
+      nomina.className = &quot;sticky-name&quot;;
+      nomina.textContent = name;
+      tr.appendChild(nomina);
+
+      for (let day = 0; day &lt; 20; day++) {
+        const td = document.createElement(&quot;td&quot;);
+        td.className = &quot;attendance-cell&quot;;
+        const btn = document.createElement(&quot;button&quot;);
+        btn.className = &quot;status-chip vacio&quot;;
+        btn.dataset.status = &quot;&quot;;
+        btn.textContent = &quot;—&quot;;
+
+        if ((index + day) % 9 === 0) setButtonStatus(btn, &quot;a&quot;);
+        else if ((index + day) % 13 === 0) setButtonStatus(btn, &quot;f&quot;);
+        else if ((index + day) % 17 === 0) setButtonStatus(btn, &quot;j&quot;);
+        else setButtonStatus(btn, &quot;p&quot;);
+
+        btn.onclick = () =&gt; cycleStatus(btn);
+        td.appendChild(btn);
+        tr.appendChild(td);
+      }
+
+      [&quot;p&quot;, &quot;a&quot;, &quot;f&quot;, &quot;j&quot;].forEach(s =&gt; {
+        const td = document.createElement(&quot;td&quot;);
+        td.className = &quot;summary-cell &quot; + s;
+        td.dataset.summary = s;
+        td.textContent = &quot;0&quot;;
+        tr.appendChild(td);
+      });
+
+      tbody.appendChild(tr);
+    });
+
+    updateStats();
+  }
+
+  function setButtonStatus(btn, status) {
+    btn.className = &quot;status-chip &quot; + (status || &quot;vacio&quot;);
+    btn.dataset.status = status;
+    btn.textContent = statusText[status] || &quot;—&quot;;
+  }
+
+  function cycleStatus(btn) {
+    const current = btn.dataset.status || &quot;&quot;;
+    const next = statusCycle[(statusCycle.indexOf(current) + 1) % statusCycle.length];
+    setButtonStatus(btn, next);
+    updateStats();
+  }
+
+  function updateStats() {
+    const rows = Array.from(document.querySelectorAll(&quot;#studentRows tr&quot;));
+    const totals = { p: 0, a: 0, f: 0, j: 0 };
+
+    rows.forEach(row =&gt; {
+      const counts = { p: 0, a: 0, f: 0, j: 0 };
+      row.querySelectorAll(&quot;.status-chip&quot;).forEach(btn =&gt; {
+        const s = btn.dataset.status;
+        if (counts[s] !== undefined) {
+          counts[s]++;
+          totals[s]++;
+        }
+      });
+      [&quot;p&quot;, &quot;a&quot;, &quot;f&quot;, &quot;j&quot;].forEach(s =&gt; {
+        row.querySelector(`[data-summary=&quot;${s}&quot;]`).textContent = counts[s];
+      });
+    });
+
+    document.getElementById(&quot;statTotal&quot;).textContent = rows.length;
+    document.getElementById(&quot;statP&quot;).textContent = totals.p;
+    document.getElementById(&quot;statA&quot;).textContent = totals.a;
+    document.getElementById(&quot;statF&quot;).textContent = totals.f;
+    document.getElementById(&quot;statJ&quot;).textContent = totals.j;
+
+    buildSummaryRows(rows);
+  }
+
+  function buildSummaryRows(rows) {
+    const tbody = document.getElementById(&quot;summaryRows&quot;);
+    if (!tbody) return;
+    tbody.innerHTML = &quot;&quot;;
+
+    rows.forEach((row, index) =&gt; {
+      const name = row.querySelector(&quot;.sticky-name&quot;).textContent;
+      const p = Number(row.querySelector(&#x27;[data-summary=&quot;p&quot;]&#x27;).textContent);
+      const a = Number(row.querySelector(&#x27;[data-summary=&quot;a&quot;]&#x27;).textContent);
+      const f = Number(row.querySelector(&#x27;[data-summary=&quot;f&quot;]&#x27;).textContent);
+      const j = Number(row.querySelector(&#x27;[data-summary=&quot;j&quot;]&#x27;).textContent);
+      const total = p + a + f + j;
+      const pct = total ? (((p + a + j) / total) * 100).toFixed(2).replace(&quot;.&quot;, &quot;,&quot;) + &quot;%&quot; : &quot;0,00%&quot;;
+
+      const tr = document.createElement(&quot;tr&quot;);
+      tr.innerHTML = `&lt;td&gt;${index + 1}&lt;/td&gt;&lt;td class=&quot;nomina&quot;&gt;${name}&lt;/td&gt;&lt;td&gt;${p}&lt;/td&gt;&lt;td&gt;${a}&lt;/td&gt;&lt;td&gt;${f}&lt;/td&gt;&lt;td&gt;${j}&lt;/td&gt;&lt;td&gt;&lt;strong&gt;${pct}&lt;/strong&gt;&lt;/td&gt;`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function markVisible(status) {
+    document.querySelectorAll(&quot;#studentRows tr&quot;).forEach(row =&gt; {
+      if (row.style.display === &quot;none&quot;) return;
+      row.querySelectorAll(&quot;.status-chip&quot;).forEach(btn =&gt; setButtonStatus(btn, status));
+    });
+    updateStats();
+  }
+
+  function clearMarks() {
+    document.querySelectorAll(&quot;.status-chip&quot;).forEach(btn =&gt; setButtonStatus(btn, &quot;&quot;));
+    updateStats();
+  }
+
+  function filterStudents() {
+    const q = document.getElementById(&quot;search&quot;).value.toLowerCase().trim();
+    document.querySelectorAll(&quot;#studentRows tr&quot;).forEach(row =&gt; {
+      const name = row.dataset.student;
+      row.style.display = name.includes(q) ? &quot;&quot; : &quot;none&quot;;
+    });
+  }
+
+  function showTab(tabId) {
+    document.querySelectorAll(&quot;.tab&quot;).forEach(tab =&gt; {
+      tab.classList.toggle(&quot;active&quot;, tab.dataset.tab === tabId);
+    });
+    document.querySelectorAll(&quot;.tab-pane&quot;).forEach(pane =&gt; {
+      pane.classList.toggle(&quot;active&quot;, pane.id === tabId);
+    });
+  }
+
+  function changeMonthTitle() {
+    document.getElementById(&quot;monthTitle&quot;).textContent = document.getElementById(&quot;month&quot;).value;
+  }
+
+  buildRows();
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;"></iframe>
+    </section>
+
+    <section id="trimestral" class="prototype">
+      <iframe title="Informe trimestral de asistencia" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;es&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+&lt;title&gt;UEEH — Informe de Asistencia por Rango&lt;/title&gt;
+&lt;style&gt;
+  :root {
+    --azul-oscuro: #1F4E79;
+    --azul-medio: #2E75B6;
+    --azul-claro: #9DC3E6;
+    --gris-tabla: #B7B7B7;
+    --fila-par: #FFFFFF;
+    --fila-impar: #F0F7FF;
+    --texto: #0F172A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: #C8C8C8;
+    font-family: Calibri, &quot;Trebuchet MS&quot;, Arial, sans-serif;
+    color: var(--texto);
+    padding: 22px;
+  }
+
+  .screen-toolbar {
+    max-width: 1120px;
+    margin: 0 auto 14px;
+    background: #fff;
+    border: 1px solid #CBD5E1;
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .toolbar-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .toolbar-title strong { color: var(--azul-oscuro); font-size: 16px; }
+
+  .toolbar-grid {
+    display: grid;
+    grid-template-columns: 1.5fr .75fr .75fr .75fr .65fr;
+    gap: 10px;
+    align-items: end;
+  }
+
+  label {
+    font-size: 12px;
+    color: #475569;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  select, input {
+    width: 100%;
+    padding: 8px 9px;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+
+  .btn {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 13px;
+    cursor: pointer;
+    font-weight: 700;
+    background: var(--azul-oscuro);
+    color: white;
+  }
+
+  .report {
+    width: 277mm;
+    min-height: 190mm;
+    background: white;
+    margin: 0 auto;
+    padding: 8mm;
+  }
+
+  .header-top {
+    background: var(--azul-oscuro);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    min-height: 70px;
+  }
+
+  .logo-box {
+    width: 76px;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo-placeholder {
+    width: 60px;
+    height: 50px;
+    border: 1.5px solid rgba(255,255,255,0.45);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.75);
+    font-size: 7pt;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .header-center {
+    flex: 1;
+    text-align: center;
+    padding: 0 8px;
+  }
+
+  .inst-nombre {
+    font-size: 20pt;
+    font-weight: bold;
+    color: white;
+    line-height: 1.1;
+  }
+
+  .inst-subtitulo {
+    font-size: 8.5pt;
+    color: rgba(255,255,255,0.9);
+    margin-top: 1px;
+  }
+
+  .report-title {
+    font-weight: bold;
+    font-size: 9pt;
+    color: white;
+    margin-top: 2px;
+  }
+
+  .meta-bloque {
+    background: var(--azul-claro);
+    padding: 5px 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px 18px;
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: baseline;
+    font-size: 8.2pt;
+    line-height: 1.45;
+  }
+
+  .meta-label {
+    font-weight: bold;
+    font-style: italic;
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  table.principal {
+    font-size: 7.8pt;
+  }
+
+  table.principal th,
+  table.principal td {
+    border: 1px solid var(--gris-tabla);
+    text-align: center;
+    vertical-align: middle;
+    padding: 2px 3px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  table.principal thead th {
+    background: var(--azul-medio);
+    color: white;
+    font-weight: bold;
+    font-size: 8pt;
+    height: 29px;
+    white-space: normal;
+    line-height: 1.15;
+  }
+
+  table.principal td.nomina {
+    text-align: left;
+    padding-left: 5px;
+    font-size: 7.8pt;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); }
+  table.principal tbody tr:nth-child(odd) td { background: var(--fila-par); }
+
+  .bold { font-weight: bold; }
+  .ok { background: #E2EFDA !important; font-weight: bold; }
+  .warn { background: #FFF2CC !important; font-weight: bold; }
+  .bad { background: #FCE4D6 !important; font-weight: bold; }
+
+  .bloque-inferior {
+    padding: 10px 10px 0;
+  }
+
+  .fila-estadistica {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+  }
+
+  table.estadistica {
+    width: 350px;
+    font-size: 8pt;
+    flex-shrink: 0;
+  }
+
+  table.estadistica th,
+  table.estadistica td {
+    border: 1px solid #000;
+    padding: 3px 5px;
+    text-align: center;
+  }
+
+  table.estadistica thead th {
+    background: var(--azul-medio);
+    color: white;
+    font-weight: bold;
+  }
+
+  table.estadistica td.s-desc {
+    text-align: left;
+    font-weight: bold;
+  }
+
+  table.estadistica tr.total td {
+    background: var(--azul-claro);
+    font-weight: bold;
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 99px;
+    display: inline-block;
+    margin-right: 6px;
+  }
+
+  .grafico-wrap {
+    flex: 1;
+    min-height: 165px;
+    border: 1px solid #CCC;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+  }
+
+  .fila-promedio {
+    display: flex;
+    justify-content: center;
+    margin: 9px 0 0;
+  }
+
+  table.promedio {
+    width: 410px;
+    font-size: 8.2pt;
+  }
+
+  table.promedio td {
+    border: 1px solid #000;
+    padding: 4px 8px;
+    text-align: center;
+  }
+
+  table.promedio .valor {
+    width: 82px;
+    font-weight: bold;
+  }
+
+  .nota {
+    font-size: 7.5pt;
+    color: #334155;
+    margin-top: 7px;
+    line-height: 1.25;
+  }
+
+  .firmas {
+    display: flex;
+    justify-content: center;
+    gap: 90px;
+    margin-top: 36px;
+    padding: 0 10px 8px;
+  }
+
+  .firma-bloque {
+    width: 210px;
+    text-align: center;
+  }
+
+  .firma-linea {
+    border-top: 1px solid #000;
+    margin-bottom: 3px;
+  }
+
+  .firma-nombre {
+    font-size: 8.4pt;
+    font-weight: bold;
+  }
+
+  .firma-cargo {
+    font-size: 8pt;
+  }
+
+  @page { size: A4 landscape; margin: 10mm; }
+
+  @media print {
+    body {
+      background: white;
+      padding: 0;
+    }
+
+    .screen-toolbar {
+      display: none;
+    }
+
+    .report {
+      width: 277mm;
+      min-height: auto;
+      margin: 0;
+      padding: 0;
+    }
+
+    .fila-estadistica,
+    .fila-promedio,
+    .firmas {
+      page-break-inside: avoid;
+    }
+  }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+&lt;div class=&quot;screen-toolbar&quot;&gt;
+  &lt;div class=&quot;toolbar-title&quot;&gt;
+    &lt;div&gt;
+      &lt;strong&gt;Informe trimestral de asistencia&lt;/strong&gt;
+      &lt;span style=&quot;color:#64748B;&quot;&gt; · consolidado por rango de fechas&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;button class=&quot;btn&quot; onclick=&quot;window.print()&quot;&gt;Imprimir / PDF&lt;/button&gt;
+  &lt;/div&gt;
+
+  &lt;div class=&quot;toolbar-grid&quot;&gt;
+    &lt;div&gt;
+      &lt;label&gt;Asignación&lt;/label&gt;
+      &lt;select&gt;
+        &lt;option&gt;Matemática | 3ro de EGB-A | Juca Farfan Pablo Hernan | 2026-2027&lt;/option&gt;
+        &lt;option&gt;Lengua y Literatura | 2do de EGB-A | Juca Farfan Pablo Hernan | 2026-2027&lt;/option&gt;
+        &lt;option&gt;Ciencias Naturales | 4to de EGB-B | Juca Farfan Pablo Hernan | 2026-2027&lt;/option&gt;
+      &lt;/select&gt;
+    &lt;/div&gt;
+    &lt;div&gt;
+      &lt;label&gt;Trimestre&lt;/label&gt;
+      &lt;select id=&quot;trimestre&quot; onchange=&quot;syncHeader()&quot;&gt;
+        &lt;option&gt;Primer Trimestre&lt;/option&gt;
+        &lt;option&gt;Segundo Trimestre&lt;/option&gt;
+        &lt;option&gt;Tercer Trimestre&lt;/option&gt;
+      &lt;/select&gt;
+    &lt;/div&gt;
+    &lt;div&gt;
+      &lt;label&gt;Fecha desde&lt;/label&gt;
+      &lt;input type=&quot;date&quot; id=&quot;desde&quot; value=&quot;2026-05-04&quot; onchange=&quot;syncHeader()&quot;&gt;
+    &lt;/div&gt;
+    &lt;div&gt;
+      &lt;label&gt;Fecha hasta&lt;/label&gt;
+      &lt;input type=&quot;date&quot; id=&quot;hasta&quot; value=&quot;2026-08-07&quot; onchange=&quot;syncHeader()&quot;&gt;
+    &lt;/div&gt;
+    &lt;div&gt;
+      &lt;button class=&quot;btn&quot; onclick=&quot;syncHeader()&quot;&gt;Aplicar período&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;section class=&quot;report&quot;&gt;
+  &lt;div class=&quot;header-top&quot;&gt;
+    &lt;div class=&quot;logo-box&quot;&gt;&lt;div class=&quot;logo-placeholder&quot;&gt;LOGO&lt;br&gt;INST.&lt;/div&gt;&lt;/div&gt;
+    &lt;div class=&quot;header-center&quot;&gt;
+      &lt;div class=&quot;inst-nombre&quot;&gt;Unidad Educativa Emiliano Hinostroza&lt;/div&gt;
+      &lt;div class=&quot;inst-subtitulo&quot;&gt;San Salvador de Cañaribamba - Santa Isabel&lt;/div&gt;
+      &lt;div class=&quot;report-title&quot;&gt;INFORME TRIMESTRAL DE ASISTENCIA&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;logo-box&quot;&gt;&lt;div class=&quot;logo-placeholder&quot;&gt;MINE-&lt;br&gt;DUC&lt;/div&gt;&lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div class=&quot;meta-bloque&quot;&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Docente:&lt;/span&gt; Juca Farfan Pablo Hernan&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Asignatura:&lt;/span&gt; Matemática&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Curso:&lt;/span&gt; 3ro de EGB &amp;nbsp;&amp;nbsp;&lt;span class=&quot;meta-label&quot;&gt;Nivel:&lt;/span&gt; EGB&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Paralelo:&lt;/span&gt; A&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Trimestre:&lt;/span&gt; &lt;span id=&quot;metaTrimestre&quot;&gt;Primer Trimestre&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Período:&lt;/span&gt; &lt;span id=&quot;metaPeriodo&quot;&gt;04/05/2026 al 07/08/2026&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Año lectivo:&lt;/span&gt; 2026-2027&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Fecha de emisión:&lt;/span&gt; 06/05/2026&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Tutor:&lt;/span&gt;&lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;table class=&quot;principal&quot;&gt;
+    &lt;colgroup&gt;
+      &lt;col style=&quot;width:30px;&quot;&gt;
+      &lt;col style=&quot;width:260px;&quot;&gt;
+      &lt;col style=&quot;width:82px;&quot;&gt;
+      &lt;col style=&quot;width:78px;&quot;&gt;
+      &lt;col style=&quot;width:72px;&quot;&gt;
+      &lt;col style=&quot;width:105px;&quot;&gt;
+      &lt;col style=&quot;width:96px;&quot;&gt;
+      &lt;col style=&quot;width:82px;&quot;&gt;
+      &lt;col style=&quot;width:105px;&quot;&gt;
+    &lt;/colgroup&gt;
+    &lt;thead&gt;
+      &lt;tr&gt;
+        &lt;th&gt;N°&lt;/th&gt;
+        &lt;th&gt;Nómina&lt;/th&gt;
+        &lt;th&gt;Días&lt;br&gt;laborables&lt;/th&gt;
+        &lt;th&gt;Presentes&lt;/th&gt;
+        &lt;th&gt;Atrasos&lt;/th&gt;
+        &lt;th&gt;Faltas&lt;br&gt;injustificadas&lt;/th&gt;
+        &lt;th&gt;Faltas&lt;br&gt;justificadas&lt;/th&gt;
+        &lt;th&gt;%&lt;br&gt;Asistencia&lt;/th&gt;
+        &lt;th&gt;Observación&lt;/th&gt;
+      &lt;/tr&gt;
+    &lt;/thead&gt;
+    &lt;tbody&gt;
+      
+      &lt;tr&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Benalcazar Coronel Angely Yuleidi&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;54&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;98,28%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Cedillo Mena Neymar Josue&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;51&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;96,55%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;3&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Delgado Guaillasaca Keysi Fiorela&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;98,28%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Guaillasaca Velepucha Britany Sulay&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;48&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;93,10%&lt;/td&gt;
+        &lt;td class=&quot;warn&quot;&gt;Seguimiento&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;5&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Guaman Guaman Jessenia Fernanda&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;57&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;100,00%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;6&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Gutama Chavez Estalin Mateo&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;51&lt;/td&gt;
+        &lt;td&gt;3&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;96,55%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;7&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Merchan Pizarro Zoila Veronica&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;54&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;98,28%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;8&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Orellana Guaillasaca Johny Danilo&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;50&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;96,55%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;9&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Pando Orellana Yesli Anai&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;57&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;100,00%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;10&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Pomaquiza Lalvay Sofia Daniela&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;100,00%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;11&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Sanchez Guerrero Jostin Jose&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;47&lt;/td&gt;
+        &lt;td&gt;5&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;93,10%&lt;/td&gt;
+        &lt;td class=&quot;warn&quot;&gt;Seguimiento&lt;/td&gt;
+      &lt;/tr&gt;
+    
+    &lt;/tbody&gt;
+  &lt;/table&gt;
+
+  &lt;div class=&quot;bloque-inferior&quot;&gt;
+    &lt;div class=&quot;fila-estadistica&quot;&gt;
+      &lt;table class=&quot;estadistica&quot;&gt;
+        &lt;thead&gt;
+          &lt;tr&gt;&lt;th&gt;ESTADO&lt;/th&gt;&lt;th&gt;N°&lt;/th&gt;&lt;th&gt;%&lt;/th&gt;&lt;/tr&gt;
+        &lt;/thead&gt;
+        &lt;tbody&gt;
+          &lt;tr&gt;&lt;td class=&#x27;s-desc&#x27;&gt;&lt;span class=&#x27;dot&#x27; style=&#x27;background:#22C55E&#x27;&gt;&lt;/span&gt;Presentes&lt;/td&gt;&lt;td&gt;579&lt;/td&gt;&lt;td&gt;90,75%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td class=&#x27;s-desc&#x27;&gt;&lt;span class=&#x27;dot&#x27; style=&#x27;background:#F59E0B&#x27;&gt;&lt;/span&gt;Atrasos&lt;/td&gt;&lt;td&gt;28&lt;/td&gt;&lt;td&gt;4,39%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td class=&#x27;s-desc&#x27;&gt;&lt;span class=&#x27;dot&#x27; style=&#x27;background:#EF4444&#x27;&gt;&lt;/span&gt;Faltas injustificadas&lt;/td&gt;&lt;td&gt;17&lt;/td&gt;&lt;td&gt;2,66%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td class=&#x27;s-desc&#x27;&gt;&lt;span class=&#x27;dot&#x27; style=&#x27;background:#8B5CF6&#x27;&gt;&lt;/span&gt;Faltas justificadas&lt;/td&gt;&lt;td&gt;14&lt;/td&gt;&lt;td&gt;2,19%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;total&#x27;&gt;&lt;td&gt;TOTAL REGISTROS&lt;/td&gt;&lt;td&gt;638&lt;/td&gt;&lt;td&gt;100,00%&lt;/td&gt;&lt;/tr&gt;
+        &lt;/tbody&gt;
+      &lt;/table&gt;
+
+      &lt;div class=&quot;grafico-wrap&quot;&gt;
+        
+&lt;svg width=&quot;100%&quot; height=&quot;165&quot; viewBox=&quot;0 0 450 165&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;&gt;
+  &lt;rect x=&quot;0&quot; y=&quot;0&quot; width=&quot;450&quot; height=&quot;165&quot; fill=&quot;white&quot;/&gt;
+  &lt;text x=&#x27;69.0&#x27; y=&#x27;30&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;90,75%&lt;/text&gt;&lt;rect x=&#x27;40&#x27; y=&#x27;38&#x27; width=&#x27;58&#x27; height=&#x27;82&#x27; fill=&#x27;#22C55E&#x27; stroke=&#x27;#1F4E79&#x27;/&gt;&lt;text x=&#x27;69.0&#x27; y=&#x27;136&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;579&lt;/text&gt;&lt;text x=&#x27;69.0&#x27; y=&#x27;151&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;P&lt;/text&gt;&lt;text x=&#x27;169.0&#x27; y=&#x27;109&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;4,39%&lt;/text&gt;&lt;rect x=&#x27;140&#x27; y=&#x27;117&#x27; width=&#x27;58&#x27; height=&#x27;3&#x27; fill=&#x27;#F59E0B&#x27; stroke=&#x27;#1F4E79&#x27;/&gt;&lt;text x=&#x27;169.0&#x27; y=&#x27;136&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;28&lt;/text&gt;&lt;text x=&#x27;169.0&#x27; y=&#x27;151&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;A&lt;/text&gt;&lt;text x=&#x27;269.0&#x27; y=&#x27;109&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;2,66%&lt;/text&gt;&lt;rect x=&#x27;240&#x27; y=&#x27;117&#x27; width=&#x27;58&#x27; height=&#x27;3&#x27; fill=&#x27;#EF4444&#x27; stroke=&#x27;#1F4E79&#x27;/&gt;&lt;text x=&#x27;269.0&#x27; y=&#x27;136&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;17&lt;/text&gt;&lt;text x=&#x27;269.0&#x27; y=&#x27;151&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;F&lt;/text&gt;&lt;text x=&#x27;369.0&#x27; y=&#x27;109&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;2,19%&lt;/text&gt;&lt;rect x=&#x27;340&#x27; y=&#x27;117&#x27; width=&#x27;58&#x27; height=&#x27;3&#x27; fill=&#x27;#8B5CF6&#x27; stroke=&#x27;#1F4E79&#x27;/&gt;&lt;text x=&#x27;369.0&#x27; y=&#x27;136&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;14&lt;/text&gt;&lt;text x=&#x27;369.0&#x27; y=&#x27;151&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;J&lt;/text&gt;
+&lt;/svg&gt;
+
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;fila-promedio&quot;&gt;
+      &lt;table class=&quot;promedio&quot;&gt;
+        &lt;tr&gt;
+          &lt;td&gt;Porcentaje General de Asistencia&lt;/td&gt;
+          &lt;td class=&quot;valor&quot;&gt;97,34%&lt;/td&gt;
+        &lt;/tr&gt;
+      &lt;/table&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;nota&quot;&gt;
+      Nota: P = presente, A = atraso, F = falta injustificada, J = falta justificada. Para el porcentaje se consideran como asistencia administrativa los estados P, A y J. El rango de fechas del trimestre es definido por el docente o por la institución.
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div class=&quot;firmas&quot;&gt;
+    &lt;div class=&quot;firma-bloque&quot;&gt;
+      &lt;div class=&quot;firma-linea&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;firma-nombre&quot;&gt;[[firma_docente]]&lt;/div&gt;
+      &lt;div class=&quot;firma-cargo&quot;&gt;Docente&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;firma-bloque&quot;&gt;
+      &lt;div class=&quot;firma-linea&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;firma-nombre&quot;&gt;[[firma_rector]]&lt;/div&gt;
+      &lt;div class=&quot;firma-cargo&quot;&gt;Rector&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/section&gt;
+
+&lt;script&gt;
+  function formatDate(value) {
+    if (!value) return &quot;&quot;;
+    const parts = value.split(&quot;-&quot;);
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+
+  function syncHeader() {
+    const trimestre = document.getElementById(&quot;trimestre&quot;).value;
+    const desde = document.getElementById(&quot;desde&quot;).value;
+    const hasta = document.getElementById(&quot;hasta&quot;).value;
+    document.getElementById(&quot;metaTrimestre&quot;).textContent = trimestre;
+    document.getElementById(&quot;metaPeriodo&quot;).textContent = `${formatDate(desde)} al ${formatDate(hasta)}`;
+  }
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+    </section>
+
+    <section id="anual" class="prototype">
+      <iframe title="Informe anual de asistencia" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;es&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+&lt;title&gt;UEEH — Informe Anual de Asistencia&lt;/title&gt;
+&lt;style&gt;
+  :root {
+    --azul-oscuro: #1F4E79;
+    --azul-medio: #2E75B6;
+    --azul-claro: #9DC3E6;
+    --gris-tabla: #B7B7B7;
+    --fila-par: #FFFFFF;
+    --fila-impar: #F0F7FF;
+    --texto: #0F172A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: #C8C8C8;
+    font-family: Calibri, &quot;Trebuchet MS&quot;, Arial, sans-serif;
+    color: var(--texto);
+    padding: 22px;
+  }
+
+  .screen-toolbar {
+    max-width: 1120px;
+    margin: 0 auto 14px;
+    background: #fff;
+    border: 1px solid #CBD5E1;
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .toolbar-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .toolbar-title strong { color: var(--azul-oscuro); font-size: 16px; }
+
+  .toolbar-grid {
+    display: grid;
+    grid-template-columns: 1.5fr .7fr .7fr .7fr .7fr;
+    gap: 10px;
+    align-items: end;
+  }
+
+  label {
+    font-size: 12px;
+    color: #475569;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  select, input {
+    width: 100%;
+    padding: 8px 9px;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+
+  .btn {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 13px;
+    cursor: pointer;
+    font-weight: 700;
+    background: var(--azul-oscuro);
+    color: white;
+  }
+
+  .report {
+    width: 277mm;
+    min-height: 190mm;
+    background: white;
+    margin: 0 auto;
+    padding: 8mm;
+  }
+
+  .header-top {
+    background: var(--azul-oscuro);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    min-height: 70px;
+  }
+
+  .logo-box {
+    width: 76px;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo-placeholder {
+    width: 60px;
+    height: 50px;
+    border: 1.5px solid rgba(255,255,255,0.45);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.75);
+    font-size: 7pt;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .header-center {
+    flex: 1;
+    text-align: center;
+    padding: 0 8px;
+  }
+
+  .inst-nombre {
+    font-size: 20pt;
+    font-weight: bold;
+    color: white;
+    line-height: 1.1;
+  }
+
+  .inst-subtitulo {
+    font-size: 8.5pt;
+    color: rgba(255,255,255,0.9);
+    margin-top: 1px;
+  }
+
+  .report-title {
+    font-weight: bold;
+    font-size: 9pt;
+    color: white;
+    margin-top: 2px;
+  }
+
+  .meta-bloque {
+    background: var(--azul-claro);
+    padding: 5px 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px 18px;
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: baseline;
+    font-size: 8.2pt;
+    line-height: 1.45;
+  }
+
+  .meta-label {
+    font-weight: bold;
+    font-style: italic;
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  table.principal {
+    font-size: 6.9pt;
+  }
+
+  table.principal th,
+  table.principal td {
+    border: 1px solid var(--gris-tabla);
+    text-align: center;
+    vertical-align: middle;
+    padding: 2px 2px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  table.principal thead tr.head1 th {
+    background: var(--azul-medio);
+    color: white;
+    font-weight: bold;
+    font-size: 7.1pt;
+    height: 27px;
+    white-space: normal;
+    line-height: 1.12;
+  }
+
+  table.principal thead tr.head2 th {
+    background: var(--azul-claro);
+    color: #000;
+    font-weight: bold;
+    font-size: 6.4pt;
+    height: 25px;
+    white-space: normal;
+    line-height: 1.12;
+  }
+
+  table.principal td.nomina {
+    text-align: left;
+    padding-left: 5px;
+    font-size: 6.9pt;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); }
+  table.principal tbody tr:nth-child(odd) td { background: var(--fila-par); }
+
+  .bold { font-weight: bold; }
+  .ok { background: #E2EFDA !important; font-weight: bold; }
+  .warn { background: #FFF2CC !important; font-weight: bold; }
+  .bad { background: #FCE4D6 !important; font-weight: bold; }
+
+  .bloque-inferior {
+    padding: 10px 10px 0;
+  }
+
+  .fila-estadistica {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+  }
+
+  table.estadistica {
+    width: 350px;
+    font-size: 8pt;
+    flex-shrink: 0;
+  }
+
+  table.estadistica th,
+  table.estadistica td {
+    border: 1px solid #000;
+    padding: 3px 5px;
+    text-align: center;
+  }
+
+  table.estadistica thead th {
+    background: var(--azul-medio);
+    color: white;
+    font-weight: bold;
+  }
+
+  table.estadistica td.s-desc {
+    text-align: left;
+    font-weight: bold;
+  }
+
+  table.estadistica tr.total td {
+    background: var(--azul-claro);
+    font-weight: bold;
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 99px;
+    display: inline-block;
+    margin-right: 6px;
+  }
+
+  .grafico-wrap {
+    flex: 1;
+    min-height: 165px;
+    border: 1px solid #CCC;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+  }
+
+  .fila-promedio {
+    display: flex;
+    justify-content: center;
+    margin: 9px 0 0;
+  }
+
+  table.promedio {
+    width: 430px;
+    font-size: 8.2pt;
+  }
+
+  table.promedio td {
+    border: 1px solid #000;
+    padding: 4px 8px;
+    text-align: center;
+  }
+
+  table.promedio .valor {
+    width: 82px;
+    font-weight: bold;
+  }
+
+  .nota {
+    font-size: 7.5pt;
+    color: #334155;
+    margin-top: 7px;
+    line-height: 1.25;
+  }
+
+  .firmas {
+    display: flex;
+    justify-content: center;
+    gap: 90px;
+    margin-top: 36px;
+    padding: 0 10px 8px;
+  }
+
+  .firma-bloque {
+    width: 210px;
+    text-align: center;
+  }
+
+  .firma-linea {
+    border-top: 1px solid #000;
+    margin-bottom: 3px;
+  }
+
+  .firma-nombre {
+    font-size: 8.4pt;
+    font-weight: bold;
+  }
+
+  .firma-cargo {
+    font-size: 8pt;
+  }
+
+  @page { size: A4 landscape; margin: 10mm; }
+
+  @media print {
+    body {
+      background: white;
+      padding: 0;
+    }
+
+    .screen-toolbar {
+      display: none;
+    }
+
+    .report {
+      width: 277mm;
+      min-height: auto;
+      margin: 0;
+      padding: 0;
+    }
+
+    .fila-estadistica,
+    .fila-promedio,
+    .firmas {
+      page-break-inside: avoid;
+    }
+  }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+&lt;div class=&quot;screen-toolbar&quot;&gt;
+  &lt;div class=&quot;toolbar-title&quot;&gt;
+    &lt;div&gt;
+      &lt;strong&gt;Informe anual de asistencia&lt;/strong&gt;
+      &lt;span style=&quot;color:#64748B;&quot;&gt; · consolidado de los tres trimestres&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;button class=&quot;btn&quot; onclick=&quot;window.print()&quot;&gt;Imprimir / PDF&lt;/button&gt;
+  &lt;/div&gt;
+
+  &lt;div class=&quot;toolbar-grid&quot;&gt;
+    &lt;div&gt;
+      &lt;label&gt;Asignación&lt;/label&gt;
+      &lt;select&gt;
+        &lt;option&gt;Matemática | 3ro de EGB-A | Juca Farfan Pablo Hernan | 2026-2027&lt;/option&gt;
+        &lt;option&gt;Lengua y Literatura | 2do de EGB-A | Juca Farfan Pablo Hernan | 2026-2027&lt;/option&gt;
+        &lt;option&gt;Ciencias Naturales | 4to de EGB-B | Juca Farfan Pablo Hernan | 2026-2027&lt;/option&gt;
+      &lt;/select&gt;
+    &lt;/div&gt;
+    &lt;div&gt;
+      &lt;label&gt;Inicio T1&lt;/label&gt;
+      &lt;input type=&quot;date&quot; id=&quot;t1desde&quot; value=&quot;2026-05-04&quot; onchange=&quot;syncHeader()&quot;&gt;
+    &lt;/div&gt;
+    &lt;div&gt;
+      &lt;label&gt;Fin T1&lt;/label&gt;
+      &lt;input type=&quot;date&quot; id=&quot;t1hasta&quot; value=&quot;2026-08-07&quot; onchange=&quot;syncHeader()&quot;&gt;
+    &lt;/div&gt;
+    &lt;div&gt;
+      &lt;label&gt;Inicio T2&lt;/label&gt;
+      &lt;input type=&quot;date&quot; id=&quot;t2desde&quot; value=&quot;2026-08-10&quot; onchange=&quot;syncHeader()&quot;&gt;
+    &lt;/div&gt;
+    &lt;div&gt;
+      &lt;label&gt;Fin T3&lt;/label&gt;
+      &lt;input type=&quot;date&quot; id=&quot;t3hasta&quot; value=&quot;2027-02-26&quot; onchange=&quot;syncHeader()&quot;&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;section class=&quot;report&quot;&gt;
+  &lt;div class=&quot;header-top&quot;&gt;
+    &lt;div class=&quot;logo-box&quot;&gt;&lt;div class=&quot;logo-placeholder&quot;&gt;LOGO&lt;br&gt;INST.&lt;/div&gt;&lt;/div&gt;
+    &lt;div class=&quot;header-center&quot;&gt;
+      &lt;div class=&quot;inst-nombre&quot;&gt;Unidad Educativa Emiliano Hinostroza&lt;/div&gt;
+      &lt;div class=&quot;inst-subtitulo&quot;&gt;San Salvador de Cañaribamba - Santa Isabel&lt;/div&gt;
+      &lt;div class=&quot;report-title&quot;&gt;INFORME ANUAL DE ASISTENCIA&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;logo-box&quot;&gt;&lt;div class=&quot;logo-placeholder&quot;&gt;MINE-&lt;br&gt;DUC&lt;/div&gt;&lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div class=&quot;meta-bloque&quot;&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Docente:&lt;/span&gt; Juca Farfan Pablo Hernan&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Asignatura:&lt;/span&gt; Matemática&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Curso:&lt;/span&gt; 3ro de EGB &amp;nbsp;&amp;nbsp;&lt;span class=&quot;meta-label&quot;&gt;Nivel:&lt;/span&gt; EGB&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Paralelo:&lt;/span&gt; A&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Año lectivo:&lt;/span&gt; 2026-2027&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Período anual:&lt;/span&gt; &lt;span id=&quot;metaPeriodo&quot;&gt;04/05/2026 al 26/02/2027&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Primer trimestre:&lt;/span&gt; &lt;span id=&quot;metaT1&quot;&gt;04/05/2026 al 07/08/2026&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Segundo trimestre:&lt;/span&gt; &lt;span id=&quot;metaT2&quot;&gt;10/08/2026 al 27/11/2026&lt;/span&gt;&lt;/div&gt;
+    &lt;div class=&quot;meta-row&quot;&gt;&lt;span class=&quot;meta-label&quot;&gt;Tercer trimestre:&lt;/span&gt; &lt;span id=&quot;metaT3&quot;&gt;30/11/2026 al 26/02/2027&lt;/span&gt;&lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;table class=&quot;principal&quot;&gt;
+    &lt;colgroup&gt;
+      &lt;col style=&quot;width:28px;&quot;&gt;
+      &lt;col style=&quot;width:190px;&quot;&gt;
+      &lt;col span=&quot;3&quot; style=&quot;width:46px;&quot;&gt;
+      &lt;col span=&quot;3&quot; style=&quot;width:46px;&quot;&gt;
+      &lt;col span=&quot;3&quot; style=&quot;width:46px;&quot;&gt;
+      &lt;col style=&quot;width:38px;&quot;&gt;
+      &lt;col style=&quot;width:34px;&quot;&gt;
+      &lt;col style=&quot;width:34px;&quot;&gt;
+      &lt;col style=&quot;width:34px;&quot;&gt;
+      &lt;col style=&quot;width:34px;&quot;&gt;
+      &lt;col style=&quot;width:52px;&quot;&gt;
+      &lt;col style=&quot;width:78px;&quot;&gt;
+    &lt;/colgroup&gt;
+    &lt;thead&gt;
+      &lt;tr class=&quot;head1&quot;&gt;
+        &lt;th rowspan=&quot;2&quot;&gt;N°&lt;/th&gt;
+        &lt;th rowspan=&quot;2&quot;&gt;Nómina&lt;/th&gt;
+        &lt;th colspan=&quot;3&quot;&gt;Primer&lt;br&gt;Trimestre&lt;/th&gt;
+        &lt;th colspan=&quot;3&quot;&gt;Segundo&lt;br&gt;Trimestre&lt;/th&gt;
+        &lt;th colspan=&quot;3&quot;&gt;Tercer&lt;br&gt;Trimestre&lt;/th&gt;
+        &lt;th rowspan=&quot;2&quot;&gt;Días&lt;/th&gt;
+        &lt;th rowspan=&quot;2&quot;&gt;P&lt;/th&gt;
+        &lt;th rowspan=&quot;2&quot;&gt;A&lt;/th&gt;
+        &lt;th rowspan=&quot;2&quot;&gt;F&lt;/th&gt;
+        &lt;th rowspan=&quot;2&quot;&gt;J&lt;/th&gt;
+        &lt;th rowspan=&quot;2&quot;&gt;%&lt;br&gt;Asist.&lt;/th&gt;
+        &lt;th rowspan=&quot;2&quot;&gt;Observación&lt;/th&gt;
+      &lt;/tr&gt;
+      &lt;tr class=&quot;head2&quot;&gt;
+        &lt;th&gt;Días&lt;/th&gt;&lt;th&gt;F&lt;/th&gt;&lt;th&gt;%&lt;/th&gt;
+        &lt;th&gt;Días&lt;/th&gt;&lt;th&gt;F&lt;/th&gt;&lt;th&gt;%&lt;/th&gt;
+        &lt;th&gt;Días&lt;/th&gt;&lt;th&gt;F&lt;/th&gt;&lt;th&gt;%&lt;/th&gt;
+      &lt;/tr&gt;
+    &lt;/thead&gt;
+    &lt;tbody&gt;
+      
+      &lt;tr&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Benalcazar Coronel Angely Yuleidi&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;98,28%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;98,18%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;98,33%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;162&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;5&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;3&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;3&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;98,27%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Cedillo Mena Neymar Josue&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;96,55%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;98,18%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;96,67%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;155&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;10&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;5&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;3&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;97,11%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;3&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Delgado Guaillasaca Keysi Fiorela&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;98,28%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;98,18%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;98,33%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;163&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;4&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;3&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;3&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;98,27%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Guaillasaca Velepucha Britany Sulay&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;93,10%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;3&lt;/td&gt;
+        &lt;td&gt;94,55%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;3&lt;/td&gt;
+        &lt;td&gt;95,00%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;147&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;11&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;10&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;5&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;94,22%&lt;/td&gt;
+        &lt;td class=&quot;bad&quot;&gt;Alerta alta&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;5&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Guaman Guaman Jessenia Fernanda&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;100,00%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;100,00%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;100,00%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;170&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;3&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;0&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;0&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;100,00%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;6&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Gutama Chavez Estalin Mateo&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;96,55%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;98,18%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;96,67%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;153&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;9&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;5&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;6&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;97,11%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;7&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Merchan Pizarro Zoila Veronica&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;98,28%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;100,00%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;98,33%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;162&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;6&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;2&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;3&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;98,84%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;8&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Orellana Guaillasaca Johny Danilo&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;96,55%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;96,36%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;2&lt;/td&gt;
+        &lt;td&gt;96,67%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;152&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;11&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;6&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;4&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;96,53%&lt;/td&gt;
+        &lt;td class=&quot;warn&quot;&gt;Seguimiento&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;9&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Pando Orellana Yesli Anai&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;100,00%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;100,00%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;100,00%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;170&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;2&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;0&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;1&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;100,00%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;10&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Pomaquiza Lalvay Sofia Daniela&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;100,00%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;100,00%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;0&lt;/td&gt;
+        &lt;td&gt;100,00%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;164&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;4&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;0&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;5&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;100,00%&lt;/td&gt;
+        &lt;td class=&quot;ok&quot;&gt;Normal&lt;/td&gt;
+      &lt;/tr&gt;
+    
+      &lt;tr&gt;
+        &lt;td&gt;11&lt;/td&gt;
+        &lt;td class=&quot;nomina&quot;&gt;Sanchez Guerrero Jostin Jose&lt;/td&gt;
+        &lt;td&gt;58&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;93,10%&lt;/td&gt;
+        &lt;td&gt;55&lt;/td&gt;
+        &lt;td&gt;3&lt;/td&gt;
+        &lt;td&gt;94,55%&lt;/td&gt;
+        &lt;td&gt;60&lt;/td&gt;
+        &lt;td&gt;3&lt;/td&gt;
+        &lt;td&gt;95,00%&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;173&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;143&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;14&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;10&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;6&lt;/td&gt;
+        &lt;td class=&quot;bold&quot;&gt;94,22%&lt;/td&gt;
+        &lt;td class=&quot;bad&quot;&gt;Alerta alta&lt;/td&gt;
+      &lt;/tr&gt;
+    
+    &lt;/tbody&gt;
+  &lt;/table&gt;
+
+  &lt;div class=&quot;bloque-inferior&quot;&gt;
+    &lt;div class=&quot;fila-estadistica&quot;&gt;
+      &lt;table class=&quot;estadistica&quot;&gt;
+        &lt;thead&gt;
+          &lt;tr&gt;&lt;th&gt;ESTADO&lt;/th&gt;&lt;th&gt;N°&lt;/th&gt;&lt;th&gt;%&lt;/th&gt;&lt;/tr&gt;
+        &lt;/thead&gt;
+        &lt;tbody&gt;
+          &lt;tr&gt;&lt;td class=&#x27;s-desc&#x27;&gt;&lt;span class=&#x27;dot&#x27; style=&#x27;background:#22C55E&#x27;&gt;&lt;/span&gt;Presentes&lt;/td&gt;&lt;td&gt;1741&lt;/td&gt;&lt;td&gt;91,49%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td class=&#x27;s-desc&#x27;&gt;&lt;span class=&#x27;dot&#x27; style=&#x27;background:#F59E0B&#x27;&gt;&lt;/span&gt;Atrasos&lt;/td&gt;&lt;td&gt;79&lt;/td&gt;&lt;td&gt;4,15%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td class=&#x27;s-desc&#x27;&gt;&lt;span class=&#x27;dot&#x27; style=&#x27;background:#EF4444&#x27;&gt;&lt;/span&gt;Faltas injustificadas&lt;/td&gt;&lt;td&gt;44&lt;/td&gt;&lt;td&gt;2,31%&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td class=&#x27;s-desc&#x27;&gt;&lt;span class=&#x27;dot&#x27; style=&#x27;background:#8B5CF6&#x27;&gt;&lt;/span&gt;Faltas justificadas&lt;/td&gt;&lt;td&gt;39&lt;/td&gt;&lt;td&gt;2,05%&lt;/td&gt;&lt;/tr&gt;&lt;tr class=&#x27;total&#x27;&gt;&lt;td&gt;TOTAL REGISTROS&lt;/td&gt;&lt;td&gt;1903&lt;/td&gt;&lt;td&gt;100,00%&lt;/td&gt;&lt;/tr&gt;
+        &lt;/tbody&gt;
+      &lt;/table&gt;
+
+      &lt;div class=&quot;grafico-wrap&quot;&gt;
+        
+&lt;svg width=&quot;100%&quot; height=&quot;165&quot; viewBox=&quot;0 0 450 165&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;&gt;
+  &lt;rect x=&quot;0&quot; y=&quot;0&quot; width=&quot;450&quot; height=&quot;165&quot; fill=&quot;white&quot;/&gt;
+  &lt;text x=&#x27;69.0&#x27; y=&#x27;30&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;91,49%&lt;/text&gt;&lt;rect x=&#x27;40&#x27; y=&#x27;38&#x27; width=&#x27;58&#x27; height=&#x27;82&#x27; fill=&#x27;#22C55E&#x27; stroke=&#x27;#1F4E79&#x27;/&gt;&lt;text x=&#x27;69.0&#x27; y=&#x27;136&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;1741&lt;/text&gt;&lt;text x=&#x27;69.0&#x27; y=&#x27;151&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;P&lt;/text&gt;&lt;text x=&#x27;169.0&#x27; y=&#x27;109&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;4,15%&lt;/text&gt;&lt;rect x=&#x27;140&#x27; y=&#x27;117&#x27; width=&#x27;58&#x27; height=&#x27;3&#x27; fill=&#x27;#F59E0B&#x27; stroke=&#x27;#1F4E79&#x27;/&gt;&lt;text x=&#x27;169.0&#x27; y=&#x27;136&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;79&lt;/text&gt;&lt;text x=&#x27;169.0&#x27; y=&#x27;151&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;A&lt;/text&gt;&lt;text x=&#x27;269.0&#x27; y=&#x27;109&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;2,31%&lt;/text&gt;&lt;rect x=&#x27;240&#x27; y=&#x27;117&#x27; width=&#x27;58&#x27; height=&#x27;3&#x27; fill=&#x27;#EF4444&#x27; stroke=&#x27;#1F4E79&#x27;/&gt;&lt;text x=&#x27;269.0&#x27; y=&#x27;136&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;44&lt;/text&gt;&lt;text x=&#x27;269.0&#x27; y=&#x27;151&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;F&lt;/text&gt;&lt;text x=&#x27;369.0&#x27; y=&#x27;109&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;2,05%&lt;/text&gt;&lt;rect x=&#x27;340&#x27; y=&#x27;117&#x27; width=&#x27;58&#x27; height=&#x27;3&#x27; fill=&#x27;#8B5CF6&#x27; stroke=&#x27;#1F4E79&#x27;/&gt;&lt;text x=&#x27;369.0&#x27; y=&#x27;136&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;39&lt;/text&gt;&lt;text x=&#x27;369.0&#x27; y=&#x27;151&#x27; text-anchor=&#x27;middle&#x27; font-size=&#x27;10&#x27; font-weight=&#x27;bold&#x27;&gt;J&lt;/text&gt;
+&lt;/svg&gt;
+
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;fila-promedio&quot;&gt;
+      &lt;table class=&quot;promedio&quot;&gt;
+        &lt;tr&gt;
+          &lt;td&gt;Porcentaje General Anual de Asistencia&lt;/td&gt;
+          &lt;td class=&quot;valor&quot;&gt;97,69%&lt;/td&gt;
+        &lt;/tr&gt;
+      &lt;/table&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;nota&quot;&gt;
+      Nota: P = presente, A = atraso, F = falta injustificada, J = falta justificada. El informe anual consolida los tres trimestres y calcula el porcentaje anual considerando como asistencia administrativa los estados P, A y J.
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div class=&quot;firmas&quot;&gt;
+    &lt;div class=&quot;firma-bloque&quot;&gt;
+      &lt;div class=&quot;firma-linea&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;firma-nombre&quot;&gt;[[firma_docente]]&lt;/div&gt;
+      &lt;div class=&quot;firma-cargo&quot;&gt;Docente&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;firma-bloque&quot;&gt;
+      &lt;div class=&quot;firma-linea&quot;&gt;&lt;/div&gt;
+      &lt;div class=&quot;firma-nombre&quot;&gt;[[firma_rector]]&lt;/div&gt;
+      &lt;div class=&quot;firma-cargo&quot;&gt;Rector&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/section&gt;
+
+&lt;script&gt;
+  function formatDate(value) {
+    if (!value) return &quot;&quot;;
+    const parts = value.split(&quot;-&quot;);
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+
+  function syncHeader() {
+    const t1d = document.getElementById(&quot;t1desde&quot;).value;
+    const t1h = document.getElementById(&quot;t1hasta&quot;).value;
+    const t2d = document.getElementById(&quot;t2desde&quot;).value;
+    const t3h = document.getElementById(&quot;t3hasta&quot;).value;
+
+    document.getElementById(&quot;metaPeriodo&quot;).textContent = `${formatDate(t1d)} al ${formatDate(t3h)}`;
+    document.getElementById(&quot;metaT1&quot;).textContent = `${formatDate(t1d)} al ${formatDate(t1h)}`;
+    document.getElementById(&quot;metaT2&quot;).textContent = `${formatDate(t2d)} al 27/11/2026`;
+    document.getElementById(&quot;metaT3&quot;).textContent = `30/11/2026 al ${formatDate(t3h)}`;
+  }
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+    </section>
+
+    <div class="footer-note">
+      Nota: cada prototipo se mantiene aislado dentro de este archivo para conservar sus estilos, botones e interacciones sin mezclar CSS o JavaScript.
+    </div>
+  </main>
+
+<script>
+  function showPrototype(id) {
+    document.querySelectorAll(".prototype").forEach(section => {
+      section.classList.toggle("active", section.id === id);
+    });
+
+    document.querySelectorAll(".main-tab").forEach(button => {
+      button.classList.toggle("active", button.dataset.target === id);
+    });
+  }
+</script>
+</body>
+</html>
