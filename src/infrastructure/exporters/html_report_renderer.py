@@ -178,22 +178,19 @@ class HtmlReportRenderer:
         if not filtered_rows:
             return "<div style='font-size:10px;color:#666;'>Sin datos para graficar</div>"
 
-        categories = [r["escala"] for r in filtered_rows]
-        pcts = [r["porcentaje"] for r in filtered_rows]
-        nums = [r["numero"] for r in filtered_rows]
-        return (
-            '<div id="bar-chart" class="bar-chart" data-categories="' + ",".join(categories) + '" '
-            'data-percentages="' + ",".join(f"{p:.2f}" for p in pcts) + '" '
-            'data-frequencies="' + ",".join(str(n) for n in nums) + '"></div>'
-            "<script>(function(){const el=document.getElementById('bar-chart');if(!el)return;"
-            "const cats=el.dataset.categories.split(',');const p=el.dataset.percentages.split(',').map(Number);"
-            "const n=el.dataset.frequencies.split(',').map(Number);"
-            "let h='';"
-            "for(let i=0;i<cats.length;i++){const bh=Math.max(4,p[i]*1.5);h+=`<div class=\"bar-item\">"
-            "<div class=\"bar-pct\">${String(p[i].toFixed(2)).replace('.',',')}%</div>"
-            "<div class=\"bar\" style=\"height:${bh}px\"></div><div class=\"bar-n\">${n[i]}</div>"
-            "<div class=\"bar-label\">${cats[i]}</div></div>`;}el.innerHTML=h;})();</script>"
-        )
+        bar_items: list[str] = []
+        for item in filtered_rows:
+            bar_height = max(4.0, min(120.0, item["porcentaje"] * 1.3))
+            pct_text = f"{item['porcentaje']:.2f}".replace(".", ",") + "%"
+            bar_items.append(
+                "<div class='bar-item'>"
+                f"<div class='bar-pct'>{html.escape(pct_text)}</div>"
+                f"<div class='bar' style='height:{bar_height:.1f}px'></div>"
+                f"<div class='bar-n'>{item['numero']}</div>"
+                f"<div class='bar-label'>{html.escape(item['escala'])}</div>"
+                "</div>"
+            )
+        return "<div class='bar-chart'>" + "".join(bar_items) + "</div>"
 
     def _build_simplified_stats(self, rows: list[dict[str, Any]], use_anual: bool = False) -> dict[str, Any]:
         categories = ["A+", "A-", "B+", "B-", "C+", "C-", "D+", "D-", "E+", "E-"]
