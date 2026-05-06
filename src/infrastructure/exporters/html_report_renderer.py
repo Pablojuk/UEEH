@@ -18,7 +18,7 @@ class HtmlReportRenderer:
         if simplified_trimestral:
             template_name = "reporte_trimestral_simplificado.html"
         elif simplified_anual:
-            template_name = "reporte_anual_simplificado.html"
+            template_name = "reporte_anual_simplificado_egb.html"
         else:
             template_name = "reporte_trimestral.html" if context.get("report_type") == "trimestral" else "reporte_anual.html"
         template_path = Path(__file__).resolve().parent.parent / "templates" / template_name
@@ -39,9 +39,10 @@ class HtmlReportRenderer:
         chart_svg = self._build_simplified_trimestral_chart_html(rows, use_anual=bool(simplified_anual)) if (simplified_trimestral or simplified_anual) else (
             self._build_trimestral_chart_svg(rows) if is_trimestral else self._build_anual_chart_svg(rows)
         )
+        promedio_field = "promedio" if simplified_anual else "promedio_final"
         promedio_general = self._fmt(
-            sum((float(r.get("promedio_final")) for r in rows if not self._is_empty_value(r.get("promedio_final"))), 0.0)
-            / max(sum(1 for r in rows if not self._is_empty_value(r.get("promedio_final"))), 1)
+            sum((float(r.get(promedio_field)) for r in rows if not self._is_empty_value(r.get(promedio_field))), 0.0)
+            / max(sum(1 for r in rows if not self._is_empty_value(r.get(promedio_field))), 1)
         )
         values = {
             "institucion_nombre": context.get("institucion_nombre", "Institución"),
@@ -65,7 +66,9 @@ class HtmlReportRenderer:
             "logros_rows_html": logros_rows,
             "estadistica_rows_html": estadistica_rows,
             "chart_svg": chart_svg,
-            "promedio_general": self._fmt(self._average_trimestral(rows) if simplified_trimestral else float(promedio_general or 0)),
+            "promedio_general": self._fmt(
+                self._average_trimestral(rows) if simplified_trimestral else float(promedio_general or 0)
+            ),
             "firma_docente": context.get("firmantes", {}).get("docente", ""),
             "firma_coordinador": context.get("firmantes", {}).get("coordinador_area", ""),
             "firma_rector": context.get("firmantes", {}).get("rector", ""),
@@ -137,12 +140,11 @@ class HtmlReportRenderer:
                 "<tr>"
                 f"<td>{idx}</td><td class='nomina'>{html.escape(str(row.get('estudiante', '')))}</td>"
                 f"{self._build_numeric_cell(row.get('trimestre_1'))}<td>{html.escape(str(row.get('equivalencia_t1', '')))}</td>"
-                f"{self._build_numeric_cell(row.get('trimestre_2'))}<td>{html.escape(str(row.get('equivalencia_t2', '')))}</td>"
-                f"{self._build_numeric_cell(row.get('trimestre_3'))}<td>{html.escape(str(row.get('equivalencia_t3', '')))}</td>"
+                f"{self._build_numeric_cell(row.get('trimestre_2'))}<td>{html.escape(str(row.get('equivalencia_t2', row.get('cualitativo_t2', ''))))}</td>"
+                f"{self._build_numeric_cell(row.get('trimestre_3'))}<td>{html.escape(str(row.get('equivalencia_t3', row.get('cualitativo_t3', ''))))}</td>"
                 f"{self._build_numeric_cell(row.get('promedio'), extra_classes='prom-bold')}"
                 f"<td>{html.escape(str(row.get('cualitativa_anual', '')))}</td>"
-                f"<td>{html.escape(str(row.get('cualitativo_final', '')))}</td>"
-                f"<td class='{self._observation_class(str(row.get('observacion', '')))}'>{html.escape(str(row.get('observacion', '')))}</td>"
+                f"<td class='celda-equivalencia'>{html.escape(str(row.get('equivalencia', row.get('cualitativo_final', ''))))}</td>"
                 "</tr>"
             )
         return "".join(parts)
@@ -178,22 +180,19 @@ class HtmlReportRenderer:
         if not filtered_rows:
             return "<div style='font-size:10px;color:#666;'>Sin datos para graficar</div>"
 
-        categories = [r["escala"] for r in filtered_rows]
-        pcts = [r["porcentaje"] for r in filtered_rows]
-        nums = [r["numero"] for r in filtered_rows]
-        return (
-            '<div id="bar-chart" class="bar-chart" data-categories="' + ",".join(categories) + '" '
-            'data-percentages="' + ",".join(f"{p:.2f}" for p in pcts) + '" '
-            'data-frequencies="' + ",".join(str(n) for n in nums) + '"></div>'
-            "<script>(function(){const el=document.getElementById('bar-chart');if(!el)return;"
-            "const cats=el.dataset.categories.split(',');const p=el.dataset.percentages.split(',').map(Number);"
-            "const n=el.dataset.frequencies.split(',').map(Number);"
-            "let h='';"
-            "for(let i=0;i<cats.length;i++){const bh=Math.max(4,p[i]*1.5);h+=`<div class=\"bar-item\">"
-            "<div class=\"bar-pct\">${String(p[i].toFixed(2)).replace('.',',')}%</div>"
-            "<div class=\"bar\" style=\"height:${bh}px\"></div><div class=\"bar-n\">${n[i]}</div>"
-            "<div class=\"bar-label\">${cats[i]}</div></div>`;}el.innerHTML=h;})();</script>"
-        )
+        bar_items: list[str] = []
+        for item in filtered_rows:
+            bar_height = max(4.0, min(120.0, item["porcentaje"] * 1.3))
+            pct_text = f"{item['porcentaje']:.2f}".replace(".", ",") + "%"
+            bar_items.append(
+                "<div class='bar-item'>"
+                f"<div class='bar-pct'>{html.escape(pct_text)}</div>"
+                f"<div class='bar' style='height:{bar_height:.1f}px'></div>"
+                f"<div class='bar-n'>{item['numero']}</div>"
+                f"<div class='bar-label'>{html.escape(item['escala'])}</div>"
+                "</div>"
+            )
+        return "<div class='bar-chart'>" + "".join(bar_items) + "</div>"
 
     def _build_simplified_stats(self, rows: list[dict[str, Any]], use_anual: bool = False) -> dict[str, Any]:
         categories = ["A+", "A-", "B+", "B-", "C+", "C-", "D+", "D-", "E+", "E-"]

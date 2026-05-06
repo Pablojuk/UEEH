@@ -34,6 +34,7 @@ class Sidebar(QFrame):
             ("teaching_assignments", "Asignaciones"),
             ("grades", "Notas"),
             ("reports", "Reportes"),
+            ("attendance", "Asistencias"),
             ("settings", "Utilidades"),
         ]
 
