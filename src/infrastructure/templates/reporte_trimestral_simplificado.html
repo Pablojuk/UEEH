@@ -9,7 +9,7 @@
   :root { --azul-oscuro:#1F4E79; --azul-medio:#2E75B6; --azul-claro:#9DC3E6; --azul-linea:#1E4DFF; --gris-tabla:#B7B7B7; --verde-aprobado:#E2EFDA; --rojo-reporte:#FCE4D6; --fila-par:#FFFFFF; --fila-impar:#F0F7FF; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { width: 100%; background: #C8C8C8; font-family: 'Calibri', 'Trebuchet MS', sans-serif; font-size: 8.5pt; color: #000; display: flex; flex-direction: column; align-items: center; padding: 24px 0 48px; }
-  .hoja { width: 794px; background: white; border: 2.5px solid var(--azul-linea); display: flex; flex-direction: column; page-break-inside: avoid; page-break-after: avoid; }
+  .hoja { width: 794px; background: white; border: none; display: flex; flex-direction: column; page-break-inside: avoid; page-break-after: avoid; }
   .header-top { background: var(--azul-oscuro); display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; min-height: 68px; flex-shrink: 0; }
   .logo-box { width: 78px; height: 62px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .logo-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
@@ -49,7 +49,7 @@
   table.promedio { border-collapse: collapse; font-size: 8pt; width: 360px; }
   table.promedio td { border: 1px solid #000; padding: 3px 8px; }
   table.promedio td.p-label { text-align: center; } table.promedio td.p-valor { text-align: center; font-weight: bold; width: 68px; }
-  .firmas { display: flex; justify-content: space-around; margin-top: 28px; padding: 0 10px 8px; flex-shrink: 0; page-break-inside: avoid; page-break-before: avoid; }
+  .firmas { display: flex; justify-content: space-around; margin-top: 45px; padding: 0 10px 8px; flex-shrink: 0; page-break-inside: avoid; page-break-before: avoid; }
   .firma-bloque { display: flex; flex-direction: column; align-items: center; width: 160px; }
   .firma-linea { width: 100%; border-top: 1px solid #000; margin-bottom: 3px; }
   .firma-nombre { font-size: 8.5pt; text-align: center; font-weight: bold; }
