@@ -33,7 +33,13 @@ class PdfReportExporter:
         if not rendered:
             raise RuntimeError("No se pudo renderizar la plantilla HTML del reporte")
 
-        orientation = "landscape" if context.get("report_type") == "trimestral" else "portrait"
+        is_simplified_trimestral = bool(
+            context.get("report_type") == "trimestral" and context.get("is_simplified_trimestral")
+        )
+        is_simplified_anual = bool(context.get("report_type") == "anual" and context.get("is_simplified_anual"))
+        orientation = "portrait" if (is_simplified_trimestral or is_simplified_anual) else (
+            "landscape" if context.get("report_type") == "trimestral" else "portrait"
+        )
         if not self.export_to_pdf(
             rendered,
             str(path),

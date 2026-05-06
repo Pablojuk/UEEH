@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMainWindow, QStacked
 
 from src.application.services.academic_summary_service import AcademicSummaryService
 from src.application.services.backup_service import BackupService
+from src.application.services.attendance_service import AttendanceService
 from src.application.services.catalog_service import CatalogService
 from src.application.services.classroom_accompaniment_service import ClassroomAccompanimentService
 from src.application.services.enrollment_service import EnrollmentService
@@ -28,6 +29,7 @@ from src.presentation.views.settings_view import SettingsView
 from src.presentation.views.students_view import StudentsView
 from src.presentation.views.teachers_view import TeachersView
 from src.presentation.views.teaching_assignments_view import TeachingAssignmentsView
+from src.presentation.views.attendance_view import AttendanceView
 from src.presentation.widgets.sidebar import Sidebar
 
 
@@ -46,6 +48,7 @@ class MainWindow(QMainWindow):
         report_export_service: ReportExportService,
         backup_service: BackupService,
         classroom_accompaniment_service: ClassroomAccompanimentService,
+        attendance_service: AttendanceService,
     ) -> None:
         super().__init__()
 
@@ -61,6 +64,7 @@ class MainWindow(QMainWindow):
         self.report_export_service = report_export_service
         self.backup_service = backup_service
         self.classroom_accompaniment_service = classroom_accompaniment_service
+        self.attendance_service = attendance_service
         self.app_signals = AppSignals()
 
         self.setWindowTitle("Sistema Académico UEEH")
@@ -117,6 +121,7 @@ class MainWindow(QMainWindow):
                 classroom_accompaniment_service=self.classroom_accompaniment_service,
                 grade_registration_service=self.grade_registration_service,
             ),
+            "attendance": AttendanceView(attendance_service=self.attendance_service),
             "classroom_accompaniment": ClassroomAccompanimentView(
                 accompaniment_service=self.classroom_accompaniment_service,
                 app_signals=self.app_signals,

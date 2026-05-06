@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from openpyxl.cell.cell import MergedCell
 
 
 class ExcelReportExporter:
@@ -15,6 +16,18 @@ class ExcelReportExporter:
     COLOR_REPROBADO = "FFC7CE"
     COLOR_SPL = "FFEB9C"
     COLOR_BORDE = "B8CCE4"
+
+    def _safe_set_cell_value(self, ws, row: int, column: int, value):
+        cell = ws.cell(row=row, column=column)
+        if isinstance(cell, MergedCell):
+            for merged_range in ws.merged_cells.ranges:
+                if cell.coordinate in merged_range:
+                    top_left = ws.cell(row=merged_range.min_row, column=merged_range.min_col)
+                    top_left.value = value
+                    return top_left
+            return cell
+        cell.value = value
+        return cell
 
     def exportar(
         self,
@@ -94,7 +107,7 @@ class ExcelReportExporter:
         if context.get("report_type") == "trimestral":
             simplified = bool(context.get("is_simplified_trimestral"))
             if simplified:
-                headers = ["N°", "Nómina", "Promedio Trimestral", "Cualitativo", "Equivalencia", "Observación"]
+                headers = ["N°", "Nómina", "Promedio Trimestral", "Cualitativo", "Equivalencia"]
             else:
                 headers = [
                     "N°", "Nómina",
@@ -117,8 +130,7 @@ class ExcelReportExporter:
                         row.get("estudiante", ""),
                         row.get("promedio_trimestral", row.get("promedio_final")),
                         row.get("cualitativo", row.get("cualitativa", "")),
-                        row.get("equivalencia", ""),
-                        row.get("observacion", ""),
+                        self._equivalencia_egb_basica_desde_cualitativo(row.get("cualitativo", row.get("cualitativa", ""))),
                     ]
                     if simplified else
                     [
@@ -142,13 +154,14 @@ class ExcelReportExporter:
                     cell.fill = PatternFill(start_color=base_color, end_color=base_color, fill_type="solid")
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
-                obs_text = str(row.get("observacion", "")).strip().upper()
-                obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
-                if obs_color:
-                    obs_cell = ws.cell(row=r, column=6 if simplified else 10)
-                    obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
+                if not simplified:
+                    obs_text = str(row.get("observacion", "")).strip().upper()
+                    obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
+                    if obs_color:
+                        obs_cell = ws.cell(row=r, column=10)
+                        obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
             if simplified:
-                widths = [5, 34, 16, 12, 12, 12]
+                widths = [5, 34, 16, 12, 34]
                 signatures_row = self._draw_trimester_stats(ws, max(start_row + len(filtered_rows) + 4, 18), border, filtered_rows)
             else:
                 widths = [5, 34, 14, 12, 15, 12, 10, 10, 10, 12]
@@ -160,7 +173,7 @@ class ExcelReportExporter:
                 "Trimestre Cali", "Trimestre Cuali",
                 "Trimestre Cali", "Trimestre Cuali",
                 "Trimestre Cali", "Trimestre Cuali",
-                "Promedio", "Cualitativa", "Equivalencia", "Observación",
+                "Promedio", "Cualitativo", "Equivalencia",
             ] if simplified_anual else [
                 "N°", "Nómina",
                 "Trimestre Cali", "Trimestre Cuali",
@@ -187,8 +200,7 @@ class ExcelReportExporter:
                     row.get("equivalencia_t3", ""),
                     row.get("promedio"),
                     row.get("cualitativa_anual", ""),
-                    row.get("cualitativo_final", ""),
-                    row.get("observacion", ""),
+                    row.get("equivalencia", row.get("cualitativo_final", "")),
                 ] if simplified_anual else [
                     idx,row.get("estudiante",""),row.get("trimestre_1"),row.get("equivalencia_t1",""),
                     row.get("trimestre_2"),row.get("equivalencia_t2",""),row.get("trimestre_3"),row.get("equivalencia_t3",""),
@@ -203,12 +215,13 @@ class ExcelReportExporter:
                     cell.fill = PatternFill(start_color=base_color, end_color=base_color, fill_type="solid")
                     if isinstance(value, (int, float)) and cidx != 1:
                         cell.number_format = "0.00"
-                obs_text = str(row.get("observacion", "")).strip().upper()
-                obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
-                if obs_color:
-                    obs_cell = ws.cell(row=r, column=12 if simplified_anual else 14)
-                    obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
-            widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 12] if simplified_anual else [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
+                if not simplified_anual:
+                    obs_text = str(row.get("observacion", "")).strip().upper()
+                    obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
+                    if obs_color:
+                        obs_cell = ws.cell(row=r, column=14)
+                        obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
+            widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 24] if simplified_anual else [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
             last_student_row = start_row + len(filtered_rows)
             stats_start = max(last_student_row + 4, 39)
             signatures_row = self._draw_annual_statistics(ws, stats_start, border, filtered_rows, last_student_row)
@@ -235,15 +248,20 @@ class ExcelReportExporter:
             c = str(row.get("cualitativo", row.get("cualitativa", ""))).strip().upper()
             if c in counts:
                 counts[c] += 1
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=3)
-        ws.cell(row=start_row, column=1, value="ESCALA CUALITATIVA").font = Font(bold=True)
-        ws.cell(row=start_row, column=2, value="N°").font = Font(bold=True)
-        ws.cell(row=start_row, column=3, value="%").font = Font(bold=True)
+        self._safe_set_cell_value(ws, start_row, 1, "ESCALA CUALITATIVA")
+        self._safe_set_cell_value(ws, start_row, 2, "N°")
+        self._safe_set_cell_value(ws, start_row, 3, "%")
+        ws.cell(row=start_row, column=1).font = Font(bold=True)
+        ws.cell(row=start_row, column=2).font = Font(bold=True)
+        ws.cell(row=start_row, column=3).font = Font(bold=True)
+        for c in range(1, 4):
+            ws.cell(row=start_row, column=c).border = border
+            ws.cell(row=start_row, column=c).alignment = Alignment(horizontal="center")
         for idx, label in enumerate(labels, start=1):
             r = start_row + idx
-            ws.cell(r, 1, label)
-            ws.cell(r, 2, counts[label])
-            ws.cell(r, 3, ((counts[label] / total) if total else 0))
+            self._safe_set_cell_value(ws, r, 1, label)
+            self._safe_set_cell_value(ws, r, 2, counts[label])
+            self._safe_set_cell_value(ws, r, 3, ((counts[label] / total) if total else 0))
             ws.cell(r, 3).number_format = "0.00%"
             for c in range(1, 4):
                 ws.cell(r, c).border = border
@@ -251,11 +269,22 @@ class ExcelReportExporter:
         return start_row + len(labels) + 2
 
     @staticmethod
-    def _apply_print_settings(ws, max_cols: int, max_rows: int) -> None:
+    def _equivalencia_egb_basica_desde_cualitativo(cualitativo: object) -> str:
+        key = str(cualitativo or "").strip().upper()
+        if key in {"A+", "A-", "B+"}:
+            return "Destreza o aprendizaje alcanzado"
+        if key in {"B-", "C+", "C-"}:
+            return "Destreza o aprendizaje en proceso de desarrollo"
+        if key in {"D+", "D-", "E+", "E-"}:
+            return "Destreza o aprendizaje iniciado"
+        return ""
+
+    @staticmethod
+    def _apply_print_settings(ws, max_cols: int, max_rows: int, orientation: str = "landscape") -> None:
         from openpyxl.worksheet.page import PageMargins
 
         ws.page_setup.paperSize = ws.PAPERSIZE_A4
-        ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+        ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT if orientation == "portrait" else ws.ORIENTATION_LANDSCAPE
         ws.page_setup.fitToWidth = 1
         ws.page_setup.fitToHeight = 1
         ws.sheet_properties.pageSetUpPr.fitToPage = True
