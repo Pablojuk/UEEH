@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
+import unicodedata
 from typing import Any
 
 from src.domain.calculations import (
@@ -200,6 +201,13 @@ class AcademicSummaryService:
         ).fetchall()
         supp_map = {row["estudiante_id"]: row["nota_supletorio"] for row in supletorios}
 
+        asignatura = self.connection.execute(
+            "SELECT nombre FROM asignaturas WHERE id_asignatura = ?",
+            (asignacion["asignatura_id"],),
+        ).fetchone()
+        curso = self.connection.execute("SELECT nombre FROM cursos WHERE id_curso = ?", (asignacion["curso_id"],)).fetchone()
+        simplified_egb = self._is_simplified_egb_course(curso["nombre"] if curso else "", asignatura["nombre"] if asignatura else "")
+
         resumenes: list[dict[str, Any]] = []
         for student in estudiantes:
             student_row = dict(student)
@@ -214,8 +222,7 @@ class AcademicSummaryService:
             else:
                 promedio_final = calcular_resultado_con_supletorio(promedio, supletorio)
 
-            resumenes.append(
-                {
+            base = {
                     "estudiante_id": student_id,
                     "estudiante": f"{student_row.get('apellidos', '')} {student_row.get('nombres', '')}".strip(),
                     "codigo": student_row.get("codigo"),
@@ -235,9 +242,63 @@ class AcademicSummaryService:
                     "observacion": calcular_observacion_final(promedio_final) if promedio_final is not None else "",
                     "nota_definitiva": promedio_final,
                 }
-            )
+            if simplified_egb:
+                c1 = calcular_cualitativo_trimestral(t1)
+                c2 = calcular_cualitativo_trimestral(t2)
+                c3 = calcular_cualitativo_trimestral(t3)
+                cual_anual = calcular_cualitativo_trimestral(promedio) if promedio is not None else ""
+                base.update(
+                    {
+                        "equivalencia_t1": c1,
+                        "equivalencia_t2": c2,
+                        "equivalencia_t3": c3,
+                        "cualitativo_t1": c1,
+                        "cualitativo_t2": c2,
+                        "cualitativo_t3": c3,
+                        "cualitativa_anual": cual_anual,
+                        "cualitativo_final": cual_anual,
+                        "equivalencia": self._calcular_equivalencia_egb_basica(cual_anual),
+                    }
+                )
+            resumenes.append(base)
 
         return resumenes
+
+    @staticmethod
+    def _normalize_text(value: Any) -> str:
+        normalized = unicodedata.normalize("NFD", str(value or "").strip().lower())
+        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        return " ".join(normalized.split())
+
+    def _is_simplified_egb_course(self, curso_nombre: str, asignatura_nombre: str) -> bool:
+        subject = self._normalize_text(asignatura_nombre)
+        if subject in {
+            "orientacion vocacional y profesional",
+            "comportamiento",
+            "acompanamiento integral en el aula",
+            "animacion a la lectura",
+        }:
+            return False
+        course = self._normalize_text(curso_nombre)
+        return any(
+            alias in course
+            for alias in {
+                "2do de egb", "2do egb", "segundo de egb", "segundo egb",
+                "3ro de egb", "3ro egb", "tercero de egb", "tercero egb",
+                "4to de egb", "4to egb", "cuarto de egb", "cuarto egb",
+            }
+        )
+
+    @staticmethod
+    def _calcular_equivalencia_egb_basica(cualitativo: str) -> str:
+        key = str(cualitativo or "").strip().upper()
+        if key in {"A+", "A-", "B+"}:
+            return "Destreza o aprendizaje alcanzado"
+        if key in {"B-", "C+", "C-"}:
+            return "Destreza o aprendizaje en proceso de desarrollo"
+        if key in {"D+", "D-", "E+", "E-"}:
+            return "Destreza o aprendizaje iniciado"
+        return ""
 
     def recalcular_resumenes(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         recalculados: list[dict[str, Any]] = []
