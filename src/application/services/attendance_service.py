@@ -90,3 +90,123 @@ class AttendanceService:
                 """,
                 (assignment_id, student_id, on_date, observation, now, now),
             )
+
+
+    def get_assignment_context(self, assignment_id: str) -> dict[str, Any]:
+        row = self.connection.execute(
+            """
+            SELECT a.id_asignacion, a.periodo_id,
+                   d.apellidos || ' ' || d.nombres AS docente,
+                   s.nombre AS asignatura,
+                   c.nombre AS curso,
+                   COALESCE(c.nivel, '') AS nivel,
+                   p.nombre AS paralelo,
+                   i.nombre AS institucion_nombre,
+                   COALESCE(i.direccion, '') AS institucion_subtitulo,
+                   COALESCE(i.rector, '') AS rector
+            FROM asignaciones_docente a
+            LEFT JOIN docentes d ON d.id_docente = a.docente_id
+            LEFT JOIN asignaturas s ON s.id_asignatura = a.asignatura_id
+            LEFT JOIN cursos c ON c.id_curso = a.curso_id
+            LEFT JOIN paralelos p ON p.id_paralelo = a.paralelo_id
+            LEFT JOIN institucion i ON 1=1
+            WHERE a.id_asignacion=?
+            LIMIT 1
+            """,
+            (assignment_id,),
+        ).fetchone()
+        if not row:
+            return {}
+        return dict(row)
+
+    def build_quarterly_attendance_report(self, assignment_id: str, start_date: str, end_date: str) -> dict[str, Any]:
+        context = self.get_assignment_context(assignment_id)
+        students = self.list_students_for_assignment(assignment_id)
+        records = self.connection.execute(
+            """SELECT student_id, status FROM attendance_records
+               WHERE assignment_id=? AND date BETWEEN ? AND ?""",
+            (assignment_id, start_date, end_date),
+        ).fetchall()
+        by_student: dict[str, dict[str, int]] = defaultdict(lambda: {"P": 0, "A": 0, "F": 0, "J": 0})
+        for r in records:
+            status = str(r["status"] or "").upper()
+            if status in self.VALID:
+                by_student[r["student_id"]][status] += 1
+
+        rows = []
+        totals = {"P": 0, "A": 0, "F": 0, "J": 0}
+        for idx, st in enumerate(students, start=1):
+            cnt = by_student.get(st["id_estudiante"], {"P": 0, "A": 0, "F": 0, "J": 0})
+            dias = sum(cnt.values())
+            asistencia = cnt["P"] + cnt["A"] + cnt["J"]
+            pct = (asistencia / dias * 100.0) if dias else 0.0
+            if pct < 85 or cnt["F"] >= 6:
+                obs = "Crítico"
+            elif pct < 95 or cnt["F"] >= 3:
+                obs = "Seguimiento"
+            else:
+                obs = "Normal"
+            row = {
+                "nro": idx,
+                "estudiante_id": st["id_estudiante"],
+                "nomina": st["estudiante"],
+                "dias_laborables": dias,
+                "presentes": cnt["P"],
+                "atrasos": cnt["A"],
+                "faltas_injustificadas": cnt["F"],
+                "faltas_justificadas": cnt["J"],
+                "porcentaje_asistencia": pct,
+                "observacion": obs,
+            }
+            rows.append(row)
+            for k in totals:
+                totals[k] += cnt[k]
+
+        total_reg = sum(totals.values())
+        stats = {
+            "total_presentes": totals["P"],
+            "total_atrasos": totals["A"],
+            "total_faltas_injustificadas": totals["F"],
+            "total_faltas_justificadas": totals["J"],
+            "total_registros": total_reg,
+            "porcentaje_p": (totals["P"] / total_reg * 100.0) if total_reg else 0.0,
+            "porcentaje_a": (totals["A"] / total_reg * 100.0) if total_reg else 0.0,
+            "porcentaje_f": (totals["F"] / total_reg * 100.0) if total_reg else 0.0,
+            "porcentaje_j": (totals["J"] / total_reg * 100.0) if total_reg else 0.0,
+            "porcentaje_general_asistencia": ((totals["P"] + totals["A"] + totals["J"]) / total_reg * 100.0) if total_reg else 0.0,
+        }
+        return {"context": context, "rows": rows, "stats": stats}
+
+
+    def list_quarterly_signer_options(self, assignment_id: str | None = None) -> dict[str, list[str]]:
+        docente = ""
+        if assignment_id:
+            ctx = self.get_assignment_context(assignment_id)
+            docente = str(ctx.get("docente") or "").strip()
+        rector_rows = self.connection.execute("SELECT COALESCE(rector,'') AS rector FROM institucion").fetchall()
+        rectores = [str(r["rector"]).strip() for r in rector_rows if str(r["rector"] or "").strip()]
+        return {
+            "docente": [docente] if docente else [],
+            "rector": sorted(set(rectores)),
+        }
+
+
+    def listar_firmantes_disponibles(self) -> list[dict[str, str]]:
+        rows = self.connection.execute(
+            """
+            SELECT id_docente, titulo, nombres, apellidos
+            FROM docentes
+            WHERE activo = 1
+            ORDER BY apellidos, nombres
+            """
+        ).fetchall()
+        firmantes: list[dict[str, str]] = []
+        for row in rows:
+            nombres = str(row["nombres"] or "").strip().split()
+            apellidos = str(row["apellidos"] or "").strip().split()
+            primer_nombre = nombres[0] if nombres else ""
+            primer_apellido = apellidos[0] if apellidos else ""
+            titulo = str(row["titulo"] or "").strip()
+            firma = " ".join(part for part in [titulo, primer_nombre, primer_apellido] if part).strip()
+            firmantes.append({"id_docente": row["id_docente"], "firma": firma})
+        return firmantes

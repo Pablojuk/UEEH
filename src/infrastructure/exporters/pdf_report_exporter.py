@@ -58,6 +58,7 @@ class PdfReportExporter:
         output_path: str,
         orientation: str = "landscape",
         ocultar_filas_vacias: bool = False,
+        margins_mm: float = 10,
     ) -> bool:
         """Exporta HTML a PDF usando QWebEngineView offscreen."""
         try:
@@ -80,14 +81,14 @@ class PdfReportExporter:
             printer = QPrinter(QPrinter.HighResolution)
             printer.setPageSize(QPageSize(QPageSize.A4))
             printer.setPageOrientation(page_orientation)
-            printer.setPageMargins(QMarginsF(10, 10, 10, 10), QPageLayout.Millimeter)
+            printer.setPageMargins(QMarginsF(margins_mm, margins_mm, margins_mm, margins_mm), QPageLayout.Millimeter)
             printer.setOutputFormat(QPrinter.PdfFormat)
             printer.setOutputFileName(output_path)
 
             page_layout = QPageLayout(
                 QPageSize(QPageSize.A4),
                 page_orientation,
-                QMarginsF(10, 10, 10, 10),
+                QMarginsF(margins_mm, margins_mm, margins_mm, margins_mm),
                 QPageLayout.Millimeter,
             )
 
