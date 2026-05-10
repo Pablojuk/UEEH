@@ -102,8 +102,10 @@ class AttendanceService:
                    COALESCE(c.nivel, '') AS nivel,
                    p.nombre AS paralelo,
                    i.nombre AS institucion_nombre,
-                   COALESCE(i.direccion, '') AS institucion_subtitulo,
-                   COALESCE(i.rector, '') AS rector
+                   TRIM(COALESCE(i.parroquia,'') || CASE WHEN COALESCE(i.parroquia,'')<>'' AND COALESCE(i.ciudad,'')<>'' THEN ' - ' ELSE '' END || COALESCE(i.ciudad,'')) AS institucion_subtitulo,
+                   COALESCE(i.rector, '') AS rector,
+                   COALESCE(i.logo_path,'') AS logo_path,
+                   COALESCE(i.logo_ministerio_path,'') AS logo_ministerio_path
             FROM asignaciones_docente a
             LEFT JOIN docentes d ON d.id_docente = a.docente_id
             LEFT JOIN asignaturas s ON s.id_asignatura = a.asignatura_id
