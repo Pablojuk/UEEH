@@ -142,12 +142,8 @@ class AttendanceService:
             dias = sum(cnt.values())
             asistencia = cnt["P"] + cnt["A"] + cnt["J"]
             pct = (asistencia / dias * 100.0) if dias else 0.0
-            if pct < 85 or cnt["F"] >= 6:
-                obs = "Crítico"
-            elif pct < 95 or cnt["F"] >= 3:
-                obs = "Seguimiento"
-            else:
-                obs = "Normal"
+            max_f = self._max_consecutive_unjustified_absences(assignment_id, st['id_estudiante'], start_date, end_date)
+            obs = self._calcular_observacion_institucional(pct, cnt['F'], cnt['J'], max_f, periodo='trimestral')
             row = {
                 "nro": idx,
                 "estudiante_id": st["id_estudiante"],
@@ -244,7 +240,8 @@ class AttendanceService:
             j_total=int(r1.get('faltas_justificadas',0))+int(r2.get('faltas_justificadas',0))+int(r3.get('faltas_justificadas',0))
             dias_total=int(r1.get('dias_laborables',0))+int(r2.get('dias_laborables',0))+int(r3.get('dias_laborables',0))
             pct=((p_total+a_total+j_total)/dias_total*100) if dias_total else 0.0
-            obs='Alerta alta' if (pct<90 or f_total>=10) else ('Seguimiento' if (pct<95 or f_total>=5) else 'Normal')
+            max_f = max(self._max_consecutive_unjustified_absences(assignment_id, _sid, t1_start, t1_end), self._max_consecutive_unjustified_absences(assignment_id, _sid, t2_start, t2_end), self._max_consecutive_unjustified_absences(assignment_id, _sid, t3_start, t3_end))
+            obs=self._calcular_observacion_institucional(pct, f_total, j_total, max_f, periodo='anual')
             rows.append({'nro':i,'estudiante_id':_sid,'nomina':r1.get('nomina') or r2.get('nomina') or r3.get('nomina') or '',
                 't1_dias':int(r1.get('dias_laborables',0)),'t1_faltas':int(r1.get('faltas_injustificadas',0)),'t1_porcentaje':float(r1.get('porcentaje_asistencia',0)),
                 't2_dias':int(r2.get('dias_laborables',0)),'t2_faltas':int(r2.get('faltas_injustificadas',0)),'t2_porcentaje':float(r2.get('porcentaje_asistencia',0)),
@@ -258,3 +255,34 @@ class AttendanceService:
             'porcentaje_faltas_injustificadas':(totals['F']/total_reg*100) if total_reg else 0.0,'porcentaje_faltas_justificadas':(totals['J']/total_reg*100) if total_reg else 0.0,
             'porcentaje_general_anual_asistencia':((totals['P']+totals['A']+totals['J'])/total_reg*100) if total_reg else 0.0}
         return {'context':context,'rows':rows,'stats':stats}
+
+
+    def _max_consecutive_unjustified_absences(self, assignment_id: str, student_id: str, start_date: str, end_date: str) -> int:
+        rows = self.connection.execute(
+            """SELECT date FROM attendance_records
+               WHERE assignment_id=? AND student_id=? AND status='F' AND date BETWEEN ? AND ? ORDER BY date""",
+            (assignment_id, student_id, start_date, end_date),
+        ).fetchall()
+        if not rows:
+            return 0
+        from datetime import datetime
+        dates = [datetime.fromisoformat(r['date']).date() for r in rows if r['date']]
+        best = run = 1
+        for i in range(1, len(dates)):
+            delta = (dates[i] - dates[i-1]).days
+            if delta == 1 or delta == 3:
+                run += 1
+            else:
+                run = 1
+            best = max(best, run)
+        return best
+
+    def _calcular_observacion_institucional(self, porcentaje: float, faltas_injustificadas: int, faltas_justificadas: int, max_faltas_continuas: int, periodo: str = 'trimestral') -> str:
+        recurrentes_j = faltas_justificadas >= (6 if periodo == 'anual' else 3)
+        if faltas_injustificadas >= 10:
+            return 'Riesgo alto de abandono o vulneración'
+        if porcentaje < 90 or faltas_injustificadas >= 3 or max_faltas_continuas >= 4:
+            return 'Alerta institucional'
+        if porcentaje < 95 or 1 <= faltas_injustificadas <= 2 or recurrentes_j:
+            return 'Seguimiento preventivo'
+        return 'Normal / Sin novedad'

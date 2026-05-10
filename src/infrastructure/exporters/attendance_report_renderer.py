@@ -26,11 +26,11 @@ class AttendanceReportRenderer:
         for r in rows:
             cls='ok' if r['observacion']=='Normal' else ('warn' if r['observacion']=='Seguimiento' else 'bad')
             pct=f"{float(r['porcentaje_asistencia']):.2f}%".replace('.',',')
-            out.append(f"<tr><td>{r['nro']}</td><td class='nomina'>{html.escape(str(r['nomina']))}</td><td>{r['dias_laborables']}</td><td>{r['presentes']}</td><td>{r['atrasos']}</td><td>{r['faltas_injustificadas']}</td><td>{r['faltas_justificadas']}</td><td class='bold'>{pct}</td><td class='{cls}'>{r['observacion']}</td></tr>")
+            obs=r.get('observacion',''); out.append(f"<tr><td>{r['nro']}</td><td class='nomina'>{html.escape(str(r['nomina']))}</td><td>{r['dias_laborables']}</td><td>{r['presentes']}</td><td>{r['atrasos']}</td><td>{r['faltas_injustificadas']}</td><td>{r['faltas_justificadas']}</td><td class='bold'>{pct}</td><td class='{self._observation_class(obs)}'>{obs}</td></tr>")
         return ''.join(out)
     def _build_stats(self,s):
-        rows=[('Presentes',s.get('total_presentes',0),s.get('porcentaje_p',0),'#22C55E'),('Atrasos',s.get('total_atrasos',0),s.get('porcentaje_a',0),'#F59E0B'),('Faltas injustificadas',s.get('total_faltas_injustificadas',0),s.get('porcentaje_f',0),'#EF4444'),('Faltas justificadas',s.get('total_faltas_justificadas',0),s.get('porcentaje_j',0),'#8B5CF6')]
-        h=[f"<tr><td class='s-desc'><span class='dot' style='background:{c}'></span>{n}</td><td>{v}</td><td>{p:.2f}%</td></tr>" for n,v,p,c in rows]
+        rows=[('Presentes',s.get('total_presentes',0),s.get('porcentaje_p',s.get('porcentaje_presentes',0)),'dot-p'),('Atrasos',s.get('total_atrasos',0),s.get('porcentaje_a',s.get('porcentaje_atrasos',0)),'dot-a'),('Faltas injustificadas',s.get('total_faltas_injustificadas',0),s.get('porcentaje_f',s.get('porcentaje_faltas_injustificadas',0)),'dot-f'),('Faltas justificadas',s.get('total_faltas_justificadas',0),s.get('porcentaje_j',s.get('porcentaje_faltas_justificadas',0)),'dot-j')]
+        h=[f"<tr><td class='s-desc'><span class='dot {c}'></span>{n}</td><td>{v}</td><td>{p:.2f}%</td></tr>" for n,v,p,c in rows]
         h.append(f"<tr class='total'><td>TOTAL REGISTROS</td><td>{s.get('total_registros',0)}</td><td>100,00%</td></tr>")
         return ''.join(h).replace('.',',')
     def _build_svg(self,s):
@@ -68,7 +68,7 @@ class AttendanceReportRenderer:
             'logo_mineduc_html':f"<img src='{logo_min}' class='logo-img'>" if logo_min else "<div class='logo-placeholder'>MINE<br>DUC</div>",
             'docente':context.get('docente',''),'asignatura':context.get('asignatura',''),'curso':context.get('curso',''),'nivel':context.get('nivel',''),'paralelo':context.get('paralelo',''),'anio_lectivo':context.get('periodo_id',''),
             'periodo_anual':context.get('periodo_anual',''),'periodo_t1':context.get('periodo_t1',''),'periodo_t2':context.get('periodo_t2',''),'periodo_t3':context.get('periodo_t3',''),'fecha_emision':datetime.now().strftime('%d/%m/%Y'),
-            'rows_html':self._build_annual_rows_html(rows),'stats_rows_html':self._build_stats(stats).replace('porcentaje_p','porcentaje_presentes'),'chart_svg':self._build_svg({'total_presentes':stats.get('total_presentes',0),'total_atrasos':stats.get('total_atrasos',0),'total_faltas_injustificadas':stats.get('total_faltas_injustificadas',0),'total_faltas_justificadas':stats.get('total_faltas_justificadas',0),'porcentaje_p':stats.get('porcentaje_presentes',0),'porcentaje_a':stats.get('porcentaje_atrasos',0),'porcentaje_f':stats.get('porcentaje_faltas_injustificadas',0),'porcentaje_j':stats.get('porcentaje_faltas_justificadas',0)}),
+            'rows_html':self._build_annual_rows_html(rows),'stats_rows_html':self._build_stats(stats),'chart_svg':self._build_svg({'total_presentes':stats.get('total_presentes',0),'total_atrasos':stats.get('total_atrasos',0),'total_faltas_injustificadas':stats.get('total_faltas_injustificadas',0),'total_faltas_justificadas':stats.get('total_faltas_justificadas',0),'porcentaje_p':stats.get('porcentaje_presentes',0),'porcentaje_a':stats.get('porcentaje_atrasos',0),'porcentaje_f':stats.get('porcentaje_faltas_injustificadas',0),'porcentaje_j':stats.get('porcentaje_faltas_justificadas',0)}),
             'porcentaje_general_anual_asistencia':f"{float(stats.get('porcentaje_general_anual_asistencia',0)):.2f}%".replace('.',','),'firma_docente':context.get('firma_docente',''),'firma_rector':context.get('firma_rector','')
         }
         pat=re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_]+)\s*\]\]")
@@ -79,5 +79,12 @@ class AttendanceReportRenderer:
         out=[]
         for r in rows:
             pct=f"{float(r.get('porcentaje_asistencia_anual',0)):.2f}%".replace('.',',')
-            out.append(f"<tr><td>{r.get('nro','')}</td><td class='nomina'>{html.escape(str(r.get('nomina','')))}</td><td>{r.get('t1_dias',0)}</td><td>{r.get('t1_faltas',0)}</td><td>{float(r.get('t1_porcentaje',0)):.1f}%</td><td>{r.get('t2_dias',0)}</td><td>{r.get('t2_faltas',0)}</td><td>{float(r.get('t2_porcentaje',0)):.1f}%</td><td>{r.get('t3_dias',0)}</td><td>{r.get('t3_faltas',0)}</td><td>{float(r.get('t3_porcentaje',0)):.1f}%</td><td>{r.get('dias_total',0)}</td><td>{r.get('presentes_total',0)}</td><td>{r.get('atrasos_total',0)}</td><td>{r.get('faltas_injustificadas_total',0)}</td><td>{r.get('faltas_justificadas_total',0)}</td><td>{pct}</td><td>{r.get('observacion','')}</td></tr>")
+            obs=r.get('observacion',''); out.append(f"<tr><td>{r.get('nro','')}</td><td class='nomina'>{html.escape(str(r.get('nomina','')))}</td><td>{r.get('t1_dias',0)}</td><td>{r.get('t1_faltas',0)}</td><td>{float(r.get('t1_porcentaje',0)):.1f}%</td><td>{r.get('t2_dias',0)}</td><td>{r.get('t2_faltas',0)}</td><td>{float(r.get('t2_porcentaje',0)):.1f}%</td><td>{r.get('t3_dias',0)}</td><td>{r.get('t3_faltas',0)}</td><td>{float(r.get('t3_porcentaje',0)):.1f}%</td><td>{r.get('dias_total',0)}</td><td>{r.get('presentes_total',0)}</td><td>{r.get('atrasos_total',0)}</td><td>{r.get('faltas_injustificadas_total',0)}</td><td>{r.get('faltas_justificadas_total',0)}</td><td>{pct}</td><td class='{self._observation_class(obs)}'>{obs}</td></tr>")
         return ''.join(out).replace('.',',')
+
+    def _observation_class(self, obs: str) -> str:
+        t=str(obs or '').lower()
+        if 'riesgo' in t: return 'obs-riesgo'
+        if 'alerta' in t: return 'obs-alerta'
+        if 'seguimiento' in t: return 'obs-seguimiento'
+        return 'obs-normal'
