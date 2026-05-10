@@ -176,3 +176,16 @@ class AttendanceService:
             "porcentaje_general_asistencia": ((totals["P"] + totals["A"] + totals["J"]) / total_reg * 100.0) if total_reg else 0.0,
         }
         return {"context": context, "rows": rows, "stats": stats}
+
+
+    def list_quarterly_signer_options(self, assignment_id: str | None = None) -> dict[str, list[str]]:
+        docente = ""
+        if assignment_id:
+            ctx = self.get_assignment_context(assignment_id)
+            docente = str(ctx.get("docente") or "").strip()
+        rector_rows = self.connection.execute("SELECT COALESCE(rector,'') AS rector FROM institucion").fetchall()
+        rectores = [str(r["rector"]).strip() for r in rector_rows if str(r["rector"] or "").strip()]
+        return {
+            "docente": [docente] if docente else [],
+            "rector": sorted(set(rectores)),
+        }
