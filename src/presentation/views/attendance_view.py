@@ -1,5 +1,7 @@
 from __future__ import annotations
 from datetime import date
+import re
+import unicodedata
 from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
     QComboBox,QDateEdit,QFileDialog,QGroupBox,QHBoxLayout,QLabel,QLineEdit,QMessageBox,
@@ -73,12 +75,25 @@ class AttendanceView(QWidget):
             combo.blockSignals(False)
         self._reload_sheet(); self._on_quarterly_assignment_changed()
     def _on_quarterly_assignment_changed(self)->None:
-        aid=self.q_assignment.currentData(); opts=self.service.list_quarterly_signer_options(aid)
-        self.signer_docente_combo.blockSignals(True); self.signer_rector_combo.blockSignals(True)
-        self.signer_docente_combo.clear(); self.signer_rector_combo.clear()
-        for v in opts.get('docente',[]): self.signer_docente_combo.addItem(v,v)
-        for v in opts.get('rector',[]): self.signer_rector_combo.addItem(v,v)
-        self.signer_docente_combo.blockSignals(False); self.signer_rector_combo.blockSignals(False); self._update_signers()
+        aid=self.q_assignment.currentData()
+        self._load_attendance_signer_options()
+        ctx=self.service.get_assignment_context(aid) if aid else {}
+        docente=ctx.get('docente','')
+        rector=ctx.get('rector','')
+        if docente:
+            idx=self.signer_docente_combo.findData(docente)
+            if idx>=0: self.signer_docente_combo.setCurrentIndex(idx)
+        if rector:
+            idx=self.signer_rector_combo.findData(rector)
+            if idx>=0: self.signer_rector_combo.setCurrentIndex(idx)
+        self._update_signers()
+
+    def _load_attendance_signer_options(self)->None:
+        options=self.service.listar_firmantes_disponibles()
+        for combo in (self.signer_docente_combo,self.signer_rector_combo):
+            combo.blockSignals(True); combo.clear(); combo.addItem('Seleccione','')
+            for row in options: combo.addItem(row.get('firma',''),row.get('firma',''))
+            combo.blockSignals(False)
     def _update_signers(self)->None:
         self._attendance_firmantes['docente']=self.signer_docente_combo.currentData() or self.signer_docente_combo.currentText().strip()
         self._attendance_firmantes['rector']=self.signer_rector_combo.currentData() or self.signer_rector_combo.currentText().strip()
@@ -137,17 +152,32 @@ class AttendanceView(QWidget):
         ctx=data['context']; ctx['trimestre']=self.q_trimester.currentText(); ctx['periodo']=f"{self.q_from.date().toString('dd/MM/yyyy')} al {self.q_to.date().toString('dd/MM/yyyy')}"; self._update_signers(); ctx['firma_docente']=self._attendance_firmantes['docente'] or ctx.get('docente',''); ctx['firma_rector']=self._attendance_firmantes['rector'] or ctx.get('rector','')
         html=self.renderer.render_attendance_quarterly(ctx,data['rows'],data['stats']); self._set_attendance_preview_html(html)
         self._quarterly_data=(ctx,data['rows'],data['stats'],html)
+
+    @staticmethod
+    def _sanitize_filename(text: str) -> str:
+        value = str(text or '').strip()
+        value = unicodedata.normalize('NFD', value)
+        value = ''.join(ch for ch in value if unicodedata.category(ch) != 'Mn')
+        value = re.sub(r'[|/\\:*?"<>]', '_', value)
+        value = value.replace(' ', '_')
+        value = re.sub(r'_+', '_', value).strip(' ._')
+        return value or 'reporte'
+
     def _export_quarterly_pdf(self)->None:
         if not self._quarterly_data: self._generate_quarterly_preview()
         if not self._quarterly_data: return
-        path,_=QFileDialog.getSaveFileName(self,'Exportar PDF','informe_asistencia_trimestral.pdf','PDF (*.pdf)')
+        assignment_text=self.q_assignment.currentText() or str(self.q_assignment.currentData() or '')
+        default_name=f"{self._sanitize_filename(assignment_text)}_asistencia.pdf"
+        path,_=QFileDialog.getSaveFileName(self,'Exportar PDF',default_name,'PDF (*.pdf)')
         if not path: return
-        ok=self.pdf_exporter.export_to_pdf(self._quarterly_data[3],path,orientation='landscape')
+        ok=self.pdf_exporter.export_to_pdf(self._quarterly_data[3],path,orientation='landscape',margins_mm=8)
         QMessageBox.information(self,'PDF','Exportado correctamente' if ok else 'No se pudo exportar PDF')
     def _export_quarterly_excel(self)->None:
         if not self._quarterly_data: self._generate_quarterly_preview()
         if not self._quarterly_data: return
-        path,_=QFileDialog.getSaveFileName(self,'Exportar Excel','informe_asistencia_trimestral.xlsx','Excel (*.xlsx)')
+        assignment_text=self.q_assignment.currentText() or str(self.q_assignment.currentData() or '')
+        default_name=f"{self._sanitize_filename(assignment_text)}_asistencia.xlsx"
+        path,_=QFileDialog.getSaveFileName(self,'Exportar Excel',default_name,'Excel (*.xlsx)')
         if not path: return
         self.excel_exporter.export_attendance_quarterly_excel(path,self._quarterly_data[0],self._quarterly_data[1],self._quarterly_data[2])
         QMessageBox.information(self,'Excel','Exportado correctamente')
