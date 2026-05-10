@@ -90,3 +90,199 @@ class AttendanceService:
                 """,
                 (assignment_id, student_id, on_date, observation, now, now),
             )
+
+
+    def get_assignment_context(self, assignment_id: str) -> dict[str, Any]:
+        row = self.connection.execute(
+            """
+            SELECT a.id_asignacion, a.periodo_id,
+                   d.apellidos || ' ' || d.nombres AS docente,
+                   s.nombre AS asignatura,
+                   c.nombre AS curso,
+                   COALESCE(c.nivel, '') AS nivel,
+                   p.nombre AS paralelo,
+                   i.nombre AS institucion_nombre,
+                   TRIM(COALESCE(i.parroquia,'') || CASE WHEN COALESCE(i.parroquia,'')<>'' AND COALESCE(i.ciudad,'')<>'' THEN ' - ' ELSE '' END || COALESCE(i.ciudad,'')) AS institucion_subtitulo,
+                   COALESCE(i.rector, '') AS rector,
+                   COALESCE(i.logo_path,'') AS logo_path,
+                   COALESCE(i.logo_ministerio_path,'') AS logo_ministerio_path
+            FROM asignaciones_docente a
+            LEFT JOIN docentes d ON d.id_docente = a.docente_id
+            LEFT JOIN asignaturas s ON s.id_asignatura = a.asignatura_id
+            LEFT JOIN cursos c ON c.id_curso = a.curso_id
+            LEFT JOIN paralelos p ON p.id_paralelo = a.paralelo_id
+            LEFT JOIN institucion i ON 1=1
+            WHERE a.id_asignacion=?
+            LIMIT 1
+            """,
+            (assignment_id,),
+        ).fetchone()
+        if not row:
+            return {}
+        return dict(row)
+
+    def build_quarterly_attendance_report(self, assignment_id: str, start_date: str, end_date: str) -> dict[str, Any]:
+        context = self.get_assignment_context(assignment_id)
+        students = self.list_students_for_assignment(assignment_id)
+        records = self.connection.execute(
+            """SELECT student_id, status FROM attendance_records
+               WHERE assignment_id=? AND date BETWEEN ? AND ?""",
+            (assignment_id, start_date, end_date),
+        ).fetchall()
+        by_student: dict[str, dict[str, int]] = defaultdict(lambda: {"P": 0, "A": 0, "F": 0, "J": 0})
+        for r in records:
+            status = str(r["status"] or "").upper()
+            if status in self.VALID:
+                by_student[r["student_id"]][status] += 1
+
+        rows = []
+        totals = {"P": 0, "A": 0, "F": 0, "J": 0}
+        for idx, st in enumerate(students, start=1):
+            cnt = by_student.get(st["id_estudiante"], {"P": 0, "A": 0, "F": 0, "J": 0})
+            dias = sum(cnt.values())
+            asistencia = cnt["P"] + cnt["A"] + cnt["J"]
+            pct = (asistencia / dias * 100.0) if dias else 0.0
+            max_f = self._max_consecutive_unjustified_absences(assignment_id, st['id_estudiante'], start_date, end_date)
+            obs = self._calcular_observacion_institucional(pct, cnt['F'], cnt['J'], max_f, periodo='trimestral')
+            row = {
+                "nro": idx,
+                "estudiante_id": st["id_estudiante"],
+                "nomina": st["estudiante"],
+                "dias_laborables": dias,
+                "presentes": cnt["P"],
+                "atrasos": cnt["A"],
+                "faltas_injustificadas": cnt["F"],
+                "faltas_justificadas": cnt["J"],
+                "porcentaje_asistencia": pct,
+                "observacion": obs,
+            }
+            rows.append(row)
+            for k in totals:
+                totals[k] += cnt[k]
+
+        total_reg = sum(totals.values())
+        stats = {
+            "total_presentes": totals["P"],
+            "total_atrasos": totals["A"],
+            "total_faltas_injustificadas": totals["F"],
+            "total_faltas_justificadas": totals["J"],
+            "total_registros": total_reg,
+            "porcentaje_p": (totals["P"] / total_reg * 100.0) if total_reg else 0.0,
+            "porcentaje_a": (totals["A"] / total_reg * 100.0) if total_reg else 0.0,
+            "porcentaje_f": (totals["F"] / total_reg * 100.0) if total_reg else 0.0,
+            "porcentaje_j": (totals["J"] / total_reg * 100.0) if total_reg else 0.0,
+            "porcentaje_general_asistencia": ((totals["P"] + totals["A"] + totals["J"]) / total_reg * 100.0) if total_reg else 0.0,
+        }
+        return {"context": context, "rows": rows, "stats": stats}
+
+
+    def list_quarterly_signer_options(self, assignment_id: str | None = None) -> dict[str, list[str]]:
+        docente = ""
+        if assignment_id:
+            ctx = self.get_assignment_context(assignment_id)
+            docente = str(ctx.get("docente") or "").strip()
+        rector_rows = self.connection.execute("SELECT COALESCE(rector,'') AS rector FROM institucion").fetchall()
+        rectores = [str(r["rector"]).strip() for r in rector_rows if str(r["rector"] or "").strip()]
+        return {
+            "docente": [docente] if docente else [],
+            "rector": sorted(set(rectores)),
+        }
+
+
+    def listar_firmantes_disponibles(self) -> list[dict[str, str]]:
+        rows = self.connection.execute(
+            """
+            SELECT id_docente, titulo, nombres, apellidos
+            FROM docentes
+            WHERE activo = 1
+            ORDER BY apellidos, nombres
+            """
+        ).fetchall()
+        firmantes: list[dict[str, str]] = []
+        for row in rows:
+            nombres = str(row["nombres"] or "").strip().split()
+            apellidos = str(row["apellidos"] or "").strip().split()
+            primer_nombre = nombres[0] if nombres else ""
+            primer_apellido = apellidos[0] if apellidos else ""
+            titulo = str(row["titulo"] or "").strip()
+            firma = " ".join(part for part in [titulo, primer_nombre, primer_apellido] if part).strip()
+            firmantes.append({"id_docente": row["id_docente"], "firma": firma})
+        return firmantes
+
+
+    def build_annual_attendance_report(
+        self,
+        assignment_id: str,
+        t1_start: str,
+        t1_end: str,
+        t2_start: str,
+        t2_end: str,
+        t3_start: str,
+        t3_end: str,
+        firmantes: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        q1 = self.build_quarterly_attendance_report(assignment_id, t1_start, t1_end)
+        q2 = self.build_quarterly_attendance_report(assignment_id, t2_start, t2_end)
+        q3 = self.build_quarterly_attendance_report(assignment_id, t3_start, t3_end)
+        context = dict(q1.get('context', {}))
+        if firmantes:
+            context['firma_docente'] = firmantes.get('docente', '')
+            context['firma_rector'] = firmantes.get('rector', '')
+        by_id = {r['estudiante_id']: {'q1': r, 'q2': None, 'q3': None} for r in q1.get('rows', [])}
+        for r in q2.get('rows', []): by_id.setdefault(r['estudiante_id'], {'q1': None, 'q2': None, 'q3': None})['q2'] = r
+        for r in q3.get('rows', []): by_id.setdefault(r['estudiante_id'], {'q1': None, 'q2': None, 'q3': None})['q3'] = r
+        rows=[]; totals={'P':0,'A':0,'F':0,'J':0}
+        for i,(_sid,b) in enumerate(by_id.items(),start=1):
+            r1=b['q1'] or {}; r2=b['q2'] or {}; r3=b['q3'] or {}
+            p_total=int(r1.get('presentes',0))+int(r2.get('presentes',0))+int(r3.get('presentes',0))
+            a_total=int(r1.get('atrasos',0))+int(r2.get('atrasos',0))+int(r3.get('atrasos',0))
+            f_total=int(r1.get('faltas_injustificadas',0))+int(r2.get('faltas_injustificadas',0))+int(r3.get('faltas_injustificadas',0))
+            j_total=int(r1.get('faltas_justificadas',0))+int(r2.get('faltas_justificadas',0))+int(r3.get('faltas_justificadas',0))
+            dias_total=int(r1.get('dias_laborables',0))+int(r2.get('dias_laborables',0))+int(r3.get('dias_laborables',0))
+            pct=((p_total+a_total+j_total)/dias_total*100) if dias_total else 0.0
+            max_f = max(self._max_consecutive_unjustified_absences(assignment_id, _sid, t1_start, t1_end), self._max_consecutive_unjustified_absences(assignment_id, _sid, t2_start, t2_end), self._max_consecutive_unjustified_absences(assignment_id, _sid, t3_start, t3_end))
+            obs=self._calcular_observacion_institucional(pct, f_total, j_total, max_f, periodo='anual')
+            rows.append({'nro':i,'estudiante_id':_sid,'nomina':r1.get('nomina') or r2.get('nomina') or r3.get('nomina') or '',
+                't1_dias':int(r1.get('dias_laborables',0)),'t1_faltas':int(r1.get('faltas_injustificadas',0)),'t1_porcentaje':float(r1.get('porcentaje_asistencia',0)),
+                't2_dias':int(r2.get('dias_laborables',0)),'t2_faltas':int(r2.get('faltas_injustificadas',0)),'t2_porcentaje':float(r2.get('porcentaje_asistencia',0)),
+                't3_dias':int(r3.get('dias_laborables',0)),'t3_faltas':int(r3.get('faltas_injustificadas',0)),'t3_porcentaje':float(r3.get('porcentaje_asistencia',0)),
+                'dias_total':dias_total,'presentes_total':p_total,'atrasos_total':a_total,'faltas_injustificadas_total':f_total,'faltas_justificadas_total':j_total,
+                'porcentaje_asistencia_anual':pct,'observacion':obs})
+            totals['P']+=p_total; totals['A']+=a_total; totals['F']+=f_total; totals['J']+=j_total
+        total_reg=sum(totals.values())
+        stats={'total_presentes':totals['P'],'total_atrasos':totals['A'],'total_faltas_injustificadas':totals['F'],'total_faltas_justificadas':totals['J'],'total_registros':total_reg,
+            'porcentaje_presentes':(totals['P']/total_reg*100) if total_reg else 0.0,'porcentaje_atrasos':(totals['A']/total_reg*100) if total_reg else 0.0,
+            'porcentaje_faltas_injustificadas':(totals['F']/total_reg*100) if total_reg else 0.0,'porcentaje_faltas_justificadas':(totals['J']/total_reg*100) if total_reg else 0.0,
+            'porcentaje_general_anual_asistencia':((totals['P']+totals['A']+totals['J'])/total_reg*100) if total_reg else 0.0}
+        return {'context':context,'rows':rows,'stats':stats}
+
+
+    def _max_consecutive_unjustified_absences(self, assignment_id: str, student_id: str, start_date: str, end_date: str) -> int:
+        rows = self.connection.execute(
+            """SELECT date FROM attendance_records
+               WHERE assignment_id=? AND student_id=? AND status='F' AND date BETWEEN ? AND ? ORDER BY date""",
+            (assignment_id, student_id, start_date, end_date),
+        ).fetchall()
+        if not rows:
+            return 0
+        from datetime import datetime
+        dates = [datetime.fromisoformat(r['date']).date() for r in rows if r['date']]
+        best = run = 1
+        for i in range(1, len(dates)):
+            delta = (dates[i] - dates[i-1]).days
+            if delta == 1 or delta == 3:
+                run += 1
+            else:
+                run = 1
+            best = max(best, run)
+        return best
+
+    def _calcular_observacion_institucional(self, porcentaje: float, faltas_injustificadas: int, faltas_justificadas: int, max_faltas_continuas: int, periodo: str = 'trimestral') -> str:
+        recurrentes_j = faltas_justificadas >= (6 if periodo == 'anual' else 3)
+        if faltas_injustificadas >= 10:
+            return 'Riesgo alto de abandono o vulneración'
+        if porcentaje < 90 or faltas_injustificadas >= 3 or max_faltas_continuas >= 4:
+            return 'Alerta institucional'
+        if porcentaje < 95 or 1 <= faltas_injustificadas <= 2 or recurrentes_j:
+            return 'Seguimiento preventivo'
+        return 'Normal / Sin novedad'
