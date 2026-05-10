@@ -23,7 +23,7 @@ class AttendanceView(QWidget):
         super().__init__(); self.service=attendance_service
         self.renderer=AttendanceReportRenderer(); self.excel_exporter=AttendanceExcelExporter(); self.pdf_exporter=PdfReportExporter()
         self.assignments=[]; self._days=[]; self._quarterly_data=None; self._annual_data=None
-        self._attendance_firmantes={"docente":"","rector":""}
+        self._attendance_firmantes={"docente":"","tutor":"","rector":""}
         root=QVBoxLayout(self); self.tabs=QTabWidget(); root.addWidget(self.tabs)
         self.tabs.addTab(self._build_month_sheet_tab(),"Sábana mensual")
         self.tabs.addTab(self._build_quarterly_report_tab(),"Informe trimestral")
@@ -54,10 +54,12 @@ class AttendanceView(QWidget):
         for wid in (QLabel("Asignación"),self.q_assignment,QLabel("Trimestre"),self.q_trimester,QLabel("Fecha desde"),self.q_from,QLabel("Fecha hasta"),self.q_to,self.q_btn_preview,self.q_btn_pdf,self.q_btn_xlsx): top.addWidget(wid)
         l.addLayout(top)
         sign=QGroupBox("Firmantes del reporte"); sign_l=QHBoxLayout(sign)
-        self.signer_docente_combo=QComboBox(); self.signer_rector_combo=QComboBox()
+        self.signer_docente_combo=QComboBox(); self.signer_tutor_combo=QComboBox(); self.signer_rector_combo=QComboBox()
         self.signer_docente_combo.currentIndexChanged.connect(self._update_signers)
+        self.signer_tutor_combo.currentIndexChanged.connect(self._update_signers)
         self.signer_rector_combo.currentIndexChanged.connect(self._update_signers)
         sign_l.addWidget(QLabel("Docente")); sign_l.addWidget(self.signer_docente_combo,1)
+        sign_l.addWidget(QLabel("Tutor")); sign_l.addWidget(self.signer_tutor_combo,1)
         sign_l.addWidget(QLabel("Rector")); sign_l.addWidget(self.signer_rector_combo,1); l.addWidget(sign)
         if QWebEngineView is not None:
             self.attendance_preview_view=QWebEngineView(); self._attendance_preview_uses_webengine=True
@@ -80,11 +82,11 @@ class AttendanceView(QWidget):
         self.a_btn_xlsx=QPushButton("Exportar Excel"); self.a_btn_xlsx.clicked.connect(self._export_annual_excel)
         for wid in (QLabel("Asignación"),self.a_assignment,QLabel("Inicio T1"),self.a_t1_start,QLabel("Fin T1"),self.a_t1_end,QLabel("Inicio T2"),self.a_t2_start,QLabel("Fin T2"),self.a_t2_end,QLabel("Inicio T3"),self.a_t3_start,QLabel("Fin T3"),self.a_t3_end,self.a_btn_preview,self.a_btn_pdf,self.a_btn_xlsx): top.addWidget(wid)
         l.addLayout(top)
-        sign=QGroupBox("Firmantes del reporte"); sl=QHBoxLayout(sign); self.a_signer_docente=QComboBox(); self.a_signer_rector=QComboBox(); self.a_signer_docente.currentIndexChanged.connect(self._update_annual_signers); self.a_signer_rector.currentIndexChanged.connect(self._update_annual_signers); sl.addWidget(QLabel("Docente")); sl.addWidget(self.a_signer_docente,1); sl.addWidget(QLabel("Rector")); sl.addWidget(self.a_signer_rector,1); l.addWidget(sign)
+        sign=QGroupBox("Firmantes del reporte"); sl=QHBoxLayout(sign); self.a_signer_docente=QComboBox(); self.a_signer_tutor=QComboBox(); self.a_signer_rector=QComboBox(); self.a_signer_docente.currentIndexChanged.connect(self._update_annual_signers); self.a_signer_tutor.currentIndexChanged.connect(self._update_annual_signers); self.a_signer_rector.currentIndexChanged.connect(self._update_annual_signers); sl.addWidget(QLabel("Docente")); sl.addWidget(self.a_signer_docente,1); sl.addWidget(QLabel("Tutor")); sl.addWidget(self.a_signer_tutor,1); sl.addWidget(QLabel("Rector")); sl.addWidget(self.a_signer_rector,1); l.addWidget(sign)
         if QWebEngineView is not None: self.annual_preview_view=QWebEngineView()
         else: self.annual_preview_view=QTextBrowser()
         l.addWidget(self.annual_preview_view,1)
-        self._annual_firmantes={"docente":"","rector":""}
+        self._annual_firmantes={"docente":"","tutor":"","rector":""}
         return w
 
     def _set_attendance_preview_html(self, html_content: str) -> None:
@@ -112,12 +114,13 @@ class AttendanceView(QWidget):
 
     def _load_attendance_signer_options(self)->None:
         options=self.service.listar_firmantes_disponibles()
-        for combo in (self.signer_docente_combo,self.signer_rector_combo):
+        for combo in (self.signer_docente_combo,self.signer_tutor_combo,self.signer_rector_combo):
             combo.blockSignals(True); combo.clear(); combo.addItem('Seleccione','')
             for row in options: combo.addItem(row.get('firma',''),row.get('firma',''))
             combo.blockSignals(False)
     def _update_signers(self)->None:
         self._attendance_firmantes['docente']=self.signer_docente_combo.currentData() or self.signer_docente_combo.currentText().strip()
+        self._attendance_firmantes['tutor']=self.signer_tutor_combo.currentData() or self.signer_tutor_combo.currentText().strip()
         self._attendance_firmantes['rector']=self.signer_rector_combo.currentData() or self.signer_rector_combo.currentText().strip()
     def _build_status_combo(self, value='P')->QComboBox:
         c=QComboBox(); c.addItems(self.STATUS); c.setCurrentText(value if value in self.STATUS else 'P'); c.currentIndexChanged.connect(self._update_stats); return c
@@ -171,7 +174,7 @@ class AttendanceView(QWidget):
         if not aid: return QMessageBox.warning(self,'Informe trimestral','Seleccione una asignación')
         if self.q_from.date()>self.q_to.date(): return QMessageBox.warning(self,'Informe trimestral','Fecha desde no puede ser mayor que fecha hasta')
         data=self.service.build_quarterly_attendance_report(aid,self.q_from.date().toString('yyyy-MM-dd'),self.q_to.date().toString('yyyy-MM-dd'))
-        ctx=data['context']; ctx['trimestre']=self.q_trimester.currentText(); ctx['periodo']=f"{self.q_from.date().toString('dd/MM/yyyy')} al {self.q_to.date().toString('dd/MM/yyyy')}"; self._update_signers(); ctx['firma_docente']=self._attendance_firmantes['docente'] or ctx.get('docente',''); ctx['firma_rector']=self._attendance_firmantes['rector'] or ctx.get('rector','')
+        ctx=data['context']; ctx['trimestre']=self.q_trimester.currentText(); ctx['periodo']=f"{self.q_from.date().toString('dd/MM/yyyy')} al {self.q_to.date().toString('dd/MM/yyyy')}"; self._update_signers(); ctx['firma_docente']=self._attendance_firmantes['docente'] or ctx.get('docente',''); ctx['tutor']=self._attendance_firmantes['tutor'] or ctx.get('tutor',''); ctx['firma_tutor']=self._attendance_firmantes['tutor'] or ctx.get('tutor',''); ctx['firma_rector']=self._attendance_firmantes['rector'] or ctx.get('rector','')
         html=self.renderer.render_attendance_quarterly(ctx,data['rows'],data['stats']); self._set_attendance_preview_html(html)
         self._quarterly_data=(ctx,data['rows'],data['stats'],html)
 
@@ -208,10 +211,12 @@ class AttendanceView(QWidget):
         self._load_attendance_signer_options()
         self.a_signer_docente.clear(); self.a_signer_rector.clear()
         for i in range(self.signer_docente_combo.count()): self.a_signer_docente.addItem(self.signer_docente_combo.itemText(i),self.signer_docente_combo.itemData(i))
+        for i in range(self.signer_tutor_combo.count()): self.a_signer_tutor.addItem(self.signer_tutor_combo.itemText(i),self.signer_tutor_combo.itemData(i))
         for i in range(self.signer_rector_combo.count()): self.a_signer_rector.addItem(self.signer_rector_combo.itemText(i),self.signer_rector_combo.itemData(i))
 
     def _update_annual_signers(self)->None:
         self._annual_firmantes['docente']=self.a_signer_docente.currentData() or self.a_signer_docente.currentText().strip()
+        self._annual_firmantes['tutor']=self.a_signer_tutor.currentData() or self.a_signer_tutor.currentText().strip()
         self._annual_firmantes['rector']=self.a_signer_rector.currentData() or self.a_signer_rector.currentText().strip()
 
     def _validate_annual_dates(self)->bool:
@@ -227,7 +232,7 @@ class AttendanceView(QWidget):
         if not self._validate_annual_dates(): return
         self._update_annual_signers()
         data=self.service.build_annual_attendance_report(aid,self.a_t1_start.date().toString('yyyy-MM-dd'),self.a_t1_end.date().toString('yyyy-MM-dd'),self.a_t2_start.date().toString('yyyy-MM-dd'),self.a_t2_end.date().toString('yyyy-MM-dd'),self.a_t3_start.date().toString('yyyy-MM-dd'),self.a_t3_end.date().toString('yyyy-MM-dd'),self._annual_firmantes)
-        ctx=data['context']; ctx['periodo_anual']=f"{self.a_t1_start.date().toString('dd/MM/yyyy')} al {self.a_t3_end.date().toString('dd/MM/yyyy')}"; ctx['periodo_t1']=f"{self.a_t1_start.date().toString('dd/MM/yyyy')} al {self.a_t1_end.date().toString('dd/MM/yyyy')}"; ctx['periodo_t2']=f"{self.a_t2_start.date().toString('dd/MM/yyyy')} al {self.a_t2_end.date().toString('dd/MM/yyyy')}"; ctx['periodo_t3']=f"{self.a_t3_start.date().toString('dd/MM/yyyy')} al {self.a_t3_end.date().toString('dd/MM/yyyy')}"
+        ctx=data['context']; ctx['periodo_anual']=f"{self.a_t1_start.date().toString('dd/MM/yyyy')} al {self.a_t3_end.date().toString('dd/MM/yyyy')}"; ctx['periodo_t1']=f"{self.a_t1_start.date().toString('dd/MM/yyyy')} al {self.a_t1_end.date().toString('dd/MM/yyyy')}"; ctx['periodo_t2']=f"{self.a_t2_start.date().toString('dd/MM/yyyy')} al {self.a_t2_end.date().toString('dd/MM/yyyy')}"; ctx['periodo_t3']=f"{self.a_t3_start.date().toString('dd/MM/yyyy')} al {self.a_t3_end.date().toString('dd/MM/yyyy')}"; ctx['firma_docente']=self._annual_firmantes['docente'] or ctx.get('docente',''); ctx['tutor']=self._annual_firmantes['tutor'] or ctx.get('tutor',''); ctx['firma_tutor']=self._annual_firmantes['tutor'] or ctx.get('tutor',''); ctx['firma_rector']=self._annual_firmantes['rector'] or ctx.get('rector','')
         html=self.renderer.render_attendance_annual(ctx,data['rows'],data['stats']); self.annual_preview_view.setHtml(html); self._annual_data=(ctx,data['rows'],data['stats'],html)
 
     def _export_annual_pdf(self)->None:

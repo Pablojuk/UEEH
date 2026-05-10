@@ -14,7 +14,7 @@ class AttendanceReportRenderer:
             'logo_inst_src':logo_inst,'logo_mineduc_src':logo_min,'logo_inst_html':f"<img src='{logo_inst}' class='logo-img' alt='Logo institucional'>" if logo_inst else "<div class='logo-placeholder'>LOGO<br>INST.</div>",
             'logo_mineduc_html':f"<img src='{logo_min}' class='logo-img' alt='Logo ministerio'>" if logo_min else "<div class='logo-placeholder'>MINE<br>DUC</div>",
             'docente':context.get('docente',''),'asignatura':context.get('asignatura',''),'curso':context.get('curso',''),'nivel':context.get('nivel',''),'paralelo':context.get('paralelo',''),
-            'trimestre':context.get('trimestre',''),'periodo':context.get('periodo',''),'anio_lectivo':context.get('periodo_id',''),'fecha_emision':datetime.now().strftime('%d/%m/%Y'),'tutor':context.get('tutor',''),
+            'trimestre':context.get('trimestre',''),'periodo':context.get('periodo',''),'anio_lectivo':context.get('periodo_id',''),'fecha_emision':datetime.now().strftime('%d/%m/%Y'),'tutor':context.get('tutor',''),'firma_tutor':context.get('firma_tutor',context.get('tutor','')),
             'rows_html':self._build_rows(rows),'stats_rows_html':self._build_stats(stats),'chart_svg':self._build_svg(stats),
             'porcentaje_general_asistencia':f"{float(stats.get('porcentaje_general_asistencia',0)):.2f}%".replace('.',','),'firma_docente':context.get('firma_docente',context.get('docente','')),'firma_rector':context.get('firma_rector',context.get('rector','')),
         }
@@ -69,7 +69,7 @@ class AttendanceReportRenderer:
             'docente':context.get('docente',''),'asignatura':context.get('asignatura',''),'curso':context.get('curso',''),'nivel':context.get('nivel',''),'paralelo':context.get('paralelo',''),'anio_lectivo':context.get('periodo_id',''),
             'periodo_anual':context.get('periodo_anual',''),'periodo_t1':context.get('periodo_t1',''),'periodo_t2':context.get('periodo_t2',''),'periodo_t3':context.get('periodo_t3',''),'fecha_emision':datetime.now().strftime('%d/%m/%Y'),
             'rows_html':self._build_annual_rows_html(rows),'stats_rows_html':self._build_stats(stats),'chart_svg':self._build_svg({'total_presentes':stats.get('total_presentes',0),'total_atrasos':stats.get('total_atrasos',0),'total_faltas_injustificadas':stats.get('total_faltas_injustificadas',0),'total_faltas_justificadas':stats.get('total_faltas_justificadas',0),'porcentaje_p':stats.get('porcentaje_presentes',0),'porcentaje_a':stats.get('porcentaje_atrasos',0),'porcentaje_f':stats.get('porcentaje_faltas_injustificadas',0),'porcentaje_j':stats.get('porcentaje_faltas_justificadas',0)}),
-            'porcentaje_general_anual_asistencia':f"{float(stats.get('porcentaje_general_anual_asistencia',0)):.2f}%".replace('.',','),'firma_docente':context.get('firma_docente',''),'firma_rector':context.get('firma_rector','')
+            'porcentaje_general_anual_asistencia':f"{float(stats.get('porcentaje_general_anual_asistencia',0)):.2f}%".replace('.',','),'tutor':context.get('tutor',''),'firma_docente':context.get('firma_docente',''),'firma_tutor':context.get('firma_tutor',context.get('tutor','')),'firma_rector':context.get('firma_rector','')
         }
         pat=re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_]+)\s*\]\]")
         raw={'rows_html','stats_rows_html','chart_svg','logo_inst_html','logo_mineduc_html'}

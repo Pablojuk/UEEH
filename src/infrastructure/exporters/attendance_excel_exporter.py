@@ -30,7 +30,7 @@ class AttendanceExcelExporter:
         ws[f'A{r0+3}']='Faltas injustificadas'; ws[f'B{r0+3}']=stats.get('total_faltas_injustificadas',0)
         ws[f'A{r0+4}']='Faltas justificadas'; ws[f'B{r0+4}']=stats.get('total_faltas_justificadas',0)
         ws[f'A{r0+6}']='Porcentaje general'; ws[f'B{r0+6}']=stats.get('porcentaje_general_asistencia',0)/100.0; ws[f'B{r0+6}'].number_format='0.00%'
-        ws[f'F{r0+8}']=context.get('firma_docente',''); ws[f'F{r0+9}']='Docente'; ws[f'H{r0+8}']=context.get('firma_rector',''); ws[f'H{r0+9}']='Rector'
+        ws[f'E{r0+8}']=context.get('firma_docente',''); ws[f'E{r0+9}']='Docente'; ws[f'G{r0+8}']=context.get('firma_tutor',context.get('tutor','')); ws[f'G{r0+9}']='Tutor'; ws[f'I{r0+8}']=context.get('firma_rector',''); ws[f'I{r0+9}']='Rector'
         for col,w in [('A',7),('B',36),('C',14),('D',10),('E',10),('F',20),('G',18),('H',12),('I',14)]: ws.column_dimensions[col].width=w
         wb.save(path); return str(path)
 
@@ -46,6 +46,7 @@ class AttendanceExcelExporter:
             ws.cell(row=i+2,column=18).fill=PatternFill('solid', fgColor=self._obs_fill(rows[i].get('observacion','')))
             ws.cell(row=i+2,column=17).number_format='0.00%'
         ws['A'+str(len(rows)+3)]='Porcentaje general anual'; ws['B'+str(len(rows)+3)]=stats.get('porcentaje_general_anual_asistencia',0)/100.0; ws['B'+str(len(rows)+3)].number_format='0.00%'
+        rr=len(rows)+6; ws[f'F{rr}']=context.get('firma_docente',''); ws[f'F{rr+1}']='Docente'; ws[f'H{rr}']=context.get('firma_tutor',context.get('tutor','')); ws[f'H{rr+1}']='Tutor'; ws[f'J{rr}']=context.get('firma_rector',''); ws[f'J{rr+1}']='Rector'
         wb.save(path); return str(path)
 
 
