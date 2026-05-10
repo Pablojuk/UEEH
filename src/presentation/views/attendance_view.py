@@ -3,11 +3,14 @@ from __future__ import annotations
 from datetime import date
 from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
-    QComboBox, QDateEdit, QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-    QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget
+    QComboBox, QDateEdit, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+    QPushButton, QTabWidget, QTableWidget, QTableWidgetItem, QTextBrowser, QVBoxLayout, QWidget
 )
 
 from src.application.services.attendance_service import AttendanceService
+from src.infrastructure.exporters.attendance_report_renderer import AttendanceReportRenderer
+from src.infrastructure.exporters.attendance_excel_exporter import AttendanceExcelExporter
+from src.infrastructure.exporters.pdf_report_exporter import PdfReportExporter
 
 
 class AttendanceView(QWidget):
@@ -16,16 +19,18 @@ class AttendanceView(QWidget):
     def __init__(self, attendance_service: AttendanceService) -> None:
         super().__init__()
         self.service = attendance_service
+        self.renderer = AttendanceReportRenderer()
+        self.excel_exporter = AttendanceExcelExporter()
+        self.pdf_exporter = PdfReportExporter()
         self.assignments: list[dict] = []
         self._days = []
+        self._quarterly_data = None
         root = QVBoxLayout(self)
         self.tabs = QTabWidget()
         root.addWidget(self.tabs)
         self.tabs.addTab(self._build_month_sheet_tab(), "Sábana mensual")
-        self.tabs.addTab(self._build_just_tab(), "Justificaciones")
-        self.tabs.addTab(self._placeholder("Informe trimestral (en desarrollo)"), "Informe trimestral")
+        self.tabs.addTab(self._build_quarterly_report_tab(), "Informe trimestral")
         self.tabs.addTab(self._placeholder("Informe anual (en desarrollo)"), "Informe anual")
-        self.tabs.addTab(self._placeholder("Configuración (en desarrollo)"), "Configuración")
         self.refresh_data()
 
     def _placeholder(self, text: str) -> QWidget:
@@ -38,10 +43,9 @@ class AttendanceView(QWidget):
         self.month_combo = QComboBox(); [self.month_combo.addItem(m, i + 1) for i, m in enumerate(["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"])]; self.month_combo.setCurrentIndex(date.today().month - 1); self.month_combo.currentIndexChanged.connect(self._reload_sheet)
         self.year_combo = QComboBox(); [self.year_combo.addItem(str(y), y) for y in range(2026, 2036)]; self.year_combo.setCurrentText(str(max(2026, min(2035, date.today().year)))); self.year_combo.currentIndexChanged.connect(self._reload_sheet)
         self.search = QLineEdit(); self.search.setPlaceholderText("Buscar estudiante"); self.search.textChanged.connect(self._filter_rows)
-        self.btn_just = QPushButton("Justificaciones"); self.btn_just.clicked.connect(self._open_just_modal)
         self.btn_c = QPushButton("Limpiar sábana"); self.btn_c.clicked.connect(self._reset_visible_to_p)
         self.btn_save = QPushButton("Guardar asistencia"); self.btn_save.clicked.connect(self._save)
-        for wid in (QLabel("Asignación"), self.assignment_combo, QLabel("Mes"), self.month_combo, QLabel("Año"), self.year_combo, self.search, self.btn_just, self.btn_c, self.btn_save): top.addWidget(wid)
+        for wid in (QLabel("Asignación"), self.assignment_combo, QLabel("Mes"), self.month_combo, QLabel("Año"), self.year_combo, self.search, self.btn_c, self.btn_save): top.addWidget(wid)
         l.addLayout(top)
         self.stats = QLabel("Estudiantes: 0 | Presentes: 0 | Atrasos: 0 | Faltas: 0 | Justificadas: 0")
         l.addWidget(self.stats)
@@ -49,89 +53,70 @@ class AttendanceView(QWidget):
         l.addWidget(self.table)
         return w
 
-    def _build_just_tab(self) -> QWidget:
-        w = QWidget(); l = QVBoxLayout(w); row = QHBoxLayout()
-        self.just_assignment = QComboBox(); self.just_student = QComboBox(); self.just_date = QDateEdit(); self.just_date.setCalendarPopup(True); self.just_date.setDate(QDate.currentDate())
-        self.just_reason = QComboBox(); [self.just_reason.addItem(x) for x in ["Certificado médico", "Calamidad doméstica", "Representante justifica", "Actividad institucional", "Otro"]]
-        self.just_obs = QTextEdit(); self.just_obs.setMaximumHeight(60)
-        btn = QPushButton("Guardar justificación"); btn.clicked.connect(self._save_justification)
-        for wdg in (QLabel("Asignación"), self.just_assignment, QLabel("Estudiante"), self.just_student, QLabel("Fecha"), self.just_date, QLabel("Motivo"), self.just_reason, btn): row.addWidget(wdg)
-        l.addLayout(row); l.addWidget(self.just_obs); return w
+    def _build_quarterly_report_tab(self) -> QWidget:
+        w = QWidget(); l = QVBoxLayout(w)
+        top = QHBoxLayout()
+        self.q_assignment = QComboBox()
+        self.q_trimester = QComboBox(); self.q_trimester.addItems(["Primer Trimestre", "Segundo Trimestre", "Tercer Trimestre"])
+        self.q_from = QDateEdit(); self.q_from.setCalendarPopup(True); self.q_from.setDate(QDate.currentDate().addMonths(-3))
+        self.q_to = QDateEdit(); self.q_to.setCalendarPopup(True); self.q_to.setDate(QDate.currentDate())
+        self.q_docente = QLineEdit(); self.q_rector = QLineEdit()
+        self.q_btn_preview = QPushButton("Generar vista previa"); self.q_btn_preview.clicked.connect(self._generate_quarterly_preview)
+        self.q_btn_pdf = QPushButton("Exportar PDF"); self.q_btn_pdf.clicked.connect(self._export_quarterly_pdf)
+        self.q_btn_xlsx = QPushButton("Exportar Excel"); self.q_btn_xlsx.clicked.connect(self._export_quarterly_excel)
+        for wid in (QLabel("Asignación"), self.q_assignment, QLabel("Trimestre"), self.q_trimester, QLabel("Fecha desde"), self.q_from, QLabel("Fecha hasta"), self.q_to, QLabel("Firmante docente"), self.q_docente, QLabel("Firmante rector"), self.q_rector, self.q_btn_preview, self.q_btn_pdf, self.q_btn_xlsx): top.addWidget(wid)
+        l.addLayout(top)
+        self.q_preview = QTextBrowser(); l.addWidget(self.q_preview)
+        return w
 
     def refresh_data(self) -> None:
         self.assignments = self.service.list_assignments()
-        for combo in (self.assignment_combo, self.just_assignment):
+        for combo in (self.assignment_combo, self.q_assignment):
             combo.blockSignals(True); combo.clear()
             for a in self.assignments:
                 combo.addItem(f"{a['asignatura']} | {a['curso']}-{a['paralelo']} | {a['periodo_id']}", a['id_asignacion'])
             combo.blockSignals(False)
-        self.just_assignment.currentIndexChanged.connect(self._load_students_for_just)
-        self._load_students_for_just()
         self._reload_sheet()
-
-    def _load_students_for_just(self) -> None:
-        aid = self.just_assignment.currentData(); self.just_student.clear()
-        if not aid: return
-        for s in self.service.list_students_for_assignment(aid): self.just_student.addItem(s['estudiante'], s['id_estudiante'])
 
     def _build_status_combo(self, value: str = "P") -> QComboBox:
         c = QComboBox(); c.addItems(self.STATUS); c.setCurrentText(value if value in self.STATUS else "P"); c.currentIndexChanged.connect(self._update_stats); return c
-
     def _reload_sheet(self) -> None:
-        aid = self.assignment_combo.currentData()
+        aid = self.assignment_combo.currentData();
         if not aid: return
         month, year = int(self.month_combo.currentData()), int(self.year_combo.currentData())
-        students = self.service.list_students_for_assignment(aid)
-        values = self.service.load_month_sheet(aid, year, month)
-        self._days = self.service.weekdays_for_month(year, month)
-
+        students = self.service.list_students_for_assignment(aid); values = self.service.load_month_sheet(aid, year, month); self._days = self.service.weekdays_for_month(year, month)
         headers = ["N°", "Nómina"] + [f"{d.day:02d} {['Lunes','Martes','Miércoles','Jueves','Viernes'][d.weekday()]}" for d in self._days] + ["P", "A", "F", "J"]
-        self.table.clear(); self.table.setColumnCount(len(headers)); self.table.setHorizontalHeaderLabels(headers); self.table.setRowCount(len(students))
-        self.table.setColumnWidth(1, 260)
-
+        self.table.clear(); self.table.setColumnCount(len(headers)); self.table.setHorizontalHeaderLabels(headers); self.table.setRowCount(len(students)); self.table.setColumnWidth(1, 260)
         for i, s in enumerate(students):
-            n = QTableWidgetItem(str(s.get('numero_lista') or i + 1)); name = QTableWidgetItem(s['estudiante']); name.setData(256, s['id_estudiante'])
-            self.table.setItem(i, 0, n); self.table.setItem(i, 1, name)
-            for d_idx, d in enumerate(self._days):
-                key = (s['id_estudiante'], d.isoformat()); val = values.get(key, "P") or "P"
-                self.table.setCellWidget(i, 2 + d_idx, self._build_status_combo(val))
+            self.table.setItem(i, 0, QTableWidgetItem(str(s.get('numero_lista') or i + 1))); name = QTableWidgetItem(s['estudiante']); name.setData(256, s['id_estudiante']); self.table.setItem(i, 1, name)
+            for d_idx, d in enumerate(self._days): self.table.setCellWidget(i, 2 + d_idx, self._build_status_combo(values.get((s['id_estudiante'], d.isoformat()), "P") or "P"))
             for off in range(4): self.table.setItem(i, 2 + len(self._days) + off, QTableWidgetItem("0"))
         self._update_stats()
-
     def _filter_rows(self, text: str) -> None:
         text = text.lower().strip()
-        for r in range(self.table.rowCount()):
-            name = (self.table.item(r, 1).text() if self.table.item(r, 1) else "").lower()
-            self.table.setRowHidden(r, text not in name)
+        for r in range(self.table.rowCount()): self.table.setRowHidden(r, text not in ((self.table.item(r, 1).text() if self.table.item(r, 1) else "").lower()))
         self._update_stats()
-
     def _row_counts(self, r: int) -> dict[str, int]:
         cnt = {k: 0 for k in self.STATUS}
         for c in range(2, 2 + len(self._days)):
-            w = self.table.cellWidget(r, c)
-            v = w.currentText() if isinstance(w, QComboBox) else "P"
+            w = self.table.cellWidget(r, c); v = w.currentText() if isinstance(w, QComboBox) else "P"
             if v in cnt: cnt[v] += 1
         return cnt
-
     def _update_stats(self) -> None:
         total = {k: 0 for k in self.STATUS}
         for r in range(self.table.rowCount()):
             cnt = self._row_counts(r)
             for idx, k in enumerate(self.STATUS): self.table.item(r, 2 + len(self._days) + idx).setText(str(cnt[k]))
-            if self.table.isRowHidden(r):
-                continue
-            for k in self.STATUS: total[k] += cnt[k]
+            if not self.table.isRowHidden(r):
+                for k in self.STATUS: total[k] += cnt[k]
         self.stats.setText(f"Estudiantes: {self.table.rowCount()} | Presentes: {total['P']} | Atrasos: {total['A']} | Faltas: {total['F']} | Justificadas: {total['J']}")
-
     def _reset_visible_to_p(self) -> None:
         for r in range(self.table.rowCount()):
-            if self.table.isRowHidden(r):
-                continue
+            if self.table.isRowHidden(r): continue
             for c in range(2, 2 + len(self._days)):
                 w = self.table.cellWidget(r, c)
                 if isinstance(w, QComboBox): w.setCurrentText("P")
         self._update_stats()
-
     def _save(self) -> None:
         aid = self.assignment_combo.currentData(); records = []
         for r in range(self.table.rowCount()):
@@ -139,41 +124,31 @@ class AttendanceView(QWidget):
             for d_idx, d in enumerate(self._days):
                 w = self.table.cellWidget(r, 2 + d_idx); v = w.currentText() if isinstance(w, QComboBox) else "P"
                 records.append({"student_id": sid, "date": d.isoformat(), "status": v})
-        self.service.save_attendance(aid, records)
-        QMessageBox.information(self, "Asistencias", "Asistencia guardada")
+        self.service.save_attendance(aid, records); QMessageBox.information(self, "Asistencias", "Asistencia guardada")
 
-    def _open_just_modal(self) -> None:
-        aid = self.assignment_combo.currentData()
-        if not aid:
-            return
-        dlg = QDialog(self); dlg.setWindowTitle("Registrar justificación de asistencia"); dlg.resize(500, 360)
-        form = QFormLayout(dlg)
-        student = QComboBox();
-        for s in self.service.list_students_for_assignment(aid): student.addItem(s['estudiante'], s['id_estudiante'])
-        fdate = QDateEdit(); fdate.setCalendarPopup(True); fdate.setDate(QDate.currentDate())
-        reason = QComboBox(); [reason.addItem(x) for x in ["Certificado médico", "Calamidad doméstica", "Representante justifica", "Actividad institucional", "Otro"]]
-        obs = QTextEdit();
-        actions = QHBoxLayout(); bsave = QPushButton("Guardar justificación"); bcancel = QPushButton("Cancelar"); actions.addWidget(bsave); actions.addWidget(bcancel)
-        form.addRow("Estudiante", student); form.addRow("Fecha", fdate); form.addRow("Motivo", reason); form.addRow("Observación", obs); form.addRow(actions)
-        bcancel.clicked.connect(dlg.reject)
+    def _generate_quarterly_preview(self) -> None:
+        aid = self.q_assignment.currentData()
+        if not aid: return QMessageBox.warning(self, "Informe trimestral", "Seleccione una asignación")
+        if self.q_from.date() > self.q_to.date(): return QMessageBox.warning(self, "Informe trimestral", "Fecha desde no puede ser mayor que fecha hasta")
+        data = self.service.build_quarterly_attendance_report(aid, self.q_from.date().toString('yyyy-MM-dd'), self.q_to.date().toString('yyyy-MM-dd'))
+        ctx = data['context']; ctx['trimestre'] = self.q_trimester.currentText(); ctx['periodo'] = f"{self.q_from.date().toString('dd/MM/yyyy')} al {self.q_to.date().toString('dd/MM/yyyy')}"; ctx['firma_docente'] = self.q_docente.text().strip() or ctx.get('docente',''); ctx['firma_rector'] = self.q_rector.text().strip() or ctx.get('rector','')
+        self.q_docente.setText(ctx['firma_docente']); self.q_rector.setText(ctx['firma_rector'])
+        html = self.renderer.render_attendance_quarterly(ctx, data['rows'], data['stats'])
+        self.q_preview.setHtml(html)
+        self._quarterly_data = (ctx, data['rows'], data['stats'], html)
 
-        def on_save() -> None:
-            self.service.save_justification(aid, student.currentData(), fdate.date().toString('yyyy-MM-dd'), reason.currentText(), obs.toPlainText().strip())
-            self._reload_sheet()
-            target = fdate.date().toString('yyyy-MM-dd')
-            for i, d in enumerate(self._days):
-                if d.isoformat() == target:
-                    for r in range(self.table.rowCount()):
-                        if self.table.item(r, 1).data(256) == student.currentData():
-                            w = self.table.cellWidget(r, 2 + i)
-                            if isinstance(w, QComboBox): w.setCurrentText('J')
-                    break
-            self._update_stats(); dlg.accept()
+    def _export_quarterly_pdf(self) -> None:
+        if not self._quarterly_data: self._generate_quarterly_preview()
+        if not self._quarterly_data: return
+        path, _ = QFileDialog.getSaveFileName(self, 'Exportar PDF', 'informe_asistencia_trimestral.pdf', 'PDF (*.pdf)')
+        if not path: return
+        ok = self.pdf_exporter.export_to_pdf(self._quarterly_data[3], path, orientation='landscape')
+        QMessageBox.information(self, 'PDF', 'Exportado correctamente' if ok else 'No se pudo exportar PDF')
 
-        bsave.clicked.connect(on_save)
-        dlg.exec()
-
-    def _save_justification(self) -> None:
-        aid = self.just_assignment.currentData(); sid = self.just_student.currentData()
-        self.service.save_justification(aid, sid, self.just_date.date().toString('yyyy-MM-dd'), self.just_reason.currentText(), self.just_obs.toPlainText().strip())
-        QMessageBox.information(self, "Justificaciones", "Justificación guardada")
+    def _export_quarterly_excel(self) -> None:
+        if not self._quarterly_data: self._generate_quarterly_preview()
+        if not self._quarterly_data: return
+        path, _ = QFileDialog.getSaveFileName(self, 'Exportar Excel', 'informe_asistencia_trimestral.xlsx', 'Excel (*.xlsx)')
+        if not path: return
+        self.excel_exporter.export_attendance_quarterly_excel(path, self._quarterly_data[0], self._quarterly_data[1], self._quarterly_data[2])
+        QMessageBox.information(self, 'Excel', 'Exportado correctamente')
