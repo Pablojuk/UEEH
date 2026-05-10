@@ -212,3 +212,49 @@ class AttendanceService:
             firma = " ".join(part for part in [titulo, primer_nombre, primer_apellido] if part).strip()
             firmantes.append({"id_docente": row["id_docente"], "firma": firma})
         return firmantes
+
+
+    def build_annual_attendance_report(
+        self,
+        assignment_id: str,
+        t1_start: str,
+        t1_end: str,
+        t2_start: str,
+        t2_end: str,
+        t3_start: str,
+        t3_end: str,
+        firmantes: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        q1 = self.build_quarterly_attendance_report(assignment_id, t1_start, t1_end)
+        q2 = self.build_quarterly_attendance_report(assignment_id, t2_start, t2_end)
+        q3 = self.build_quarterly_attendance_report(assignment_id, t3_start, t3_end)
+        context = dict(q1.get('context', {}))
+        if firmantes:
+            context['firma_docente'] = firmantes.get('docente', '')
+            context['firma_rector'] = firmantes.get('rector', '')
+        by_id = {r['estudiante_id']: {'q1': r, 'q2': None, 'q3': None} for r in q1.get('rows', [])}
+        for r in q2.get('rows', []): by_id.setdefault(r['estudiante_id'], {'q1': None, 'q2': None, 'q3': None})['q2'] = r
+        for r in q3.get('rows', []): by_id.setdefault(r['estudiante_id'], {'q1': None, 'q2': None, 'q3': None})['q3'] = r
+        rows=[]; totals={'P':0,'A':0,'F':0,'J':0}
+        for i,(_sid,b) in enumerate(by_id.items(),start=1):
+            r1=b['q1'] or {}; r2=b['q2'] or {}; r3=b['q3'] or {}
+            p_total=int(r1.get('presentes',0))+int(r2.get('presentes',0))+int(r3.get('presentes',0))
+            a_total=int(r1.get('atrasos',0))+int(r2.get('atrasos',0))+int(r3.get('atrasos',0))
+            f_total=int(r1.get('faltas_injustificadas',0))+int(r2.get('faltas_injustificadas',0))+int(r3.get('faltas_injustificadas',0))
+            j_total=int(r1.get('faltas_justificadas',0))+int(r2.get('faltas_justificadas',0))+int(r3.get('faltas_justificadas',0))
+            dias_total=int(r1.get('dias_laborables',0))+int(r2.get('dias_laborables',0))+int(r3.get('dias_laborables',0))
+            pct=((p_total+a_total+j_total)/dias_total*100) if dias_total else 0.0
+            obs='Alerta alta' if (pct<90 or f_total>=10) else ('Seguimiento' if (pct<95 or f_total>=5) else 'Normal')
+            rows.append({'nro':i,'estudiante_id':_sid,'nomina':r1.get('nomina') or r2.get('nomina') or r3.get('nomina') or '',
+                't1_dias':int(r1.get('dias_laborables',0)),'t1_faltas':int(r1.get('faltas_injustificadas',0)),'t1_porcentaje':float(r1.get('porcentaje_asistencia',0)),
+                't2_dias':int(r2.get('dias_laborables',0)),'t2_faltas':int(r2.get('faltas_injustificadas',0)),'t2_porcentaje':float(r2.get('porcentaje_asistencia',0)),
+                't3_dias':int(r3.get('dias_laborables',0)),'t3_faltas':int(r3.get('faltas_injustificadas',0)),'t3_porcentaje':float(r3.get('porcentaje_asistencia',0)),
+                'dias_total':dias_total,'presentes_total':p_total,'atrasos_total':a_total,'faltas_injustificadas_total':f_total,'faltas_justificadas_total':j_total,
+                'porcentaje_asistencia_anual':pct,'observacion':obs})
+            totals['P']+=p_total; totals['A']+=a_total; totals['F']+=f_total; totals['J']+=j_total
+        total_reg=sum(totals.values())
+        stats={'total_presentes':totals['P'],'total_atrasos':totals['A'],'total_faltas_injustificadas':totals['F'],'total_faltas_justificadas':totals['J'],'total_registros':total_reg,
+            'porcentaje_presentes':(totals['P']/total_reg*100) if total_reg else 0.0,'porcentaje_atrasos':(totals['A']/total_reg*100) if total_reg else 0.0,
+            'porcentaje_faltas_injustificadas':(totals['F']/total_reg*100) if total_reg else 0.0,'porcentaje_faltas_justificadas':(totals['J']/total_reg*100) if total_reg else 0.0,
+            'porcentaje_general_anual_asistencia':((totals['P']+totals['A']+totals['J'])/total_reg*100) if total_reg else 0.0}
+        return {'context':context,'rows':rows,'stats':stats}

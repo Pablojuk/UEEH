@@ -57,3 +57,27 @@ class AttendanceReportRenderer:
                 continue
             if rp.exists(): return rp
         return None
+
+
+    def render_attendance_annual(self, context: dict[str, Any], rows: list[dict[str, Any]], stats: dict[str, Any]) -> str:
+        template=(Path(__file__).resolve().parent.parent/'templates'/'reporte_asistencia_anual.html').read_text(encoding='utf-8')
+        logo_inst=self._build_logo_source(context.get('logo_path')); logo_min=self._build_logo_source(context.get('logo_ministerio_path'))
+        values={
+            'institucion_nombre':context.get('institucion_nombre','Institución'),'institucion_subtitulo':context.get('institucion_subtitulo',''),'logo_inst_src':logo_inst,'logo_mineduc_src':logo_min,
+            'logo_inst_html':f"<img src='{logo_inst}' class='logo-img'>" if logo_inst else "<div class='logo-placeholder'>LOGO<br>INST.</div>",
+            'logo_mineduc_html':f"<img src='{logo_min}' class='logo-img'>" if logo_min else "<div class='logo-placeholder'>MINE<br>DUC</div>",
+            'docente':context.get('docente',''),'asignatura':context.get('asignatura',''),'curso':context.get('curso',''),'nivel':context.get('nivel',''),'paralelo':context.get('paralelo',''),'anio_lectivo':context.get('periodo_id',''),
+            'periodo_anual':context.get('periodo_anual',''),'periodo_t1':context.get('periodo_t1',''),'periodo_t2':context.get('periodo_t2',''),'periodo_t3':context.get('periodo_t3',''),'fecha_emision':datetime.now().strftime('%d/%m/%Y'),
+            'rows_html':self._build_annual_rows_html(rows),'stats_rows_html':self._build_stats(stats).replace('porcentaje_p','porcentaje_presentes'),'chart_svg':self._build_svg({'total_presentes':stats.get('total_presentes',0),'total_atrasos':stats.get('total_atrasos',0),'total_faltas_injustificadas':stats.get('total_faltas_injustificadas',0),'total_faltas_justificadas':stats.get('total_faltas_justificadas',0),'porcentaje_p':stats.get('porcentaje_presentes',0),'porcentaje_a':stats.get('porcentaje_atrasos',0),'porcentaje_f':stats.get('porcentaje_faltas_injustificadas',0),'porcentaje_j':stats.get('porcentaje_faltas_justificadas',0)}),
+            'porcentaje_general_anual_asistencia':f"{float(stats.get('porcentaje_general_anual_asistencia',0)):.2f}%".replace('.',','),'firma_docente':context.get('firma_docente',''),'firma_rector':context.get('firma_rector','')
+        }
+        pat=re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\[\[\s*([a-zA-Z0-9_]+)\s*\]\]")
+        raw={'rows_html','stats_rows_html','chart_svg','logo_inst_html','logo_mineduc_html'}
+        return pat.sub(lambda m: str(values.get((m.group(1) or m.group(2) or ''),'')) if (m.group(1) or m.group(2)) in raw else html.escape(str(values.get((m.group(1) or m.group(2) or ''),''))),template)
+
+    def _build_annual_rows_html(self, rows: list[dict[str, Any]]) -> str:
+        out=[]
+        for r in rows:
+            pct=f"{float(r.get('porcentaje_asistencia_anual',0)):.2f}%".replace('.',',')
+            out.append(f"<tr><td>{r.get('nro','')}</td><td class='nomina'>{html.escape(str(r.get('nomina','')))}</td><td>{r.get('t1_dias',0)}</td><td>{r.get('t1_faltas',0)}</td><td>{float(r.get('t1_porcentaje',0)):.1f}%</td><td>{r.get('t2_dias',0)}</td><td>{r.get('t2_faltas',0)}</td><td>{float(r.get('t2_porcentaje',0)):.1f}%</td><td>{r.get('t3_dias',0)}</td><td>{r.get('t3_faltas',0)}</td><td>{float(r.get('t3_porcentaje',0)):.1f}%</td><td>{r.get('dias_total',0)}</td><td>{r.get('presentes_total',0)}</td><td>{r.get('atrasos_total',0)}</td><td>{r.get('faltas_injustificadas_total',0)}</td><td>{r.get('faltas_justificadas_total',0)}</td><td>{pct}</td><td>{r.get('observacion','')}</td></tr>")
+        return ''.join(out).replace('.',',')

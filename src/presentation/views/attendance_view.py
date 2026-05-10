@@ -22,12 +22,12 @@ class AttendanceView(QWidget):
     def __init__(self, attendance_service: AttendanceService)->None:
         super().__init__(); self.service=attendance_service
         self.renderer=AttendanceReportRenderer(); self.excel_exporter=AttendanceExcelExporter(); self.pdf_exporter=PdfReportExporter()
-        self.assignments=[]; self._days=[]; self._quarterly_data=None
+        self.assignments=[]; self._days=[]; self._quarterly_data=None; self._annual_data=None
         self._attendance_firmantes={"docente":"","rector":""}
         root=QVBoxLayout(self); self.tabs=QTabWidget(); root.addWidget(self.tabs)
         self.tabs.addTab(self._build_month_sheet_tab(),"Sábana mensual")
         self.tabs.addTab(self._build_quarterly_report_tab(),"Informe trimestral")
-        self.tabs.addTab(self._placeholder("Informe anual (en desarrollo)"),"Informe anual")
+        self.tabs.addTab(self._build_annual_report_tab(),"Informe anual")
         self.refresh_data()
     def _placeholder(self,text:str)->QWidget:
         w=QWidget();l=QVBoxLayout(w);l.addWidget(QLabel(text));l.addStretch(1);return w
@@ -65,15 +65,37 @@ class AttendanceView(QWidget):
             self.attendance_preview_view=QTextBrowser(); self.attendance_preview_view.setOpenExternalLinks(True); self._attendance_preview_uses_webengine=False
         l.addWidget(self.attendance_preview_view,1)
         return w
+
+    def _build_annual_report_tab(self)->QWidget:
+        w=QWidget(); l=QVBoxLayout(w)
+        top=QHBoxLayout(); self.a_assignment=QComboBox(); self.a_assignment.currentIndexChanged.connect(self._on_annual_assignment_changed)
+        self.a_t1_start=QDateEdit(); self.a_t1_start.setCalendarPopup(True); self.a_t1_start.setDate(QDate.currentDate().addMonths(-9))
+        self.a_t1_end=QDateEdit(); self.a_t1_end.setCalendarPopup(True); self.a_t1_end.setDate(QDate.currentDate().addMonths(-6))
+        self.a_t2_start=QDateEdit(); self.a_t2_start.setCalendarPopup(True); self.a_t2_start.setDate(QDate.currentDate().addMonths(-6))
+        self.a_t2_end=QDateEdit(); self.a_t2_end.setCalendarPopup(True); self.a_t2_end.setDate(QDate.currentDate().addMonths(-3))
+        self.a_t3_start=QDateEdit(); self.a_t3_start.setCalendarPopup(True); self.a_t3_start.setDate(QDate.currentDate().addMonths(-3))
+        self.a_t3_end=QDateEdit(); self.a_t3_end.setCalendarPopup(True); self.a_t3_end.setDate(QDate.currentDate())
+        self.a_btn_preview=QPushButton("Generar vista previa"); self.a_btn_preview.clicked.connect(self._generate_annual_preview)
+        self.a_btn_pdf=QPushButton("Exportar PDF"); self.a_btn_pdf.clicked.connect(self._export_annual_pdf)
+        self.a_btn_xlsx=QPushButton("Exportar Excel"); self.a_btn_xlsx.clicked.connect(self._export_annual_excel)
+        for wid in (QLabel("Asignación"),self.a_assignment,QLabel("Inicio T1"),self.a_t1_start,QLabel("Fin T1"),self.a_t1_end,QLabel("Inicio T2"),self.a_t2_start,QLabel("Fin T2"),self.a_t2_end,QLabel("Inicio T3"),self.a_t3_start,QLabel("Fin T3"),self.a_t3_end,self.a_btn_preview,self.a_btn_pdf,self.a_btn_xlsx): top.addWidget(wid)
+        l.addLayout(top)
+        sign=QGroupBox("Firmantes del reporte"); sl=QHBoxLayout(sign); self.a_signer_docente=QComboBox(); self.a_signer_rector=QComboBox(); self.a_signer_docente.currentIndexChanged.connect(self._update_annual_signers); self.a_signer_rector.currentIndexChanged.connect(self._update_annual_signers); sl.addWidget(QLabel("Docente")); sl.addWidget(self.a_signer_docente,1); sl.addWidget(QLabel("Rector")); sl.addWidget(self.a_signer_rector,1); l.addWidget(sign)
+        if QWebEngineView is not None: self.annual_preview_view=QWebEngineView()
+        else: self.annual_preview_view=QTextBrowser()
+        l.addWidget(self.annual_preview_view,1)
+        self._annual_firmantes={"docente":"","rector":""}
+        return w
+
     def _set_attendance_preview_html(self, html_content: str) -> None:
         self.attendance_preview_view.setHtml(html_content)
     def refresh_data(self)->None:
         self.assignments=self.service.list_assignments()
-        for combo in (self.assignment_combo,self.q_assignment):
+        for combo in (self.assignment_combo,self.q_assignment,self.a_assignment):
             combo.blockSignals(True); combo.clear()
             for a in self.assignments: combo.addItem(f"{a['asignatura']} | {a['curso']}-{a['paralelo']} | {a['periodo_id']}",a['id_asignacion'])
             combo.blockSignals(False)
-        self._reload_sheet(); self._on_quarterly_assignment_changed()
+        self._reload_sheet(); self._on_quarterly_assignment_changed(); self._on_annual_assignment_changed()
     def _on_quarterly_assignment_changed(self)->None:
         aid=self.q_assignment.currentData()
         self._load_attendance_signer_options()
@@ -181,3 +203,46 @@ class AttendanceView(QWidget):
         if not path: return
         self.excel_exporter.export_attendance_quarterly_excel(path,self._quarterly_data[0],self._quarterly_data[1],self._quarterly_data[2])
         QMessageBox.information(self,'Excel','Exportado correctamente')
+
+    def _on_annual_assignment_changed(self)->None:
+        self._load_attendance_signer_options()
+        self.a_signer_docente.clear(); self.a_signer_rector.clear()
+        for i in range(self.signer_docente_combo.count()): self.a_signer_docente.addItem(self.signer_docente_combo.itemText(i),self.signer_docente_combo.itemData(i))
+        for i in range(self.signer_rector_combo.count()): self.a_signer_rector.addItem(self.signer_rector_combo.itemText(i),self.signer_rector_combo.itemData(i))
+
+    def _update_annual_signers(self)->None:
+        self._annual_firmantes['docente']=self.a_signer_docente.currentData() or self.a_signer_docente.currentText().strip()
+        self._annual_firmantes['rector']=self.a_signer_rector.currentData() or self.a_signer_rector.currentText().strip()
+
+    def _validate_annual_dates(self)->bool:
+        if self.a_t1_start.date()>self.a_t1_end.date() or self.a_t2_start.date()>self.a_t2_end.date() or self.a_t3_start.date()>self.a_t3_end.date():
+            QMessageBox.warning(self,'Informe anual','Rangos trimestrales inválidos'); return False
+        if not (self.a_t1_end.date()<self.a_t2_start.date()<self.a_t3_start.date()) or not (self.a_t2_end.date()<self.a_t3_start.date()):
+            QMessageBox.warning(self,'Informe anual','Secuencia de trimestres inválida'); return False
+        return True
+
+    def _generate_annual_preview(self)->None:
+        aid=self.a_assignment.currentData()
+        if not aid: return QMessageBox.warning(self,'Informe anual','Seleccione una asignación')
+        if not self._validate_annual_dates(): return
+        self._update_annual_signers()
+        data=self.service.build_annual_attendance_report(aid,self.a_t1_start.date().toString('yyyy-MM-dd'),self.a_t1_end.date().toString('yyyy-MM-dd'),self.a_t2_start.date().toString('yyyy-MM-dd'),self.a_t2_end.date().toString('yyyy-MM-dd'),self.a_t3_start.date().toString('yyyy-MM-dd'),self.a_t3_end.date().toString('yyyy-MM-dd'),self._annual_firmantes)
+        ctx=data['context']; ctx['periodo_anual']=f"{self.a_t1_start.date().toString('dd/MM/yyyy')} al {self.a_t3_end.date().toString('dd/MM/yyyy')}"; ctx['periodo_t1']=f"{self.a_t1_start.date().toString('dd/MM/yyyy')} al {self.a_t1_end.date().toString('dd/MM/yyyy')}"; ctx['periodo_t2']=f"{self.a_t2_start.date().toString('dd/MM/yyyy')} al {self.a_t2_end.date().toString('dd/MM/yyyy')}"; ctx['periodo_t3']=f"{self.a_t3_start.date().toString('dd/MM/yyyy')} al {self.a_t3_end.date().toString('dd/MM/yyyy')}"
+        html=self.renderer.render_attendance_annual(ctx,data['rows'],data['stats']); self.annual_preview_view.setHtml(html); self._annual_data=(ctx,data['rows'],data['stats'],html)
+
+    def _export_annual_pdf(self)->None:
+        if not self._annual_data: self._generate_annual_preview()
+        if not self._annual_data: return
+        assignment_text=self.a_assignment.currentText() or str(self.a_assignment.currentData() or '')
+        path,_=QFileDialog.getSaveFileName(self,'Exportar PDF',f"{self._sanitize_filename(assignment_text)}_asistencia_anual.pdf",'PDF (*.pdf)')
+        if not path: return
+        ok=self.pdf_exporter.export_to_pdf(self._annual_data[3],path,orientation='landscape',margins_mm=6)
+        QMessageBox.information(self,'PDF','Exportado correctamente' if ok else 'No se pudo exportar PDF')
+
+    def _export_annual_excel(self)->None:
+        if not self._annual_data: self._generate_annual_preview()
+        if not self._annual_data: return
+        assignment_text=self.a_assignment.currentText() or str(self.a_assignment.currentData() or '')
+        path,_=QFileDialog.getSaveFileName(self,'Exportar Excel',f"{self._sanitize_filename(assignment_text)}_asistencia_anual.xlsx",'Excel (*.xlsx)')
+        if not path: return
+        self.excel_exporter.export_attendance_annual_excel(path,self._annual_data[0],self._annual_data[1],self._annual_data[2]); QMessageBox.information(self,'Excel','Exportado correctamente')

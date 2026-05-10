@@ -32,3 +32,14 @@ class AttendanceExcelExporter:
         ws[f'F{r0+8}']=context.get('firma_docente',''); ws[f'F{r0+9}']='Docente'; ws[f'H{r0+8}']=context.get('firma_rector',''); ws[f'H{r0+9}']='Rector'
         for col,w in [('A',7),('B',36),('C',14),('D',10),('E',10),('F',20),('G',18),('H',12),('I',14)]: ws.column_dimensions[col].width=w
         wb.save(path); return str(path)
+
+
+    def export_attendance_annual_excel(self, output_path:str, context:dict[str,Any], rows:list[dict[str,Any]], stats:dict[str,Any])->str:
+        path=Path(output_path).expanduser().resolve(); path.parent.mkdir(parents=True,exist_ok=True)
+        wb=Workbook(); ws=wb.active; ws.title='Asistencia anual'; ws.page_setup.orientation=ws.ORIENTATION_LANDSCAPE
+        headers=['N°','Nómina','T1 Días','T1 F','T1 %','T2 Días','T2 F','T2 %','T3 Días','T3 F','T3 %','Días','P','A','F','J','% Asistencia','Observación']
+        ws.append(headers)
+        for r in rows:
+            ws.append([r['nro'],r['nomina'],r['t1_dias'],r['t1_faltas'],r['t1_porcentaje']/100.0,r['t2_dias'],r['t2_faltas'],r['t2_porcentaje']/100.0,r['t3_dias'],r['t3_faltas'],r['t3_porcentaje']/100.0,r['dias_total'],r['presentes_total'],r['atrasos_total'],r['faltas_injustificadas_total'],r['faltas_justificadas_total'],r['porcentaje_asistencia_anual']/100.0,r['observacion']])
+        ws['A'+str(len(rows)+3)]='Porcentaje general anual'; ws['B'+str(len(rows)+3)]=stats.get('porcentaje_general_anual_asistencia',0)/100.0; ws['B'+str(len(rows)+3)].number_format='0.00%'
+        wb.save(path); return str(path)
