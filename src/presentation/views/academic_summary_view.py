@@ -33,6 +33,7 @@ except Exception:  # noqa: BLE001
 
 from src.application.services.academic_summary_service import AcademicSummaryService
 from src.application.services.report_export_service import ReportExportService
+from src.presentation.widgets.busy_state import busy_button
 
 
 class AcademicSummaryView(QWidget):
@@ -128,17 +129,29 @@ class AcademicSummaryView(QWidget):
         self.report_type_combo.addItem("Tercer Trimestre", ("trimestral", 3))
         self.report_type_combo.currentIndexChanged.connect(self._on_report_type_changed)
         self.load_button = QPushButton("Cargar resumen")
-        self.load_button.clicked.connect(self.load_summary)
+        self.load_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.load_button, "Cargando...", self.load_summary)
+        )
         self.recalc_button = QPushButton("Recalcular")
-        self.recalc_button.clicked.connect(self.recalculate_rows)
+        self.recalc_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.recalc_button, "Procesando...", self.recalculate_rows)
+        )
         self.save_button = QPushButton("Guardar supletorio")
-        self.save_button.clicked.connect(self.save_rows)
+        self.save_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.save_button, "Guardando...", self.save_rows)
+        )
         self.preview_button = QPushButton("Vista previa")
-        self.preview_button.clicked.connect(self.show_preview)
+        self.preview_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.preview_button, "Generando...", self.show_preview)
+        )
         self.export_pdf_button = QPushButton("Exportar PDF")
-        self.export_pdf_button.clicked.connect(self.export_pdf)
+        self.export_pdf_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.export_pdf_button, "Exportando...", self.export_pdf)
+        )
         self.export_excel_button = QPushButton("Exportar Excel")
-        self.export_excel_button.clicked.connect(self.export_excel)
+        self.export_excel_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.export_excel_button, "Exportando...", self.export_excel)
+        )
 
         filter_row.addWidget(QLabel("Asignación"))
         filter_row.addWidget(self.assignment_combo, 1)
@@ -234,6 +247,10 @@ class AcademicSummaryView(QWidget):
         self.load_contexts()
         self._load_signer_options()
         self._on_report_type_changed()
+
+    def _run_with_busy_state(self, button: QPushButton, busy_text: str, callback) -> None:
+        with busy_button(button, busy_text):
+            callback()
 
     def load_contexts(self, selected_assignment_id: str | None = None) -> None:
         self.assignment_combo.clear()
@@ -345,7 +362,9 @@ class AcademicSummaryView(QWidget):
 
         assignment_text = self.assignment_combo.currentText() or str(asignacion_id)
         safe_base = self._sanitize_filename(assignment_text)
-        default_name = f"{safe_base}.{ 'pdf' if kind == 'pdf' else 'xlsx' }"
+        report_type, trimestre_num = self.report_type_combo.currentData()
+        period_suffix = self._report_period_suffix(report_type, trimestre_num)
+        default_name = f"{safe_base}_{period_suffix}.{ 'pdf' if kind == 'pdf' else 'xlsx' }"
         selected_path, _ = QFileDialog.getSaveFileName(
             self,
             "Guardar reporte",
@@ -355,7 +374,6 @@ class AcademicSummaryView(QWidget):
         if not selected_path:
             return
 
-        report_type, trimestre_num = self.report_type_combo.currentData()
         ocultar_filas_vacias = self.btn_toggle_filas.isChecked()
         if kind == "pdf":
             ok, message = self.report_export_service.exportar_resumen_pdf(
@@ -587,8 +605,19 @@ class AcademicSummaryView(QWidget):
         QApplication.clipboard().setText("\n".join(lines))
 
     @staticmethod
+    def _report_period_suffix(report_type: str, trimestre_num: int | None) -> str:
+        if report_type == "trimestral" and trimestre_num:
+            return f"Tri_{int(trimestre_num)}"
+        return "Anual"
+
+    @staticmethod
     def _sanitize_filename(text: str) -> str:
-        normalized = re.sub(r"[|/\\\\:*?\"<>]", "_", str(text or "").strip())
-        normalized = normalized.replace(" ", "_")
-        normalized = re.sub(r"_+", "_", normalized).strip(" ._")
+        import re
+
+        normalized = unicodedata.normalize("NFD", str(text or "").strip())
+        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        normalized = re.sub(r"[|/\\:*?\"<>]+", "_", normalized)
+        normalized = re.sub(r"\s+", "_", normalized)
+        normalized = re.sub(r"_+", "_", normalized)
+        normalized = normalized.strip(" ._")
         return normalized or "reporte"

@@ -108,6 +108,9 @@ class ReportsView(QWidget):
                 idx = self.accompaniment_report_view.assignment_combo.findData(assignment_id)
                 if idx >= 0:
                     self.accompaniment_report_view.assignment_combo.setCurrentIndex(idx)
+                trimester_idx = self.accompaniment_report_view.trimester_combo.findData(trimester)
+                if trimester_idx >= 0:
+                    self.accompaniment_report_view.trimester_combo.setCurrentIndex(trimester_idx)
                 self.accompaniment_report_view.load_rows()
             elif mode == self.MODE_ANIMATION:
                 selected_level = str(self.animation_report_view.level_combo.currentData() or "").strip() or None

@@ -52,6 +52,7 @@ from src.application.services.classroom_accompaniment_service import (
 )
 from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
 from src.presentation.app_signals import AppSignals
+from src.presentation.widgets.busy_state import busy_button
 
 
 class SkillConfigDialog(QDialog):
@@ -182,11 +183,17 @@ class ClassroomAccompanimentView(QWidget):
         self.trimester_combo.currentIndexChanged.connect(self._on_context_filters_changed)
 
         self.load_button = QPushButton("Cargar listado")
-        self.load_button.clicked.connect(self.load_rows)
+        self.load_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.load_button, "Cargando...", self.load_rows)
+        )
         self.save_button = QPushButton("Guardar evaluación")
-        self.save_button.clicked.connect(self.save_rows)
+        self.save_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.save_button, "Guardando...", self.save_rows)
+        )
         self.configure_skills_button = QPushButton("Configurar habilidades")
-        self.configure_skills_button.clicked.connect(self.open_skill_config)
+        self.configure_skills_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.configure_skills_button, "Procesando...", self.open_skill_config)
+        )
         self.btn_vista_previa_cual = QPushButton("Vista Previa")
         self.btn_vista_previa_cual.setStyleSheet(
             """
@@ -204,13 +211,23 @@ class ClassroomAccompanimentView(QWidget):
             """
         )
         self.btn_vista_previa_cual.setEnabled(False)
-        self.btn_vista_previa_cual.clicked.connect(self._mostrar_vista_previa_cualitativa)
+        self.btn_vista_previa_cual.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(
+                self.btn_vista_previa_cual, "Generando...", self._mostrar_vista_previa_cualitativa
+            )
+        )
         self.btn_exportar_pdf_cual = QPushButton("Exportar PDF")
         self.btn_exportar_pdf_cual.setEnabled(False)
-        self.btn_exportar_pdf_cual.clicked.connect(self._exportar_vista_previa_pdf)
+        self.btn_exportar_pdf_cual.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(
+                self.btn_exportar_pdf_cual, "Exportando...", self._exportar_vista_previa_pdf
+            )
+        )
         self.btn_exportar_excel_cual = QPushButton("Exportar Excel")
         self.btn_exportar_excel_cual.setEnabled(False)
-        self.btn_exportar_excel_cual.clicked.connect(self._exportar_excel)
+        self.btn_exportar_excel_cual.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.btn_exportar_excel_cual, "Exportando...", self._exportar_excel)
+        )
 
         self.assignment_label = QLabel("Asignación")
         self.trimester_label = QLabel("Trimestre")
@@ -276,6 +293,10 @@ class ClassroomAccompanimentView(QWidget):
         self.load_contexts()
         self._load_signer_options()
 
+
+    def _run_with_busy_state(self, button: QPushButton, busy_text: str, callback) -> None:
+        with busy_button(button, busy_text):
+            callback()
 
     def set_evaluation_variant(self, variant: str = "accompaniment") -> None:
         """Configura el texto de la vista para variantes de evaluación cualitativa."""
@@ -376,6 +397,7 @@ class ClassroomAccompanimentView(QWidget):
             self.btn_exportar_excel_cual.setEnabled(False)
             return
 
+        self._apply_default_signers_from_context()
         self._skill_categories = payload.get("skill_categories", [])
         self._skills_by_key = {
             skill["key"]: skill
@@ -845,17 +867,26 @@ class ClassroomAccompanimentView(QWidget):
 
     def _build_export_filename_base(self) -> str:
         assignment_text = self.assignment_combo.currentText() or "acompanamiento"
-        return self._sanitize_filename(assignment_text)
+        return self._sanitize_filename(f"{assignment_text}_{self._report_period_suffix()}")
+
+    def _report_period_suffix(self) -> str:
+        trimester = self.trimester_combo.currentData()
+        if trimester:
+            return f"Tri_{int(trimester)}"
+        return "Anual"
 
     @staticmethod
     def _sanitize_filename(text: str) -> str:
         import re
 
-        normalized = re.sub(r"[|/\\\\:*?\"<>]+", "_", str(text or "").strip())
+        normalized = unicodedata.normalize("NFD", str(text or "").strip())
+        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        normalized = re.sub(r"[|/\\:*?\"<>]+", "_", normalized)
         normalized = re.sub(r"\s+", "_", normalized)
         normalized = re.sub(r"_+", "_", normalized)
         normalized = normalized.strip(" ._")
         return normalized or "acompanamiento"
+
 
     def _load_signer_options(self) -> None:
         options = self.accompaniment_service.listar_firmantes_disponibles()
@@ -866,7 +897,34 @@ class ClassroomAccompanimentView(QWidget):
         for name in options:
             self.signer_docente_combo.addItem(name, name)
             self.signer_rector_combo.addItem(name, name)
+        self._apply_default_signers_from_context()
         self._update_signers()
+
+    def _apply_default_signers_from_context(self) -> None:
+        assignment_id = self.assignment_combo.currentData()
+        context = self.accompaniment_service.obtener_contexto(str(assignment_id or "")) or {}
+        docente_default = f"{context.get('docente_apellidos', '')} {context.get('docente_nombres', '')}".strip()
+        self._select_combo_by_name_parts(self.signer_docente_combo, docente_default, force=True)
+        institution = self.accompaniment_service.obtener_datos_institucion()
+        self._select_combo_by_name_parts(
+            self.signer_rector_combo,
+            str(institution.get("rector") or ""),
+            force=not bool(self.signer_rector_combo.currentData()),
+        )
+
+    @staticmethod
+    def _select_combo_by_name_parts(combo: QComboBox, full_name: str, *, force: bool = False) -> None:
+        if combo.currentData() and not force:
+            return
+        normalized_target = ClassroomAccompanimentView._normalize_text(full_name)
+        if not normalized_target:
+            return
+        target_parts = set(normalized_target.split())
+        for index in range(combo.count()):
+            option = ClassroomAccompanimentView._normalize_text(str(combo.itemData(index) or combo.itemText(index)))
+            if option and target_parts.issubset(set(option.split())):
+                combo.setCurrentIndex(index)
+                return
 
     def _update_signers(self) -> None:
         self._firmantes = {

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
+import unicodedata
 from typing import Any, Callable
 
 from PySide6.QtCore import QEvent, Qt
@@ -33,6 +34,8 @@ from PySide6.QtWidgets import (
 from openpyxl import Workbook
 
 from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
+from src.presentation.widgets.busy_state import busy_button
+
 try:
     from PySide6.QtCore import QEventLoop, QMarginsF, QUrl
     from PySide6.QtWebEngineCore import QWebEnginePage
@@ -242,18 +245,26 @@ class AnimacionLecturaView(QWidget):
         self.actions_card.setObjectName("Card")
         actions_layout = QHBoxLayout(self.actions_card)
         self.save_button = QPushButton("Guardar evaluación")
-        self.save_button.clicked.connect(self._save_rows)
+        self.save_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.save_button, "Guardando...", self._save_rows)
+        )
         self.level_combo = QComboBox()
         self.level_combo.addItem("Seleccione nivel", "")
         for label, value in self.LEVEL_OPTIONS:
             self.level_combo.addItem(label, value)
         self.level_combo.currentIndexChanged.connect(self._on_level_changed)
         self.preview_button = QPushButton("Vista Previa")
-        self.preview_button.clicked.connect(self._show_preview)
+        self.preview_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.preview_button, "Generando...", self._show_preview)
+        )
         self.export_pdf_button = QPushButton("Exportar PDF")
-        self.export_pdf_button.clicked.connect(self._export_preview_pdf)
+        self.export_pdf_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.export_pdf_button, "Exportando...", self._export_preview_pdf)
+        )
         self.export_excel_button = QPushButton("Exportar Excel")
-        self.export_excel_button.clicked.connect(self._export_preview_excel)
+        self.export_excel_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.export_excel_button, "Exportando...", self._export_preview_excel)
+        )
 
         actions_layout.addWidget(self.save_button)
         actions_layout.addWidget(self.level_combo)
@@ -322,9 +333,14 @@ class AnimacionLecturaView(QWidget):
         self._load_signers()
         self._apply_styles()
 
+    def _run_with_busy_state(self, button: QPushButton, busy_text: str, callback) -> None:
+        with busy_button(button, busy_text):
+            callback()
+
     def set_context(self, assignment_id: str | None, assignment_label: str, trimester_num: int | None, trimester_label: str) -> None:
         self._assignment_id = assignment_id
         self._trimester_num = trimester_num
+        self._apply_default_signers_from_context()
 
     def set_notes_mode(self, enabled: bool = True) -> None:
         """Modo Notas: registro de calificaciones sin controles de reporte."""
@@ -1016,7 +1032,7 @@ class AnimacionLecturaView(QWidget):
     def _export_preview_excel(self) -> None:
         rows = self._build_preview_rows()
         stats = self._build_stats_summary()
-        suggested = f"{self._sanitize_filename('animacion_lectura_' + str(self._assignment_id or 'reporte'))}.xlsx"
+        suggested = f"{self._build_export_filename_base()}.xlsx"
         file_path, _ = QFileDialog.getSaveFileName(self, "Guardar Excel", suggested, "Excel (*.xlsx)")
         if not file_path:
             return
@@ -1060,17 +1076,25 @@ class AnimacionLecturaView(QWidget):
         assignment_text = str(self.report_assignment_combo.currentText() or "").strip()
         if not assignment_text:
             assignment_text = f"animacion_lectura_{self._assignment_id or 'reporte'}"
-        return self._sanitize_filename(assignment_text)
+        return self._sanitize_filename(f"{assignment_text}_{self._report_period_suffix()}")
+
+    def _report_period_suffix(self) -> str:
+        if self._trimester_num:
+            return f"Tri_{int(self._trimester_num)}"
+        return "Anual"
 
     @staticmethod
     def _sanitize_filename(text: str) -> str:
         import re
 
-        normalized = re.sub(r"[|/\\\\:*?\"<>]+", "_", str(text or "").strip())
+        normalized = unicodedata.normalize("NFD", str(text or "").strip())
+        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        normalized = re.sub(r"[|/\\:*?\"<>]+", "_", normalized)
         normalized = re.sub(r"\s+", "_", normalized)
         normalized = re.sub(r"_+", "_", normalized)
         normalized = normalized.strip(" ._")
         return normalized or "reporte_animacion_lectura"
+
 
     def _set_header_item(
         self,
@@ -1137,6 +1161,40 @@ class AnimacionLecturaView(QWidget):
         for signer in self._list_signers():
             self.sign_docente_combo.addItem(signer, signer)
             self.sign_rector_combo.addItem(signer, signer)
+        self._apply_default_signers_from_context()
+
+    def _apply_default_signers_from_context(self) -> None:
+        assignment_context = self._get_assignment_context(str(self._assignment_id or "")) if self._get_assignment_context else {}
+        assignment_context = assignment_context or {}
+        docente_default = f"{assignment_context.get('docente_apellidos', '')} {assignment_context.get('docente_nombres', '')}".strip()
+        self._select_combo_by_name_parts(self.sign_docente_combo, docente_default, force=True)
+        institution = self._get_institution_data() if self._get_institution_data else {}
+        institution = institution or {}
+        self._select_combo_by_name_parts(
+            self.sign_rector_combo,
+            str(institution.get("rector") or ""),
+            force=not bool(self.sign_rector_combo.currentData()),
+        )
+
+    @staticmethod
+    def _select_combo_by_name_parts(combo: QComboBox, full_name: str, *, force: bool = False) -> None:
+        if combo.currentData() and not force:
+            return
+        normalized_target = AnimacionLecturaView._normalize_text(full_name)
+        if not normalized_target:
+            return
+        target_parts = set(normalized_target.split())
+        for index in range(combo.count()):
+            option = AnimacionLecturaView._normalize_text(str(combo.itemData(index) or combo.itemText(index)))
+            if option and target_parts.issubset(set(option.split())):
+                combo.setCurrentIndex(index)
+                return
+
+    @staticmethod
+    def _normalize_text(value: str) -> str:
+        normalized = unicodedata.normalize("NFD", str(value or "").strip().lower())
+        normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+        return " ".join(normalized.split())
 
     def _apply_styles(self) -> None:
         self.setStyleSheet(

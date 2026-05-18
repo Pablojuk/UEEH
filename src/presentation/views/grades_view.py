@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from src.application.services.grade_registration_service import GradeRegistrationService
 from src.presentation.app_signals import AppSignals
+from src.presentation.widgets.busy_state import busy_button
 
 if TYPE_CHECKING:
     from src.application.services.classroom_accompaniment_service import ClassroomAccompanimentService
@@ -112,14 +113,22 @@ class GradesView(QWidget):
         self.activities_count_input.setMinimumWidth(90)
 
         self.generate_activities_button = QPushButton("Generar actividades")
-        self.generate_activities_button.clicked.connect(self.generate_activities)
+        self.generate_activities_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.generate_activities_button, "Generando...", self.generate_activities)
+        )
 
         self.load_button = QPushButton("Cargar estudiantes")
-        self.load_button.clicked.connect(self.load_rows)
+        self.load_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.load_button, "Cargando...", self.load_rows)
+        )
         self.recalc_button = QPushButton("Recalcular")
-        self.recalc_button.clicked.connect(self.recalculate_rows)
+        self.recalc_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.recalc_button, "Procesando...", self.recalculate_rows)
+        )
         self.save_button = QPushButton("Guardar")
-        self.save_button.clicked.connect(self.save_rows)
+        self.save_button.clicked.connect(
+            lambda _checked=False: self._run_with_busy_state(self.save_button, "Guardando...", self.save_rows)
+        )
 
         self.activities_count_label = QLabel("N° actividades")
 
@@ -196,6 +205,10 @@ class GradesView(QWidget):
 
         self.load_contexts()
 
+    def _run_with_busy_state(self, button: QPushButton, busy_text: str, callback) -> None:
+        with busy_button(button, busy_text):
+            callback()
+
     def load_contexts(self, selected_assignment_id: str | None = None) -> None:
         self.assignment_combo.clear()
         self._contextos = self.grade_registration_service.listar_contextos_disponibles()
@@ -224,7 +237,6 @@ class GradesView(QWidget):
             QMessageBox.information(self, "Éxito", message)
             self._numero_actividades = numero
             self._build_activity_metadata_inputs()
-            self._save_activity_metadata()
             self._save_activity_names()
             self.load_rows()
         else:
@@ -514,7 +526,8 @@ class GradesView(QWidget):
             item.setFlags(item.flags() & ~Qt.ItemIsEditable)
             self.table.setItem(0, col, item)
         for activity_idx, col_act, col_ref in self._activity_group_columns:
-            self.table.setSpan(0, col_act, 1, 2)
+            if col_act >= 0 and col_ref == col_act + 1 and col_ref < self.table.columnCount():
+                self.table.setSpan(0, col_act, 1, 2)
             name_value = self._activity_name_inputs.get(activity_idx, "")
             text = name_value or f"Nombre actividad {activity_idx}"
             name_item = QTableWidgetItem(text)
