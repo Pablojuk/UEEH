@@ -41,11 +41,34 @@ class TestUIManagementViews(unittest.TestCase):
         self.assertIsNotNone(view.shift_input)
 
     def test_teachers_view_loads_empty_table(self) -> None:
+        from PySide6.QtWidgets import QHeaderView
+
         from src.presentation.views.teachers_view import TeachersView
 
         view = TeachersView(self.teacher_service)
         self.assertEqual(view.table.rowCount(), 0)
         self.assertIsNotNone(view.search_input)
+        header = view.table.horizontalHeader()
+        for column in range(view.table.columnCount()):
+            self.assertEqual(header.sectionResizeMode(column), QHeaderView.Interactive)
+
+    def test_teachers_view_conserva_textos_y_tooltips(self) -> None:
+        from src.presentation.views.teachers_view import TeachersView
+
+        self.teacher_service.crear_docente(
+            {
+                "id_docente": "DOC-001",
+                "nombres": "Nombre sintético extenso",
+                "apellidos": "Apellido sintético extenso",
+                "identificacion": "DOC-ID-001",
+                "titulo": "Licenciado",
+            }
+        )
+        view = TeachersView(self.teacher_service)
+        self.assertEqual(view.table.item(0, 1).text(), "Nombre sintético extenso")
+        self.assertEqual(view.table.item(0, 1).toolTip(), "Nombre sintético extenso")
+        self.assertEqual(view.table.item(0, 2).text(), "Apellido sintético extenso")
+        self.assertEqual(view.table.item(0, 2).toolTip(), "Apellido sintético extenso")
 
     def test_catalogs_view_loads_tabs_and_tables(self) -> None:
         from src.presentation.views.catalogs_view import CatalogsView

@@ -44,3 +44,25 @@ class TestStudentService(unittest.TestCase):
         self.assertTrue(ok)
         row = self.service.listar_estudiantes()[0]
         self.assertTrue(row["codigo"].startswith("AUTO-"))
+
+    def test_ordenar_estudiantes_por_codigo_para_presentacion(self) -> None:
+        rows = [
+            {"id_estudiante": "N2", "codigo": "zeta"},
+            {"id_estudiante": "V100", "codigo": "EST-100"},
+            {"id_estudiante": "E1", "codigo": ""},
+            {"id_estudiante": "V10", "codigo": "EST-010"},
+            {"id_estudiante": "N1", "codigo": "Alpha"},
+            {"id_estudiante": "V2", "codigo": "est-002"},
+            {"id_estudiante": "N3", "codigo": "alpha"},
+            {"id_estudiante": "V9", "codigo": "EST-009"},
+            {"id_estudiante": "E2", "codigo": None},
+            {"id_estudiante": "V1", "codigo": "EST-001"},
+        ]
+
+        ordered = self.service.ordenar_estudiantes_por_codigo(rows)
+
+        self.assertEqual(
+            [row["id_estudiante"] for row in ordered],
+            ["V1", "V2", "V9", "V10", "V100", "N1", "N3", "N2", "E1", "E2"],
+        )
+        self.assertEqual(rows[0]["id_estudiante"], "N2")

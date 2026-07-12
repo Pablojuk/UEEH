@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import uuid
 
 from src.infrastructure.persistence.repositories import EstudiantesRepository
+
+
+EST_CODE_PATTERN = re.compile(r"^EST-(\d+)$", re.IGNORECASE)
 
 
 class StudentService:
@@ -43,6 +47,23 @@ class StudentService:
             or query_norm in (row.get("identificacion") or "").lower()
             or query_norm in (row.get("codigo") or "").lower()
         ]
+
+    @staticmethod
+    def ordenar_estudiantes_por_codigo(rows: list[dict]) -> list[dict]:
+        """Ordena una copia para presentación sin alterar códigos ni persistencia."""
+
+        def sort_key(row: dict) -> tuple[int, int | str]:
+            code = str(row.get("codigo") or "").strip()
+            if not code:
+                return (2, "")
+
+            match = EST_CODE_PATTERN.fullmatch(code)
+            if match:
+                return (0, int(match.group(1)))
+
+            return (1, code.casefold())
+
+        return sorted(rows, key=sort_key)
 
     def actualizar_estudiante(self, student_id: str, data: dict) -> tuple[bool, str]:
         existing = self.obtener_estudiante_por_id(student_id)

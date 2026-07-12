@@ -20,6 +20,7 @@ from src.application.services.catalog_service import CatalogService
 from src.application.services.teacher_service import TeacherService
 from src.application.services.teaching_assignment_service import TeachingAssignmentService
 from src.presentation.app_signals import AppSignals
+from src.presentation.widgets.table_sizing import fit_table_columns_to_text
 
 
 class TeachingAssignmentsView(QWidget):
@@ -70,7 +71,7 @@ class TeachingAssignmentsView(QWidget):
 
         self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(["ID", "Docente", "Asignatura", "Curso", "Nombre", "Paralelo", "Período"])
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setColumnHidden(0, True)
         self.table.cellClicked.connect(self.select_assignment)
 
         root.addWidget(title)
@@ -124,6 +125,14 @@ class TeachingAssignmentsView(QWidget):
     def load_assignments(self) -> None:
         rows = self.teaching_assignment_service.listar_asignaciones()
         cursos = {row.get("id_curso"): row.get("nombre", "") for row in self.catalog_service.listar_cursos()}
+        asignaturas = {
+            row.get("id_asignatura"): row.get("nombre", "")
+            for row in self.catalog_service.listar_asignaturas()
+        }
+        paralelos = {
+            row.get("id_paralelo"): row.get("nombre", "")
+            for row in self.catalog_service.listar_paralelos()
+        }
 
         self.table.setRowCount(0)
         for row_data in rows:
@@ -131,13 +140,22 @@ class TeachingAssignmentsView(QWidget):
             self.table.insertRow(row)
             course_id = row_data.get("curso_id", "")
             course_name = cursos.get(course_id, "")
+            subject_id = row_data.get("asignatura_id", "")
+            subject_name = asignaturas.get(subject_id) or subject_id
+            parallel_id = row_data.get("paralelo_id", "")
+            parallel_name = paralelos.get(parallel_id) or parallel_id
             self.table.setItem(row, 0, QTableWidgetItem(row_data.get("id_asignacion", "")))
             self.table.setItem(row, 1, QTableWidgetItem(row_data.get("docente_id", "")))
-            self.table.setItem(row, 2, QTableWidgetItem(row_data.get("asignatura_id", "")))
+            subject_item = QTableWidgetItem(subject_name)
+            subject_item.setToolTip(subject_name)
+            self.table.setItem(row, 2, subject_item)
             self.table.setItem(row, 3, QTableWidgetItem(course_id))
-            self.table.setItem(row, 4, QTableWidgetItem(course_name))
-            self.table.setItem(row, 5, QTableWidgetItem(row_data.get("paralelo_id", "")))
+            course_name_item = QTableWidgetItem(course_name)
+            course_name_item.setToolTip(course_name)
+            self.table.setItem(row, 4, course_name_item)
+            self.table.setItem(row, 5, QTableWidgetItem(parallel_name))
             self.table.setItem(row, 6, QTableWidgetItem(row_data.get("periodo_id", "")))
+        fit_table_columns_to_text(self.table)
 
     def select_assignment(self, row: int, _column: int) -> None:
         item = self.table.item(row, 0)

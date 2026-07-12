@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from src.application.services.teacher_service import TeacherService
 from src.presentation.app_signals import AppSignals
+from src.presentation.widgets.table_sizing import fit_table_columns_to_text
 
 
 class TeachersView(QWidget):
@@ -78,7 +79,6 @@ class TeachersView(QWidget):
 
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(["ID", "Nombres", "Apellidos", "Identificación", "Título", "Estado"])
-        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.cellClicked.connect(self.select_teacher_from_table)
@@ -156,14 +156,21 @@ class TeachersView(QWidget):
             row = self.table.rowCount()
             self.table.insertRow(row)
             self.table.setItem(row, 0, QTableWidgetItem(row_data.get("id_docente", "")))
-            self.table.setItem(row, 1, QTableWidgetItem(row_data.get("nombres", "")))
-            self.table.setItem(row, 2, QTableWidgetItem(row_data.get("apellidos", "")))
+            names = row_data.get("nombres", "")
+            names_item = QTableWidgetItem(names)
+            names_item.setToolTip(names)
+            self.table.setItem(row, 1, names_item)
+            lastnames = row_data.get("apellidos", "")
+            lastnames_item = QTableWidgetItem(lastnames)
+            lastnames_item.setToolTip(lastnames)
+            self.table.setItem(row, 2, lastnames_item)
             self.table.setItem(row, 3, QTableWidgetItem(row_data.get("identificacion", "")))
             self.table.setItem(row, 4, QTableWidgetItem(row_data.get("titulo") or "No registrado"))
             estado = "Activo" if int(row_data.get("activo", 1)) == 1 else "Inactivo"
             status_item = QTableWidgetItem(estado)
             status_item.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(row, 5, status_item)
+        fit_table_columns_to_text(self.table)
 
     def select_teacher_from_table(self, row: int, _column: int) -> None:
         teacher_id = self.table.item(row, 0).text()

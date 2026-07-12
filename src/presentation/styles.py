@@ -1,11 +1,13 @@
 """Estilos globales minimalistas para la aplicación."""
 
+BASE_FONT_POINT_SIZE = 9.75
+
 APP_STYLE = """
 QWidget {
     background-color: #f5f7fa;
     color: #1f2937;
     font-family: 'Segoe UI', 'Arial', sans-serif;
-    font-size: 13px;
+    font-size: 9.75pt;
 }
 QMainWindow, QDialog {
     background-color: #f5f7fa;

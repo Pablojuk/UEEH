@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from src.application.services.student_import_service import StudentImportService
 from src.application.services.student_service import StudentService
 from src.presentation.app_signals import AppSignals
+from src.presentation.widgets.table_sizing import fit_table_columns_to_text
 
 
 class StudentsView(QWidget):
@@ -82,7 +83,6 @@ class StudentsView(QWidget):
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Código", "Apellidos", "Nombres", "Identificación"])
-        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.MultiSelection)
         self.table.cellClicked.connect(self.select_student)
@@ -133,6 +133,7 @@ class StudentsView(QWidget):
     def load_students(self) -> None:
         query = self.search_input.text().strip()
         rows = self.student_service.buscar_estudiantes(query) if query else self.student_service.listar_estudiantes()
+        rows = self.student_service.ordenar_estudiantes_por_codigo(rows)
 
         self.table.setRowCount(0)
         for row_data in rows:
@@ -141,9 +142,16 @@ class StudentsView(QWidget):
             code_item = QTableWidgetItem(row_data.get("codigo", ""))
             code_item.setData(Qt.UserRole, row_data.get("id_estudiante"))
             self.table.setItem(row, 0, code_item)
-            self.table.setItem(row, 1, QTableWidgetItem(row_data.get("apellidos", "")))
-            self.table.setItem(row, 2, QTableWidgetItem(row_data.get("nombres", "")))
+            lastnames = row_data.get("apellidos", "")
+            lastnames_item = QTableWidgetItem(lastnames)
+            lastnames_item.setToolTip(lastnames)
+            self.table.setItem(row, 1, lastnames_item)
+            names = row_data.get("nombres", "")
+            names_item = QTableWidgetItem(names)
+            names_item.setToolTip(names)
+            self.table.setItem(row, 2, names_item)
             self.table.setItem(row, 3, QTableWidgetItem(row_data.get("identificacion") or ""))
+        fit_table_columns_to_text(self.table)
 
     def select_student(self, row: int, column: int) -> None:
         code_item = self.table.item(row, 0)

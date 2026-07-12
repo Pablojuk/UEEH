@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QModelIndex, Qt
+from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
+    QCompleter,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -25,6 +27,7 @@ from src.application.services.catalog_service import CatalogService
 from src.application.services.enrollment_service import EnrollmentService
 from src.application.services.student_service import StudentService
 from src.presentation.app_signals import AppSignals
+from src.presentation.widgets.table_sizing import fit_table_columns_to_text
 
 
 class EnrollmentsView(QWidget):
@@ -42,6 +45,8 @@ class EnrollmentsView(QWidget):
         self.app_signals = app_signals
         self._students_cache: list[dict] = []
         self.selected_enrollment_id: str | None = None
+        self.selected_student_id: str | None = None
+        self.selected_student_display = ""
 
         root = QVBoxLayout(self)
         title = QLabel("Matrículas")
@@ -54,9 +59,10 @@ class EnrollmentsView(QWidget):
         form = QFormLayout(card)
 
         self.student_combo = QComboBox()
+        self.student_combo.hide()
         self.student_filter_input = QLineEdit()
         self.student_filter_input.setPlaceholderText("🔍 Buscar estudiante por nombre, identificación o código")
-        self.student_filter_input.textChanged.connect(self._filter_students)
+        self.student_filter_input.textChanged.connect(self.on_search_text_changed)
         self.course_combo = QComboBox()
         self.course_combo.currentIndexChanged.connect(self.load_enrollments)
         self.parallel_combo = QComboBox()
@@ -64,7 +70,6 @@ class EnrollmentsView(QWidget):
 
         student_row = QVBoxLayout()
         student_row.addWidget(self.student_filter_input)
-        student_row.addWidget(self.student_combo)
         form.addRow("Estudiante", student_row)
         form.addRow("Curso", self.course_combo)
         form.addRow("Paralelo", self.parallel_combo)
@@ -84,7 +89,7 @@ class EnrollmentsView(QWidget):
 
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(["ID", "Estudiante", "Curso", "Nombre", "Paralelo", "Período"])
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setColumnHidden(0, True)
         self.table.cellClicked.connect(self.select_enrollment)
 
         root.addWidget(title)
@@ -97,7 +102,7 @@ class EnrollmentsView(QWidget):
         self.load_enrollments()
 
     def load_combos(self) -> None:
-        selected_student = self.student_combo.currentData()
+        selected_student = self.selected_student_id
         selected_course = self.course_combo.currentData()
         selected_parallel = self.parallel_combo.currentData()
         selected_period = self.period_combo.currentData()
@@ -106,7 +111,22 @@ class EnrollmentsView(QWidget):
             self.student_service.listar_estudiantes(),
             key=lambda row: f"{row.get('apellidos', '').strip().lower()} {row.get('nombres', '').strip().lower()}",
         )
-        self._filter_students(selected_student)
+        self.update_completer_model()
+
+        if selected_student:
+            student = next(
+                (row for row in self._students_cache if row.get("id_estudiante") == selected_student),
+                None,
+            )
+            if student:
+                display = self._student_display(student)
+                self.selected_student_id = selected_student
+                self.selected_student_display = display
+                self.student_filter_input.setText(display)
+            else:
+                self._clear_student_selection()
+        else:
+            self._clear_student_selection()
 
         self.course_combo.clear()
         for row in self.catalog_service.listar_cursos():
@@ -126,14 +146,19 @@ class EnrollmentsView(QWidget):
 
     def save_enrollment(self) -> None:
         payload = {
-            "estudiante_id": self.student_combo.currentData(),
+            "estudiante_id": self.selected_student_id,
             "curso_id": self.course_combo.currentData(),
             "paralelo_id": self.parallel_combo.currentData(),
             "periodo_id": self.period_combo.currentData(),
         }
+        if not payload["estudiante_id"]:
+            QMessageBox.warning(self, "Validación", "Seleccione un estudiante válido.")
+            return
+
         ok, message = self.enrollment_service.crear_matricula(payload)
         if ok:
             QMessageBox.information(self, "Éxito", message)
+            self._clear_student_selection()
             self.load_enrollments()
             if self.app_signals:
                 self.app_signals.data_changed.emit("enrollments")
@@ -144,6 +169,10 @@ class EnrollmentsView(QWidget):
         rows = self.enrollment_service.listar_matriculas()
         students = {s.get("id_estudiante"): s for s in self.student_service.listar_estudiantes()}
         courses = {row.get("id_curso"): row.get("nombre", "") for row in self.catalog_service.listar_cursos()}
+        parallels = {
+            row.get("id_paralelo"): row.get("nombre", "")
+            for row in self.catalog_service.listar_paralelos()
+        }
         selected_course_id = self.course_combo.currentData()
         if selected_course_id:
             rows = [row for row in rows if row.get("curso_id") == selected_course_id]
@@ -161,29 +190,63 @@ class EnrollmentsView(QWidget):
             student_label = f"{student.get('apellidos', '')} {student.get('nombres', '')}".strip() or row_data.get("estudiante_id", "")
             course_id = row_data.get("curso_id", "")
             course_name = courses.get(course_id, "")
+            parallel_id = row_data.get("paralelo_id", "")
+            parallel_name = parallels.get(parallel_id) or parallel_id
             row = self.table.rowCount()
             self.table.insertRow(row)
             self.table.setItem(row, 0, QTableWidgetItem(row_data.get("id_matricula", "")))
-            self.table.setItem(row, 1, QTableWidgetItem(student_label))
+            student_item = QTableWidgetItem(student_label)
+            student_item.setToolTip(student_label)
+            self.table.setItem(row, 1, student_item)
             self.table.setItem(row, 2, QTableWidgetItem(course_id))
-            self.table.setItem(row, 3, QTableWidgetItem(course_name))
-            self.table.setItem(row, 4, QTableWidgetItem(row_data.get("paralelo_id", "")))
+            course_name_item = QTableWidgetItem(course_name)
+            course_name_item.setToolTip(course_name)
+            self.table.setItem(row, 3, course_name_item)
+            self.table.setItem(row, 4, QTableWidgetItem(parallel_name))
             self.table.setItem(row, 5, QTableWidgetItem(row_data.get("periodo_id", "")))
+        fit_table_columns_to_text(self.table)
 
-    def _filter_students(self, selected_student: str | None = None) -> None:
-        query = self.student_filter_input.text().strip().lower()
-        self.student_combo.clear()
+    @staticmethod
+    def _student_display(student: dict) -> str:
+        label = f"{student.get('apellidos', '')} {student.get('nombres', '')}".strip()
+        identification = student.get("identificacion") or ""
+        code = student.get("codigo") or ""
+        return f"{label} - {identification} - {code}".strip(" -") if identification or code else label
+
+    def update_completer_model(self) -> None:
+        self.completer_model = QStandardItemModel(self)
         for student in self._students_cache:
-            label = f"{student.get('apellidos', '')} {student.get('nombres', '')}".strip()
-            identification = student.get("identificacion") or ""
-            code = student.get("codigo") or ""
-            searchable = f"{label} {identification} {code}".lower()
-            if query and query not in searchable:
-                continue
-            display = f"{label} - {identification} - {code}".strip(" -") if identification or code else label
-            self.student_combo.addItem(display, student.get("id_estudiante"))
-        if selected_student:
-            self._restore_combo_selection(self.student_combo, selected_student)
+            item = QStandardItem(self._student_display(student))
+            item.setData(student.get("id_estudiante"), Qt.UserRole)
+            self.completer_model.appendRow(item)
+
+        self.student_completer = QCompleter(self.completer_model, self)
+        self.student_completer.setFilterMode(Qt.MatchContains)
+        self.student_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.student_completer.setCompletionMode(QCompleter.PopupCompletion)
+        self.student_completer.activated[QModelIndex].connect(self.on_student_selected)
+        self.student_filter_input.setCompleter(self.student_completer)
+
+    def on_student_selected(self, index: QModelIndex) -> None:
+        selected_id = index.data(Qt.UserRole)
+        if not selected_id:
+            self._clear_student_selection()
+            return
+        self.selected_student_display = str(index.data(Qt.DisplayRole) or "")
+        self.selected_student_id = str(selected_id)
+        self.student_filter_input.setText(self.selected_student_display)
+
+    def on_search_text_changed(self, text: str) -> None:
+        if not text.strip():
+            self.selected_student_id = None
+            self.selected_student_display = ""
+        elif text != self.selected_student_display:
+            self.selected_student_id = None
+
+    def _clear_student_selection(self) -> None:
+        self.selected_student_id = None
+        self.selected_student_display = ""
+        self.student_filter_input.clear()
 
     @staticmethod
     def _restore_combo_selection(combo: QComboBox, selected_value: str | None) -> None:
