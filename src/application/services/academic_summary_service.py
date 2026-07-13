@@ -10,6 +10,7 @@ from typing import Any
 from src.domain.calculations import (
     calcular_cualitativo,
     calcular_cualitativo_trimestral,
+    calcular_escala_cualitativa,
     calcular_observacion_final,
     calcular_promedio_anual,
     calcular_resultado_con_supletorio,
@@ -150,7 +151,7 @@ class AcademicSummaryService:
             item["cualitativa"] = calcular_cualitativo_trimestral(promedio)
             item["promedio_trimestral"] = promedio
             item["cualitativo"] = item["cualitativa"]
-            item["equivalencia"] = item.get("cualitativo_adicional") or self._calcular_equivalencia(item.get("promedio_final"))
+            item["equivalencia"] = calcular_escala_cualitativa(item.get("promedio_final"))
             item["observacion"] = (
                 calcular_observacion_final(item.get("promedio_final")) if item.get("promedio_final") is not None else ""
             )
@@ -230,15 +231,15 @@ class AcademicSummaryService:
                     "trimestre_1": t1,
                     "trimestre_2": t2,
                     "trimestre_3": t3,
-                    "equivalencia_t1": self._calcular_equivalencia(t1),
-                    "equivalencia_t2": self._calcular_equivalencia(t2),
-                    "equivalencia_t3": self._calcular_equivalencia(t3),
+                    "equivalencia_t1": calcular_escala_cualitativa(t1),
+                    "equivalencia_t2": calcular_escala_cualitativa(t2),
+                    "equivalencia_t3": calcular_escala_cualitativa(t3),
                     "promedio": promedio,
-                    "cualitativa_anual": self._calcular_equivalencia(promedio),
+                    "cualitativa_anual": calcular_escala_cualitativa(promedio),
                     "supletorio": supletorio,
                     "promedio_final": promedio_final,
                     "cualitativo": calcular_cualitativo(promedio) if promedio is not None else "",
-                    "cualitativo_final": self._calcular_equivalencia(promedio_final),
+                    "cualitativo_final": calcular_escala_cualitativa(promedio_final),
                     "observacion": calcular_observacion_final(promedio_final) if promedio_final is not None else "",
                     "nota_definitiva": promedio_final,
                 }
@@ -319,14 +320,14 @@ class AcademicSummaryService:
                     "trimestre_1": t1,
                     "trimestre_2": t2,
                     "trimestre_3": t3,
-                    "equivalencia_t1": self._calcular_equivalencia(t1),
-                    "equivalencia_t2": self._calcular_equivalencia(t2),
-                    "equivalencia_t3": self._calcular_equivalencia(t3),
+                    "equivalencia_t1": calcular_escala_cualitativa(t1),
+                    "equivalencia_t2": calcular_escala_cualitativa(t2),
+                    "equivalencia_t3": calcular_escala_cualitativa(t3),
                     "promedio": promedio,
-                    "cualitativa_anual": self._calcular_equivalencia(promedio),
+                    "cualitativa_anual": calcular_escala_cualitativa(promedio),
                     "promedio_final": promedio_final,
                     "cualitativo": calcular_cualitativo(promedio) if promedio is not None else "",
-                    "cualitativo_final": self._calcular_equivalencia(promedio_final),
+                    "cualitativo_final": calcular_escala_cualitativa(promedio_final),
                     "observacion": calcular_observacion_final(promedio_final) if promedio_final is not None else "",
                     "supletorio": supletorio,
                     "nota_definitiva": promedio_final,
@@ -393,15 +394,3 @@ class AcademicSummaryService:
         if t1 is None and t2 is None and t3 is None:
             return None
         return calcular_promedio_anual(t1 or 0.0, t2 or 0.0, t3 or 0.0)
-
-    @staticmethod
-    def _calcular_equivalencia(nota: float | None) -> str:
-        if nota is None:
-            return ""
-        if nota >= 9:
-            return "DA"
-        if nota >= 7:
-            return "AA"
-        if nota >= 5:
-            return "PA"
-        return "NA"

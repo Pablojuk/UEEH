@@ -6,6 +6,14 @@ from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from typing import Iterable, Optional
 
 
+ESCALA_CUALITATIVA_ACADEMICA = (
+    ("DA", "Domina los aprendizajes requeridos", "9,00 - 10,00"),
+    ("AA", "Alcanza los aprendizajes requeridos", "7,00 - 8,99"),
+    ("PA", "Está próximo a alcanzar los aprendizajes requeridos", "4,01 - 6,99"),
+    ("NA", "No alcanza los aprendizajes requeridos", "≤ 4,00"),
+)
+
+
 def truncar_2_decimales(valor: float) -> float:
     """Trunca un valor numérico a 2 decimales (estilo TRUNC de Excel)."""
     return float(Decimal(str(valor)).quantize(Decimal("0.00"), rounding=ROUND_DOWN))
@@ -78,6 +86,20 @@ def calcular_cualitativo(promedio_final: float) -> str:
         if promedio_final >= limite:
             return etiqueta
     return "SIN_ESCALA"
+
+
+def calcular_escala_cualitativa(nota: float | Decimal | str | None) -> str:
+    """Convierte una nota 0..10 a la escala académica DA/AA/PA/NA."""
+    if nota is None or str(nota).strip() == "":
+        return ""
+    valor = Decimal(str(nota).strip().replace(",", "."))
+    if valor >= Decimal("9.00"):
+        return "DA"
+    if valor >= Decimal("7.00"):
+        return "AA"
+    if valor > Decimal("4.00"):
+        return "PA"
+    return "NA"
 
 
 def calcular_promedio_actividad(actividad: Optional[float], refuerzo: Optional[float]) -> Optional[float]:

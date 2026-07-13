@@ -99,7 +99,7 @@ class GradesView(QWidget):
         filter_row = QHBoxLayout(self.filter_card)
 
         self.assignment_combo = QComboBox()
-        self.assignment_combo.setMinimumWidth(350)
+        self.assignment_combo.setMinimumWidth(0)
         self.assignment_combo.currentIndexChanged.connect(self._on_assignment_or_trimester_changed)
         self.trimester_combo = QComboBox()
         self.trimester_combo.addItem("Trimestre 1", 1)

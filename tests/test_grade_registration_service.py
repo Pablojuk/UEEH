@@ -147,6 +147,20 @@ class TestGradeRegistrationService(unittest.TestCase):
         self.assertEqual(fila["nota_trimestral"], 8.38)
         self.assertEqual(fila["cualitativo_adicional"], "AA")
 
+    def test_equivalencia_reutiliza_limite_academico_de_4_01(self) -> None:
+        fila = self.service.recalcular_fila(
+            {
+                "estudiante_id": "E1",
+                "actividad_1": 4.01,
+                "actividad_2": 4.01,
+                "actividad_3": 4.01,
+                "proyecto": 4.01,
+                "evaluacion": 4.01,
+            }
+        )
+        self.assertEqual(fila["nota_trimestral"], 4.01)
+        self.assertEqual(fila["cualitativo_adicional"], "PA")
+
     def test_acepta_decimal_con_coma_y_redondea(self) -> None:
         fila = self.service.validar_y_normalizar_fila(
             {

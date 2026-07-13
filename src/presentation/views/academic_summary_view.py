@@ -120,7 +120,7 @@ class AcademicSummaryView(QWidget):
         filter_row = QHBoxLayout(filter_card)
 
         self.assignment_combo = QComboBox()
-        self.assignment_combo.setMinimumWidth(380)
+        self.assignment_combo.setMinimumWidth(0)
         self.assignment_combo.currentIndexChanged.connect(self._on_filters_changed)
         self.report_type_combo = QComboBox()
         self.report_type_combo.addItem("Anual", ("anual", None))

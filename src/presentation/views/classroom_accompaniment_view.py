@@ -175,7 +175,7 @@ class ClassroomAccompanimentView(QWidget):
         filter_row = QHBoxLayout(self.filter_card)
 
         self.assignment_combo = QComboBox()
-        self.assignment_combo.setMinimumWidth(300)
+        self.assignment_combo.setMinimumWidth(0)
         self.assignment_combo.currentIndexChanged.connect(self._on_context_filters_changed)
         self.trimester_combo = QComboBox()
         for label, value in self.TRIMESTERS:
@@ -191,9 +191,7 @@ class ClassroomAccompanimentView(QWidget):
             lambda _checked=False: self._run_with_busy_state(self.save_button, "Guardando...", self.save_rows)
         )
         self.configure_skills_button = QPushButton("Configurar habilidades")
-        self.configure_skills_button.clicked.connect(
-            lambda _checked=False: self._run_with_busy_state(self.configure_skills_button, "Procesando...", self.open_skill_config)
-        )
+        self.configure_skills_button.clicked.connect(self.open_skill_config)
         self.btn_vista_previa_cual = QPushButton("Vista Previa")
         self.btn_vista_previa_cual.setStyleSheet(
             """
@@ -440,11 +438,12 @@ class ClassroomAccompanimentView(QWidget):
         else:
             QMessageBox.warning(self, "Error", message)
 
-    def open_skill_config(self) -> None:
+    def open_skill_config(self, _checked: bool = False) -> None:
         if not self._skill_categories:
             assignment_id = self.assignment_combo.currentData()
             if assignment_id:
-                self.load_rows()
+                with busy_button(self.configure_skills_button, "Procesando..."):
+                    self.load_rows()
         if not self._skill_categories:
             QMessageBox.information(self, "Información", "Primero cargue una asignación para configurar habilidades")
             return

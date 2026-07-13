@@ -6,9 +6,10 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from src.application.services.institution_service import InstitutionService
+from src.presentation.widgets.interaction_support import enable_copyable_label
 
 
 class DashboardView(QWidget):
@@ -62,12 +63,16 @@ class DashboardView(QWidget):
 
         self.logo_ministerio_label = QLabel("Logo ministerial")
         self.logo_ministerio_label.setAlignment(Qt.AlignCenter)
-        self.logo_ministerio_label.setFixedSize(320, 120)
+        self.logo_ministerio_label.setMinimumSize(120, 80)
+        self.logo_ministerio_label.setMaximumHeight(120)
+        self.logo_ministerio_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.logo_ministerio_label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")
 
         self.logo_label = QLabel("Logo institucional")
         self.logo_label.setAlignment(Qt.AlignCenter)
-        self.logo_label.setFixedSize(320, 120)
+        self.logo_label.setMinimumSize(120, 80)
+        self.logo_label.setMaximumHeight(120)
+        self.logo_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.logo_label.setStyleSheet("border: 1px dashed #cbd5e1; color: #94a3b8; border-radius: 8px;")
 
         ministerio_title = QLabel("MINISTERIO DE EDUCACIÓN, DEPORTE Y CULTURA")
@@ -104,6 +109,7 @@ class DashboardView(QWidget):
 
     def _add_value_cell(self, grid: QGridLayout, row: int, col: int, key: str, span: int = 1) -> None:
         value = QLabel("No registrado")
+        enable_copyable_label(value)
         value.setStyleSheet("background-color: #f8fafc; border: 1px solid #111827; padding: 6px;")
         self.value_labels[key] = value
         grid.addWidget(value, row, col, 1, span)
@@ -121,7 +127,9 @@ class DashboardView(QWidget):
         if logo_path and Path(logo_path).exists():
             pixmap = QPixmap(logo_path)
             if not pixmap.isNull():
-                label.setPixmap(pixmap.scaled(300, 110, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                target_width = max(1, min(300, label.width() - 8))
+                target_height = max(1, min(110, label.height() - 8))
+                label.setPixmap(pixmap.scaled(target_width, target_height, Qt.KeepAspectRatio, Qt.SmoothTransformation))
                 label.setStyleSheet("border: none;")
                 return
         label.setPixmap(QPixmap())

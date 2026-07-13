@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QSizePolicy,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from src.application.services.academic_summary_service import AcademicSummaryService
 from src.application.services.backup_service import BackupService
@@ -31,9 +41,13 @@ from src.presentation.views.teachers_view import TeachersView
 from src.presentation.views.teaching_assignments_view import TeachingAssignmentsView
 from src.presentation.views.attendance_view import AttendanceView
 from src.presentation.widgets.sidebar import Sidebar
+from src.presentation.widgets.interaction_support import enable_copyable_label
 
 
 class MainWindow(QMainWindow):
+    DEFAULT_WIDTH = 1180
+    DEFAULT_HEIGHT = 720
+
     def __init__(
         self,
         institution_service: InstitutionService,
@@ -68,9 +82,10 @@ class MainWindow(QMainWindow):
         self.app_signals = AppSignals()
 
         self.setWindowTitle("Sistema Académico UEEH")
-        self.resize(1180, 720)
+        self.setMinimumSize(0, 0)
 
         root = QWidget()
+        root.setMinimumSize(0, 0)
         self.setCentralWidget(root)
 
         container = QHBoxLayout(root)
@@ -82,10 +97,13 @@ class MainWindow(QMainWindow):
 
         right_panel = QFrame()
         right_panel.setObjectName("Card")
+        right_panel.setMinimumSize(0, 0)
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(16, 16, 16, 16)
 
         self.stack = QStackedWidget()
+        self.stack.setMinimumSize(0, 0)
+        self.stack.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         dashboard = DashboardView(institution_service=self.institution_service)
 
         self.views = {
@@ -133,6 +151,7 @@ class MainWindow(QMainWindow):
             self.stack.addWidget(view)
 
         self.author_label = QLabel("Autor: Econ Pablo Hernan Juca Farfan.")
+        enable_copyable_label(self.author_label)
         self.author_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
 
         right_layout.addWidget(self.stack, 1)
@@ -143,6 +162,20 @@ class MainWindow(QMainWindow):
 
         self.app_signals.data_changed.connect(self._on_data_changed)
         self._change_view("dashboard")
+        self._fit_to_available_screen()
+
+    def _fit_to_available_screen(self) -> None:
+        """Limita y centra la geometría inicial usando coordenadas lógicas DPI-aware."""
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            self.resize(self.DEFAULT_WIDTH, self.DEFAULT_HEIGHT)
+            return
+        available = screen.availableGeometry()
+        width = max(1, min(self.DEFAULT_WIDTH, available.width()))
+        height = max(1, min(self.DEFAULT_HEIGHT, available.height()))
+        x = available.x() + ((available.width() - width) // 2)
+        y = available.y() + ((available.height() - height) // 2)
+        self.setGeometry(x, y, width, height)
 
     def _change_view(self, section: str) -> None:
         widget = self.views.get(section)

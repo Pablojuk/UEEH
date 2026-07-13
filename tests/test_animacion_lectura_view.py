@@ -8,8 +8,9 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
-    from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import QEvent, QItemSelectionModel, Qt
+    from PySide6.QtGui import QKeyEvent
+    from PySide6.QtWidgets import QAbstractItemView, QApplication
 except ImportError:  # pragma: no cover
     QApplication = None
     Qt = None
@@ -20,6 +21,39 @@ class TestAnimacionLecturaView(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
+        from src.presentation.widgets.interaction_support import install_global_interaction_support
+
+        install_global_interaction_support(cls.app)
+
+    def test_tabla_permite_seleccion_multiple_y_copia_tsv(self) -> None:
+        from src.presentation.views.animacion_lectura_view import AnimacionLecturaView
+        from src.presentation.widgets.interaction_support import build_table_context_menu
+
+        view = AnimacionLecturaView()
+        view.level_combo.setCurrentIndex(view.level_combo.findData("superior"))
+        view.set_students([{"estudiante_id": "E1", "estudiante": "López María"}], selected_level="superior")
+        table = view.matrix_table
+        row = 3
+        indicator_col = view._indicator_start_col
+        table.item(row, indicator_col).setText("8.50")
+        table.setColumnHidden(0, True)
+        for column in (0, 1, indicator_col):
+            table.selectionModel().select(table.model().index(row, column), QItemSelectionModel.Select)
+
+        self.assertEqual(table.selectionMode(), QAbstractItemView.ExtendedSelection)
+        self.assertTrue(table.item(0, 1).flags() & Qt.ItemIsSelectable)
+        self.assertTrue(table.item(row, indicator_col).flags() & Qt.ItemIsSelectable)
+        QApplication.sendEvent(table, QKeyEvent(QEvent.KeyPress, Qt.Key_C, Qt.ControlModifier))
+        self.assertEqual(self.app.clipboard().text(), "López María\t8.50")
+        self.assertNotIn("1\t", self.app.clipboard().text())
+        self.assertEqual(
+            [action.text() for action in build_table_context_menu(table).actions()],
+            ["Copiar", "Seleccionar todo"],
+        )
+
+        table.clearSelection()
+        QApplication.sendEvent(table, QKeyEvent(QEvent.KeyPress, Qt.Key_A, Qt.ControlModifier))
+        self.assertGreater(len(table.selectedIndexes()), 2)
 
     def test_scroll_horizontal_visible_en_tabla_central(self) -> None:
         from src.presentation.views.animacion_lectura_view import AnimacionLecturaView

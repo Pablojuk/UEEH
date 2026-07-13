@@ -140,6 +140,16 @@ class TestAcademicSummaryService(unittest.TestCase):
         self.assertEqual(rows[0]["equivalencia"], "PA")
         self.assertEqual(rows[0]["observacion"], "SPL")
 
+    def test_resumen_clasifica_4_00_y_4_01_con_la_escala_central(self) -> None:
+        rows = self.service.recalcular_resumenes(
+            [
+                {"estudiante_id": "E1", "trimestre_1": 4.00, "trimestre_2": 4.00, "trimestre_3": 4.00},
+                {"estudiante_id": "E2", "trimestre_1": 4.01, "trimestre_2": 4.01, "trimestre_3": 4.01},
+            ]
+        )
+        self.assertEqual(rows[0]["cualitativa_anual"], "NA")
+        self.assertEqual(rows[1]["cualitativa_anual"], "PA")
+
     def test_reporte_trimestral_sin_notas_no_rompe_observacion(self) -> None:
         with self.conn:
             self.conn.execute("DELETE FROM grade_records WHERE id_registro = ?", ("G3",))

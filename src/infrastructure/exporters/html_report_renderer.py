@@ -11,6 +11,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from src.domain.calculations import ESCALA_CUALITATIVA_ACADEMICA
+
+
 class HtmlReportRenderer:
     def render(self, context: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         simplified_trimestral = bool(context.get("report_type") == "trimestral" and context.get("is_simplified_trimestral"))
@@ -292,12 +295,7 @@ class HtmlReportRenderer:
     @staticmethod
     def _build_logros(rows: list[dict[str, Any]]) -> list[tuple[str, str, int, float]]:
         total = max(len(rows), 1)
-        defs = [
-            ("Destreza alcanzada", "DA"),
-            ("Alcanza los Aprendizajes", "AA"),
-            ("Próximo a alcanzar", "PA"),
-            ("No alcanza los aprendizajes", "NA"),
-        ]
+        defs = [(descripcion, sigla) for sigla, descripcion, _rango in ESCALA_CUALITATIVA_ACADEMICA]
         counts = {sigla: 0 for _, sigla in defs}
         for row in rows:
             sigla = str(row.get("equivalencia") or "").strip()
@@ -401,7 +399,7 @@ class HtmlReportRenderer:
         return "".join(html_rows)
 
     def _build_logros_rows_html(self, rows: list[dict[str, Any]]) -> str:
-        scale_map = {"DA": "9 - 10", "AA": "7 - 8,99", "PA": "5 - 6,99", "NA": "<= 5"}
+        scale_map = {sigla: rango for sigla, _descripcion, rango in ESCALA_CUALITATIVA_ACADEMICA}
         parts: list[str] = []
         for detalle, sigla, count, pct in self._build_logros(rows):
             parts.append(

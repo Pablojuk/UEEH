@@ -8,6 +8,17 @@ from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
 
 
 class TestHtmlReportRenderer(unittest.TestCase):
+    def test_leyenda_usa_descripciones_y_limites_de_la_escala_central(self) -> None:
+        renderer = HtmlReportRenderer()
+        html = renderer._build_logros_rows_html(
+            [{"equivalencia": "DA"}, {"equivalencia": "AA"}, {"equivalencia": "PA"}, {"equivalencia": "NA"}]
+        )
+        self.assertIn("Domina los aprendizajes requeridos", html)
+        self.assertIn("Está próximo a alcanzar los aprendizajes requeridos", html)
+        self.assertIn("4,01 - 6,99", html)
+        self.assertIn("≤ 4,00", html)
+        self.assertNotIn("&lt;= 5", html)
+
     def test_render_anual_incluye_tabla_de_notas(self) -> None:
         renderer = HtmlReportRenderer()
         html = renderer.render(

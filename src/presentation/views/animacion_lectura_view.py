@@ -35,6 +35,7 @@ from openpyxl import Workbook
 
 from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
 from src.presentation.widgets.busy_state import busy_button
+from src.presentation.widgets.interaction_support import copy_table_selection
 
 try:
     from PySide6.QtCore import QEventLoop, QMarginsF, QUrl
@@ -231,7 +232,7 @@ class AnimacionLecturaView(QWidget):
         self.report_filter_card.setObjectName("Card")
         report_filter_row = QHBoxLayout(self.report_filter_card)
         self.report_assignment_combo = QComboBox()
-        self.report_assignment_combo.setMinimumWidth(340)
+        self.report_assignment_combo.setMinimumWidth(0)
         self.report_trimester_combo = QComboBox()
         self.report_trimester_combo.addItem("Trimestre 1", 1)
         self.report_trimester_combo.addItem("Trimestre 2", 2)
@@ -417,7 +418,7 @@ class AnimacionLecturaView(QWidget):
         header.setMinimumSectionSize(50)
         header.setDefaultSectionSize(100)
         table.setSelectionBehavior(QAbstractItemView.SelectItems)
-        table.setSelectionMode(QAbstractItemView.SingleSelection)
+        table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         table.setAlternatingRowColors(False)
         table.setWordWrap(True)
         if editable:
@@ -622,23 +623,7 @@ class AnimacionLecturaView(QWidget):
         return super().eventFilter(obj, event)
 
     def _copy_selected_cells(self) -> None:
-        ranges = self.matrix_table.selectedRanges()
-        if not ranges:
-            return
-        selected_range = ranges[0]
-        lines: list[str] = []
-        for row in range(selected_range.topRow(), selected_range.bottomRow() + 1):
-            if row < 3:
-                continue
-            cells: list[str] = []
-            left_col = max(selected_range.leftColumn(), self._indicator_start_col)
-            right_col = min(selected_range.rightColumn(), self._result_start_col - 1)
-            for col in range(left_col, right_col + 1):
-                item = self.matrix_table.item(row, col)
-                cells.append(item.text() if item else "")
-            lines.append("\t".join(cells))
-        if lines:
-            QApplication.clipboard().setText("\n".join(lines))
+        copy_table_selection(self.matrix_table)
 
     def _paste_from_clipboard(self) -> None:
         text = QApplication.clipboard().text()
@@ -1106,7 +1091,7 @@ class AnimacionLecturaView(QWidget):
         tooltip: str = "",
     ) -> None:
         item = QTableWidgetItem(text)
-        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+        item.setFlags((item.flags() | Qt.ItemIsSelectable | Qt.ItemIsEnabled) & ~Qt.ItemIsEditable)
         item.setTextAlignment(Qt.AlignCenter)
         if tooltip:
             item.setToolTip(tooltip)
@@ -1138,6 +1123,7 @@ class AnimacionLecturaView(QWidget):
     def _set_data_item(self, table: QTableWidget, row: int, col: int, text: str, editable: bool) -> None:
         item = QTableWidgetItem(text)
         flags = item.flags()
+        flags = flags | Qt.ItemIsSelectable | Qt.ItemIsEnabled
         if not editable:
             flags = flags & ~Qt.ItemIsEditable
         item.setFlags(flags)

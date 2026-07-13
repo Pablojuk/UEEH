@@ -4,6 +4,7 @@ import unittest
 
 from src.domain.calculations import (
     calcular_cualitativo,
+    calcular_escala_cualitativa,
     calcular_nota_trimestral,
     calcular_observacion_final,
     calcular_promedio_anual,
@@ -63,6 +64,26 @@ class TestPromedios(unittest.TestCase):
 
 
 class TestCualitativoYObservacion(unittest.TestCase):
+    def test_escala_academica_limites_exactos(self) -> None:
+        casos = {
+            0.00: "NA",
+            4.00: "NA",
+            4.01: "PA",
+            4.99: "PA",
+            5.00: "PA",
+            6.99: "PA",
+            7.00: "AA",
+            8.99: "AA",
+            9.00: "DA",
+            10.00: "DA",
+        }
+        for nota, esperado in casos.items():
+            with self.subTest(nota=nota):
+                self.assertEqual(calcular_escala_cualitativa(nota), esperado)
+
+    def test_escala_academica_admite_decimal_con_coma(self) -> None:
+        self.assertEqual(calcular_escala_cualitativa("4,01"), "PA")
+
     def test_cualitativo_limites(self) -> None:
         self.assertEqual(calcular_cualitativo(9.5), "A+")
         self.assertEqual(calcular_cualitativo(8.5), "A-")

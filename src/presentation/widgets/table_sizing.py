@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import math
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontMetrics
-from PySide6.QtWidgets import QApplication, QHeaderView, QTableWidget
+from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QHeaderView, QTableWidget
 
 
 CENTIMETERS_PER_INCH = 2.54
@@ -23,6 +24,9 @@ def centimeters_to_pixels(table: QTableWidget, centimeters: float) -> int:
 
 def fit_table_columns_to_text(table: QTableWidget, right_margin_cm: float = 1.0) -> None:
     """Ajusta cada columna visible al texto más largo más un margen derecho."""
+    table.setMinimumWidth(0)
+    table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustIgnored)
+    table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
     header = table.horizontalHeader()
     header.setStretchLastSection(False)
     right_margin = centimeters_to_pixels(table, right_margin_cm)

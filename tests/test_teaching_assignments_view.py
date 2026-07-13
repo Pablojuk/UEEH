@@ -40,6 +40,7 @@ class TestTeachingAssignmentsView(unittest.TestCase):
         conn.close()
 
     def test_tabla_muestra_catalogos_y_conserva_id_oculto_para_crud(self) -> None:
+        from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QHeaderView, QMessageBox
 
         from src.application.services.catalog_service import CatalogService
@@ -86,6 +87,8 @@ class TestTeachingAssignmentsView(unittest.TestCase):
         view = TeachingAssignmentsView(assignment_service, teacher_service, catalog_service)
         self.assertEqual(view.table.rowCount(), 1)
         self.assertTrue(view.table.isColumnHidden(0))
+        self.assertEqual(view.table.item(0, 1).text(), "Prueba Ana")
+        self.assertEqual(view.table.item(0, 1).data(Qt.UserRole), "D1")
         self.assertEqual(view.table.item(0, 2).text(), "Matemática sintética")
         self.assertEqual(view.table.item(0, 3).text(), "CUR-007")
         self.assertEqual(view.table.item(0, 4).text(), "1ro BGU")
@@ -108,9 +111,47 @@ class TestTeachingAssignmentsView(unittest.TestCase):
 
         view.select_assignment(0, 0)
         with (
-            patch.object(QMessageBox, "question", return_value=QMessageBox.Yes),
+            patch.object(QMessageBox, "warning", return_value=QMessageBox.Yes),
             patch.object(QMessageBox, "information"),
         ):
             view.delete_assignment()
         self.assertEqual(assignment_service.listar_asignaciones(), [])
+        conn.close()
+
+    def test_cancelar_advertencia_no_elimina_asignacion(self) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        from src.application.services.catalog_service import CatalogService
+        from src.application.services.teacher_service import TeacherService
+        from src.application.services.teaching_assignment_service import TeachingAssignmentService
+        from src.infrastructure.persistence.db import initialize_database
+        from src.presentation.views.teaching_assignments_view import TeachingAssignmentsView
+
+        conn = initialize_database(":memory:")
+        service = TeachingAssignmentService(conn)
+        conn.execute(
+            "INSERT INTO docentes (id_docente, nombres, apellidos, identificacion) "
+            "VALUES ('D1', 'Ana', 'Prueba', 'DOC-1')"
+        )
+        conn.execute(
+            "INSERT INTO asignaturas (id_asignatura, nombre, codigo) "
+            "VALUES ('A1', 'Matematica', 'MAT')"
+        )
+        conn.execute(
+            "INSERT INTO asignaciones_docente "
+            "(id_asignacion, docente_id, asignatura_id, curso_id, paralelo_id, periodo_id) "
+            "VALUES ('AD1', 'D1', 'A1', 'C1', 'P1', '2025')"
+        )
+        conn.commit()
+        view = TeachingAssignmentsView(service, TeacherService(conn), CatalogService(conn))
+        view.select_assignment(0, 0)
+        with (
+            patch.object(QMessageBox, "warning", return_value=QMessageBox.No) as warning,
+            patch.object(service, "eliminar_asignacion") as delete,
+        ):
+            view.delete_assignment()
+        warning.assert_called_once()
+        self.assertEqual(warning.call_args.args[-1], QMessageBox.No)
+        delete.assert_not_called()
+        self.assertIsNotNone(service.repo.obtener_por_id("AD1"))
         conn.close()

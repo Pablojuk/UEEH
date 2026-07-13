@@ -14,20 +14,24 @@ def busy_button(button: QPushButton | None, busy_text: str | None = None) -> Ite
     """Muestra cursor de espera y deshabilita temporalmente un botón."""
     app = QApplication.instance()
     original_text = button.text() if button is not None else ""
-    if app is not None:
-        app.setOverrideCursor(Qt.WaitCursor)
-    if button is not None:
-        button.setEnabled(False)
-        if busy_text:
-            button.setText(busy_text)
+    cursor_overridden = False
     try:
+        if app is not None:
+            app.setOverrideCursor(Qt.WaitCursor)
+            cursor_overridden = True
+        if button is not None:
+            button.setEnabled(False)
+            if busy_text:
+                button.setText(busy_text)
         if app is not None:
             app.processEvents()
         yield
     finally:
-        if button is not None:
-            button.setText(original_text)
-            button.setEnabled(True)
-        if app is not None:
-            app.restoreOverrideCursor()
-            app.processEvents()
+        try:
+            if button is not None:
+                button.setText(original_text)
+                button.setEnabled(True)
+        finally:
+            if app is not None and cursor_overridden:
+                app.restoreOverrideCursor()
+                app.processEvents()

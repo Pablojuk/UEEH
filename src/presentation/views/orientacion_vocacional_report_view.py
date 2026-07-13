@@ -61,7 +61,7 @@ class OrientacionVocacionalReportView(QWidget):
         self.report_filter_card = QFrame()
         report_filter_row = QHBoxLayout(self.report_filter_card)
         self.report_assignment_combo = QComboBox()
-        self.report_assignment_combo.setMinimumWidth(340)
+        self.report_assignment_combo.setMinimumWidth(0)
         self.report_trimester_combo = QComboBox()
         self.report_trimester_combo.addItem("Trimestre 1", 1)
         self.report_trimester_combo.addItem("Trimestre 2", 2)

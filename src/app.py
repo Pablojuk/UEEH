@@ -26,6 +26,7 @@ from src.presentation.main_window import MainWindow
 from src.presentation.styles import APP_STYLE
 from src.presentation.views.login_view import LoginView
 from src.presentation.views.setup_view import SetupView
+from src.presentation.widgets.interaction_support import install_global_interaction_support
 
 
 def run_application() -> int:
@@ -34,6 +35,7 @@ def run_application() -> int:
 
     app = QApplication.instance() or QApplication(sys.argv)
     app.setStyleSheet(APP_STYLE)
+    install_global_interaction_support(app)
 
     connection = initialize_database()
     setup_service = SetupService(connection)

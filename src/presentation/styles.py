@@ -36,6 +36,16 @@ QLineEdit, QComboBox {
     border-radius: 8px;
     padding: 6px 8px;
 }
+QAbstractItemView {
+    selection-background-color: #dbeafe;
+    selection-color: #0f172a;
+}
+QAbstractItemView::item:selected,
+QAbstractItemView::item:selected:!active {
+    background-color: #dbeafe;
+    color: #0f172a;
+    border: 1px solid #93c5fd;
+}
 QLabel#Title {
     font-size: 20px;
     font-weight: 600;

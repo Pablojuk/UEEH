@@ -10,6 +10,17 @@ from src.infrastructure.persistence.repositories import AsignacionesDocenteRepos
 
 
 class TeachingAssignmentService:
+    DEPENDENT_ASSIGNMENT_TABLES = (
+        ("grade_records", "asignacion_id"),
+        ("final_supplementary", "asignacion_id"),
+        ("grade_activity_config", "asignacion_id"),
+        ("acompanamiento_evaluaciones", "asignacion_id"),
+        ("acompanamiento_habilidades_config", "asignacion_id"),
+        ("animacion_lectura_evaluaciones", "asignacion_id"),
+        ("orientacion_vocacional_evaluaciones", "asignacion_id"),
+        ("attendance_records", "assignment_id"),
+        ("attendance_justifications", "assignment_id"),
+    )
     ORIENTATION_SUBJECT_NAME = "orientacion vocacional y profesional"
     ORIENTATION_ALLOWED_COURSE_KEYS = {"8", "9", "10"}
     ORIENTATION_VALIDATION_MESSAGE = (
@@ -91,11 +102,47 @@ class TeachingAssignmentService:
         return True, "Asignación actualizada"
 
     def eliminar_asignacion(self, assignment_id: str) -> tuple[bool, str]:
-        existing = self.repo.obtener_por_id(assignment_id)
-        if not existing:
-            return False, "Asignación no encontrada"
-        self.repo.eliminar(assignment_id)
-        return True, "Asignación eliminada"
+        savepoint = "eliminar_asignacion_completa"
+        savepoint_started = False
+        try:
+            self.connection.execute(f"SAVEPOINT {savepoint}")
+            savepoint_started = True
+            existing = self.repo.obtener_por_id(assignment_id)
+            if not existing:
+                self.connection.execute(f"RELEASE SAVEPOINT {savepoint}")
+                return False, "Asignación no encontrada"
+
+            counts = self.contar_registros_dependientes(assignment_id)
+            for table_name, assignment_field in self.DEPENDENT_ASSIGNMENT_TABLES:
+                self.connection.execute(
+                    f"DELETE FROM {table_name} WHERE {assignment_field} = ?",
+                    (assignment_id,),
+                )
+            self.connection.execute(
+                "DELETE FROM asignaciones_docente WHERE id_asignacion = ?",
+                (assignment_id,),
+            )
+            self.connection.execute(f"RELEASE SAVEPOINT {savepoint}")
+            deleted_related = sum(counts.values())
+            return True, f"Asignación eliminada. Registros académicos vinculados eliminados: {deleted_related}."
+        except Exception as exc:  # noqa: BLE001
+            if savepoint_started:
+                try:
+                    self.connection.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                    self.connection.execute(f"RELEASE SAVEPOINT {savepoint}")
+                except sqlite3.Error:
+                    self.connection.rollback()
+            return False, f"No se pudo eliminar la asignación; no se aplicaron cambios: {exc}"
+
+    def contar_registros_dependientes(self, assignment_id: str) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for table_name, assignment_field in self.DEPENDENT_ASSIGNMENT_TABLES:
+            row = self.connection.execute(
+                f"SELECT COUNT(1) AS total FROM {table_name} WHERE {assignment_field} = ?",
+                (assignment_id,),
+            ).fetchone()
+            counts[table_name] = int(row["total"] if row else 0)
+        return counts
 
     def _es_duplicada(self, data: dict, exclude_id: str | None = None) -> bool:
         for row in self.listar_asignaciones():

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -63,6 +64,10 @@ class TestClassroomAccompanimentView(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
+    def setUp(self) -> None:
+        while QApplication.overrideCursor() is not None:
+            QApplication.restoreOverrideCursor()
+
     def test_crear_vista_y_cargar(self) -> None:
         from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
 
@@ -79,6 +84,59 @@ class TestClassroomAccompanimentView(unittest.TestCase):
         before = service.load_calls
         view.trimester_combo.setCurrentIndex(1)
         self.assertGreater(service.load_calls, before)
+
+    def test_configurar_habilidades_muestra_dialogo_con_cursor_normal(self) -> None:
+        from PySide6.QtWidgets import QDialog
+
+        from src.presentation.views.classroom_accompaniment_view import (
+            ClassroomAccompanimentView,
+            SkillConfigDialog,
+        )
+
+        for variant in ("accompaniment", "behavior"):
+            with self.subTest(variant=variant):
+                view = ClassroomAccompanimentView(_FakeAccompanimentService())
+                view.set_evaluation_variant(variant)
+
+                def dialog_exec(_dialog) -> int:
+                    self.assertIsNone(QApplication.overrideCursor())
+                    return QDialog.Rejected
+
+                with patch.object(SkillConfigDialog, "exec", autospec=True, side_effect=dialog_exec):
+                    view.open_skill_config()
+                self.assertIsNone(QApplication.overrideCursor())
+                self.assertTrue(view.configure_skills_button.isEnabled())
+
+    def test_excepcion_al_cargar_configuracion_restaura_cursor_y_boton(self) -> None:
+        from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
+
+        class FailingService(_FakeAccompanimentService):
+            def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
+                raise RuntimeError("fallo sintético de carga")
+
+        view = ClassroomAccompanimentView(FailingService())
+        original_text = view.configure_skills_button.text()
+        with self.assertRaisesRegex(RuntimeError, "fallo sintético"):
+            view.open_skill_config()
+        self.assertIsNone(QApplication.overrideCursor())
+        self.assertTrue(view.configure_skills_button.isEnabled())
+        self.assertEqual(view.configure_skills_button.text(), original_text)
+
+    def test_busy_button_preserva_un_override_externo_anidado(self) -> None:
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QPushButton
+
+        from src.presentation.widgets.busy_state import busy_button
+
+        button = QPushButton("Acción")
+        QApplication.setOverrideCursor(Qt.CrossCursor)
+        try:
+            with busy_button(button, "Procesando..."):
+                self.assertEqual(QApplication.overrideCursor().shape(), Qt.WaitCursor)
+            self.assertEqual(QApplication.overrideCursor().shape(), Qt.CrossCursor)
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.assertIsNone(QApplication.overrideCursor())
 
 
 if __name__ == "__main__":

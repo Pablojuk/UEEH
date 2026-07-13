@@ -10,6 +10,7 @@ from typing import Any
 
 from src.domain.calculations import (
     calcular_cualitativo_trimestral,
+    calcular_escala_cualitativa,
     calcular_promedio_actividad,
     calcular_promedio_con_mejora,
     calcular_promedio_evaluacion_formativa,
@@ -521,7 +522,7 @@ class GradeRegistrationService:
         data["nota_trimestral"] = promedio_trimestral
         data["cualitativo"] = calcular_cualitativo_trimestral(promedio_trimestral)
         data["cualitativo_adicional"] = (
-            self._calcular_equivalencia_egb_basica(data["cualitativo"]) if usar_logica_basica else self._calcular_cualitativo_adicional(promedio_trimestral)
+            self._calcular_equivalencia_egb_basica(data["cualitativo"]) if usar_logica_basica else calcular_escala_cualitativa(promedio_trimestral)
         )
         return data
 
@@ -624,18 +625,6 @@ class GradeRegistrationService:
         actividades = [data.get(f"actividad_{idx}") for idx in range(1, numero_actividades + 1)]
         mejoras = [data.get(f"mejora_{idx}") for idx in range(1, numero_actividades + 1)]
         return actividades, mejoras
-
-    @staticmethod
-    def _calcular_cualitativo_adicional(nota_trimestral: float | None) -> str:
-        if nota_trimestral is None:
-            return ""
-        if nota_trimestral >= 9:
-            return "DA"
-        if nota_trimestral >= 7:
-            return "AA"
-        if nota_trimestral >= 5:
-            return "PA"
-        return "NA"
 
     @staticmethod
     def _parse_metadata_json(raw_value: Any, numero_actividades: int) -> list[dict[str, str]]:

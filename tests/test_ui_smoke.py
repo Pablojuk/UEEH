@@ -73,6 +73,15 @@ class TestUISmoke(unittest.TestCase):
                 attendance_service=AttendanceService(conn),
             )
             self.app.processEvents()
+            available = window.screen().availableGeometry()
+            self.assertLessEqual(window.width(), available.width())
+            self.assertLessEqual(window.height(), available.height())
+            expected_center = available.center()
+            actual_center = window.geometry().center()
+            self.assertLessEqual(abs(actual_center.x() - expected_center.x()), 1)
+            self.assertLessEqual(abs(actual_center.y() - expected_center.y()), 1)
+            self.assertEqual(window.stack.minimumWidth(), 0)
+            self.assertLess(window.sidebar.minimumWidth(), window.sidebar.maximumWidth())
         finally:
             self.app.setStyleSheet(previous_style)
             qInstallMessageHandler(previous_handler)

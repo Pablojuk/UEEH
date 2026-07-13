@@ -10,7 +10,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
     from PySide6.QtGui import QFont, QFontMetrics
-    from PySide6.QtWidgets import QApplication, QHeaderView, QTableWidget, QTableWidgetItem
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QHeaderView, QTableWidget, QTableWidgetItem
 except ImportError:  # pragma: no cover
     QApplication = None
 
@@ -56,6 +57,8 @@ class TestTableSizing(unittest.TestCase):
         self.assertEqual(table.columnWidth(2), expected_header_width)
         self.assertEqual(table.horizontalHeader().sectionResizeMode(1), QHeaderView.Interactive)
         self.assertEqual(table.horizontalHeader().sectionResizeMode(2), QHeaderView.Interactive)
+        self.assertEqual(table.horizontalScrollBarPolicy(), Qt.ScrollBarAsNeeded)
+        self.assertEqual(table.sizeAdjustPolicy(), QAbstractScrollArea.AdjustIgnored)
 
     def test_conversion_de_un_centimetro_usa_dpi_logico(self) -> None:
         from src.presentation.widgets.table_sizing import centimeters_to_pixels

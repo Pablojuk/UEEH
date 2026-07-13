@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -24,6 +25,18 @@ from src.presentation.widgets.table_sizing import fit_table_columns_to_text
 
 
 class TeachingAssignmentsView(QWidget):
+    DEPENDENCY_LABELS = {
+        "grade_records": "calificaciones",
+        "final_supplementary": "supletorios",
+        "grade_activity_config": "configuraciones de actividades",
+        "acompanamiento_evaluaciones": "evaluaciones de acompañamiento",
+        "acompanamiento_habilidades_config": "configuraciones de acompañamiento",
+        "animacion_lectura_evaluaciones": "evaluaciones de animación a la lectura",
+        "orientacion_vocacional_evaluaciones": "evaluaciones de orientación vocacional",
+        "attendance_records": "registros de asistencia",
+        "attendance_justifications": "justificaciones de asistencia",
+    }
+
     def __init__(
         self,
         teaching_assignment_service: TeachingAssignmentService,
@@ -133,6 +146,10 @@ class TeachingAssignmentsView(QWidget):
             row.get("id_paralelo"): row.get("nombre", "")
             for row in self.catalog_service.listar_paralelos()
         }
+        docentes = {
+            row.get("id_docente"): f"{row.get('apellidos', '')} {row.get('nombres', '')}".strip()
+            for row in self.teacher_service.listar_docentes()
+        }
 
         self.table.setRowCount(0)
         for row_data in rows:
@@ -145,7 +162,12 @@ class TeachingAssignmentsView(QWidget):
             parallel_id = row_data.get("paralelo_id", "")
             parallel_name = paralelos.get(parallel_id) or parallel_id
             self.table.setItem(row, 0, QTableWidgetItem(row_data.get("id_asignacion", "")))
-            self.table.setItem(row, 1, QTableWidgetItem(row_data.get("docente_id", "")))
+            teacher_id = row_data.get("docente_id", "")
+            teacher_name = docentes.get(teacher_id) or teacher_id
+            teacher_item = QTableWidgetItem(teacher_name)
+            teacher_item.setData(Qt.UserRole, teacher_id)
+            teacher_item.setToolTip(teacher_name)
+            self.table.setItem(row, 1, teacher_item)
             subject_item = QTableWidgetItem(subject_name)
             subject_item.setToolTip(subject_name)
             self.table.setItem(row, 2, subject_item)
@@ -165,7 +187,28 @@ class TeachingAssignmentsView(QWidget):
         if not self.selected_assignment_id:
             QMessageBox.warning(self, "Validación", "Seleccione una asignación de la tabla.")
             return
-        if QMessageBox.question(self, "Confirmación", "¿Desea borrar la asignación seleccionada?") != QMessageBox.Yes:
+        counts = self.teaching_assignment_service.contar_registros_dependientes(self.selected_assignment_id)
+        nonzero_details = [
+            f"- {self.DEPENDENCY_LABELS.get(table_name, table_name)}: {count}"
+            for table_name, count in counts.items()
+            if count > 0
+        ]
+        details = "\n".join(nonzero_details) if nonzero_details else "- No se encontraron registros académicos vinculados."
+        warning_text = (
+            "¿Está seguro de eliminar esta asignación?\n\n"
+            "Se eliminarán permanentemente todas las calificaciones, configuraciones, evaluaciones, "
+            "asistencias y demás registros académicos vinculados a esta asignación. "
+            "Esta acción no se puede deshacer.\n\n"
+            f"Registros relacionados: {sum(counts.values())}\n{details}"
+        )
+        answer = QMessageBox.warning(
+            self,
+            "Eliminar asignación",
+            warning_text,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
             return
         ok, message = self.teaching_assignment_service.eliminar_asignacion(self.selected_assignment_id)
         if ok:

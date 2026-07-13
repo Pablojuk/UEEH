@@ -24,6 +24,11 @@ class TestStyleDefinition(unittest.TestCase):
         self.assertIn("font-size: 9.75pt;", APP_STYLE)
         self.assertNotIn("QWidget {\n    background-color: #f5f7fa;\n    color: #1f2937;\n    font-family: 'Segoe UI', 'Arial', sans-serif;\n    font-size: 13px;", APP_STYLE)
 
+    def test_seleccion_de_tablas_es_suave_y_legible(self) -> None:
+        self.assertIn("selection-background-color: #dbeafe;", APP_STYLE)
+        self.assertIn("selection-color: #0f172a;", APP_STYLE)
+        self.assertIn("border: 1px solid #93c5fd;", APP_STYLE)
+
 
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")
 class TestQtFontUnits(unittest.TestCase):
