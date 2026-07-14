@@ -4,8 +4,81 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
+from dataclasses import dataclass
+from typing import Any
 
 from src.infrastructure.persistence.repositories import MatriculasRepository
+
+
+@dataclass(frozen=True)
+class AssignmentEnrollmentMatch:
+    """Contexto y matrículas que coinciden exactamente con una asignación."""
+
+    context: dict[str, Any] | None
+    students: list[dict[str, Any]]
+
+    @property
+    def validation_message(self) -> str:
+        if self.context is None or self.students:
+            return ""
+        course = self.context.get("curso_nombre") or self.context.get("curso_id") or "curso desconocido"
+        parallel = self.context.get("paralelo_nombre") or self.context.get("paralelo_id") or "desconocido"
+        period = self.context.get("periodo_id") or "desconocido"
+        return (
+            f"No se encontraron estudiantes matriculados para {course}, "
+            f"paralelo {parallel}, período {period}."
+        )
+
+
+def load_students_for_assignment(
+    connection: sqlite3.Connection,
+    assignment_id: str,
+) -> AssignmentEnrollmentMatch:
+    """Obtiene estudiantes por los tres IDs exactos de la asignación."""
+
+    context_row = connection.execute(
+        """
+        SELECT
+            a.id_asignacion,
+            a.curso_id,
+            a.paralelo_id,
+            a.periodo_id,
+            c.nombre AS curso_nombre,
+            p.nombre AS paralelo_nombre
+        FROM asignaciones_docente a
+        LEFT JOIN cursos c ON c.id_curso = a.curso_id
+        LEFT JOIN paralelos p ON p.id_paralelo = a.paralelo_id
+        WHERE a.id_asignacion = ?
+        """,
+        (assignment_id,),
+    ).fetchone()
+    if context_row is None:
+        return AssignmentEnrollmentMatch(context=None, students=[])
+
+    context = dict(context_row)
+    students = [
+        dict(row)
+        for row in connection.execute(
+            """
+            SELECT
+                e.id_estudiante,
+                e.codigo,
+                e.apellidos,
+                e.nombres,
+                m.numero_lista
+            FROM matriculas m
+            JOIN estudiantes e ON e.id_estudiante = m.estudiante_id
+            WHERE m.curso_id = ? AND m.paralelo_id = ? AND m.periodo_id = ?
+            ORDER BY
+                CASE WHEN m.numero_lista IS NULL THEN 1 ELSE 0 END,
+                m.numero_lista,
+                e.apellidos,
+                e.nombres
+            """,
+            (context["curso_id"], context["paralelo_id"], context["periodo_id"]),
+        ).fetchall()
+    ]
+    return AssignmentEnrollmentMatch(context=context, students=students)
 
 
 class EnrollmentService:

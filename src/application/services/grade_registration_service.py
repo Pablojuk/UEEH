@@ -8,6 +8,7 @@ import uuid
 import unicodedata
 from typing import Any
 
+from src.application.services.enrollment_service import load_students_for_assignment
 from src.domain.calculations import (
     calcular_cualitativo_trimestral,
     calcular_escala_cualitativa,
@@ -146,35 +147,22 @@ class GradeRegistrationService:
         return True, "Configuración de actividades guardada"
 
     def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict[str, Any]]:
+        rows, _validation_message = self.cargar_registro_con_estado(asignacion_id, trimestre_num)
+        return rows
+
+    def cargar_registro_con_estado(
+        self,
+        asignacion_id: str,
+        trimestre_num: int,
+    ) -> tuple[list[dict[str, Any]], str]:
         if trimestre_num not in (1, 2, 3):
             raise ValueError("El trimestre debe ser 1, 2 o 3")
 
-        asignacion = self.connection.execute(
-            "SELECT * FROM asignaciones_docente WHERE id_asignacion = ?", (asignacion_id,)
-        ).fetchone()
-        if not asignacion:
-            return []
+        enrollment_match = load_students_for_assignment(self.connection, asignacion_id)
+        if enrollment_match.context is None:
+            return [], ""
 
         numero_actividades = self.obtener_numero_actividades(asignacion_id, trimestre_num)
-        estudiantes = self.connection.execute(
-            """
-            SELECT
-                e.id_estudiante,
-                e.codigo,
-                e.apellidos,
-                e.nombres,
-                m.numero_lista
-            FROM matriculas m
-            JOIN estudiantes e ON e.id_estudiante = m.estudiante_id
-            WHERE m.curso_id = ? AND m.paralelo_id = ? AND m.periodo_id = ?
-            ORDER BY
-                CASE WHEN m.numero_lista IS NULL THEN 1 ELSE 0 END,
-                m.numero_lista,
-                e.apellidos,
-                e.nombres
-            """,
-            (asignacion["curso_id"], asignacion["paralelo_id"], asignacion["periodo_id"]),
-        ).fetchall()
 
         registros_guardados = self.connection.execute(
             "SELECT * FROM grade_records WHERE asignacion_id = ? AND trimestre_num = ?",
@@ -183,8 +171,7 @@ class GradeRegistrationService:
         por_estudiante = {row["estudiante_id"]: dict(row) for row in registros_guardados}
 
         resultado: list[dict[str, Any]] = []
-        for estudiante in estudiantes:
-            estudiante_row = dict(estudiante)
+        for estudiante_row in enrollment_match.students:
             registro = por_estudiante.get(estudiante_row["id_estudiante"])
             fila = self._fila_base_estudiante(estudiante_row, numero_actividades)
             if registro:
@@ -195,7 +182,7 @@ class GradeRegistrationService:
                 usar_logica_basica=self.usar_logica_cuantitativa_basica(asignacion_id),
             )
             resultado.append(fila)
-        return resultado
+        return resultado, enrollment_match.validation_message
 
     def guardar_registros(self, asignacion_id: str, trimestre_num: int, filas: list[dict[str, Any]]) -> tuple[bool, str]:
         if trimestre_num not in (1, 2, 3):

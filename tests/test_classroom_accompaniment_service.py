@@ -56,6 +56,49 @@ class TestClassroomAccompanimentService(unittest.TestCase):
         self.assertEqual(len(payload["students"]), 1)
         self.assertTrue(len(payload["active_skills"]) > 0)
 
+    def test_cargar_2do_egb_en_comportamiento_y_acompanamiento(self) -> None:
+        with self.conn:
+            self.conn.execute("INSERT INTO cursos (id_curso, nombre, nivel) VALUES (?,?,?)", ("C2", "2do EGB", "EGB"))
+            self.conn.execute("INSERT INTO asignaturas (id_asignatura, nombre, codigo) VALUES (?,?,?)", ("A2", "Comportamiento", "COM"))
+            self.conn.execute(
+                "INSERT INTO asignaturas (id_asignatura, nombre, codigo) VALUES (?,?,?)",
+                ("A3", "Acompañamiento integral en el aula", "AIA"),
+            )
+            self.conn.execute(
+                "INSERT INTO estudiantes (id_estudiante, codigo, apellidos, nombres) VALUES (?,?,?,?)",
+                ("E2", "002", "Sintético", "Dos"),
+            )
+            self.conn.execute(
+                "INSERT INTO matriculas (id_matricula, estudiante_id, curso_id, paralelo_id, periodo_id, numero_lista) "
+                "VALUES (?,?,?,?,?,?)",
+                ("M2", "E2", "C2", "P1", "2025-2026", 1),
+            )
+            self.conn.executemany(
+                "INSERT INTO asignaciones_docente "
+                "(id_asignacion, docente_id, asignatura_id, curso_id, paralelo_id, periodo_id) "
+                "VALUES (?,?,?,?,?,?)",
+                [
+                    ("AS-COMP", "D1", "A2", "C2", "P1", "2025-2026"),
+                    ("AS-ACOMP", "D1", "A3", "C2", "P1", "2025-2026"),
+                ],
+            )
+
+        for assignment_id in ("AS-COMP", "AS-ACOMP"):
+            with self.subTest(assignment_id=assignment_id):
+                payload = self.service.cargar_evaluacion(assignment_id, 1)
+                self.assertEqual([row["student_id"] for row in payload["students"]], ["E2"])
+
+    def test_mensaje_claro_si_no_hay_matriculas_exactas(self) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM matriculas")
+
+        payload = self.service.cargar_evaluacion("AS1", 1)
+        self.assertEqual(payload["students"], [])
+        self.assertEqual(
+            payload["validation_message"],
+            "No se encontraron estudiantes matriculados para Primero, paralelo A, período 2025-2026.",
+        )
+
     def test_guardar_y_recargar_evaluacion_por_trimestre(self) -> None:
         active_skills = ["autoconocimiento", "pensamiento_critico"]
         responses_t1 = {

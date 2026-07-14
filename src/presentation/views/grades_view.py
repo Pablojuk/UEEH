@@ -4,7 +4,7 @@ from __future__ import annotations
 import unicodedata
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QDate, QEvent, Qt
+from PySide6.QtCore import QDate, QEvent, QSignalBlocker, Qt
 from PySide6.QtGui import QColor, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -210,11 +210,14 @@ class GradesView(QWidget):
             callback()
 
     def load_contexts(self, selected_assignment_id: str | None = None) -> None:
+        blocker = QSignalBlocker(self.assignment_combo)
         self.assignment_combo.clear()
         self._contextos = self.grade_registration_service.listar_contextos_disponibles()
 
         if not self._contextos:
             self.assignment_combo.addItem("Sin asignaciones disponibles", None)
+            del blocker
+            self._toggle_mode_by_assignment()
             return
 
         for row in self._contextos:
@@ -223,6 +226,9 @@ class GradesView(QWidget):
             idx = self.assignment_combo.findData(selected_assignment_id)
             if idx >= 0:
                 self.assignment_combo.setCurrentIndex(idx)
+            else:
+                self.assignment_combo.setCurrentIndex(-1)
+        del blocker
         self._toggle_mode_by_assignment()
 
     def generate_activities(self) -> None:
@@ -258,13 +264,18 @@ class GradesView(QWidget):
             if isinstance(item, dict)
         }
         try:
-            filas = self.grade_registration_service.cargar_registro(asignacion_id, int(trimestre))
+            filas, validation_message = self._load_grade_rows_with_status(
+                str(asignacion_id),
+                int(trimestre),
+            )
         except ValueError as exc:
             QMessageBox.warning(self, "Validación", str(exc))
             self._clear_table()
             return
 
         self._fill_table(filas)
+        if validation_message:
+            QMessageBox.warning(self, "Validación", validation_message)
 
     def recalculate_rows(self) -> None:
         filas = self._collect_rows_from_table()
@@ -710,14 +721,42 @@ class GradesView(QWidget):
             return
         assignment_id = self.assignment_combo.currentData()
         trimester = self.trimester_combo.currentData()
-        if assignment_id:
-            idx = self.accompaniment_view.assignment_combo.findData(assignment_id)
-            if idx >= 0:
-                self.accompaniment_view.assignment_combo.setCurrentIndex(idx)
+        if not assignment_id:
+            self.accompaniment_view.clear_assignment_context()
+            return
+
+        requested_assignment_id = str(assignment_id)
+        was_missing_before_reload = (
+            self.accompaniment_view.assignment_combo.findData(requested_assignment_id) < 0
+        )
+        context_selected = self.accompaniment_view.load_contexts(
+            selected_assignment_id=requested_assignment_id
+        )
+        idx = self.accompaniment_view.assignment_combo.findData(requested_assignment_id)
+        if not context_selected or idx < 0:
+            self.accompaniment_view.clear_assignment_context()
+            availability = (
+                "sigue sin existir en los contextos actualizados"
+                if was_missing_before_reload
+                else "ya no existe en los contextos actualizados"
+            )
+            QMessageBox.warning(
+                self,
+                "Asignación no disponible",
+                f"La asignación seleccionada {availability}. "
+                "La tabla se limpió para evitar cargar otra asignación.",
+            )
+            return
+
+        assignment_blocker = QSignalBlocker(self.accompaniment_view.assignment_combo)
+        self.accompaniment_view.assignment_combo.setCurrentIndex(idx)
+        del assignment_blocker
         if trimester:
             idx = self.accompaniment_view.trimester_combo.findData(int(trimester))
             if idx >= 0:
+                trimester_blocker = QSignalBlocker(self.accompaniment_view.trimester_combo)
                 self.accompaniment_view.trimester_combo.setCurrentIndex(idx)
+                del trimester_blocker
         self.accompaniment_view.load_rows()
 
     def _sync_animation_reading_view(self) -> None:
@@ -760,7 +799,12 @@ class GradesView(QWidget):
                         for row in rows
                     ]
                 else:
-                    fallback_rows = self.grade_registration_service.cargar_registro(str(assignment_id), int(trimester))
+                    fallback_rows, validation_message = self._load_grade_rows_with_status(
+                        str(assignment_id),
+                        int(trimester),
+                    )
+                    if validation_message:
+                        QMessageBox.warning(self, "Validación", validation_message)
                     students = [
                         {
                             "estudiante_id": str(row.get("estudiante_id") or ""),
@@ -820,16 +864,32 @@ class GradesView(QWidget):
                     for row in saved_rows
                 ]
             else:
+                fallback_rows, validation_message = self._load_grade_rows_with_status(
+                    str(assignment_id),
+                    int(trimester),
+                )
+                if validation_message:
+                    QMessageBox.warning(self, "Validación", validation_message)
                 students = [
                     {
                         "estudiante_id": str(row.get("estudiante_id") or ""),
                         "estudiante": str(row.get("estudiante") or ""),
                     }
-                    for row in self.grade_registration_service.cargar_registro(str(assignment_id), int(trimester))
+                    for row in fallback_rows
                 ]
             self.vocational_orientation_view.set_students(students, saved_rows=saved_rows)
             return
         self.vocational_orientation_view.set_students([])
+
+    def _load_grade_rows_with_status(
+        self,
+        assignment_id: str,
+        trimester_num: int,
+    ) -> tuple[list[dict], str]:
+        load_with_status = getattr(self.grade_registration_service, "cargar_registro_con_estado", None)
+        if callable(load_with_status):
+            return load_with_status(assignment_id, trimester_num)
+        return self.grade_registration_service.cargar_registro(assignment_id, trimester_num), ""
 
     def _save_vocational_orientation_payload(self, payload: dict) -> tuple[bool, str]:
         ok, message = self.grade_registration_service.guardar_orientacion_vocacional_evaluacion(payload)

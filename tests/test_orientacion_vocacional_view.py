@@ -52,6 +52,37 @@ class TestOrientacionVocacionalView(unittest.TestCase):
         self.assertEqual(payload["filas"][0]["puntaje_total"], 14)
         self.assertEqual(payload["filas"][0]["calificacion"], "A+")
 
+    def test_encabezados_multilinea_conservan_cinco_textos_completos(self) -> None:
+        from src.presentation.views.orientacion_vocacional_view import OrientacionVocacionalView
+        from src.presentation.widgets.word_wrap_header import WordWrapHeaderView
+
+        view = OrientacionVocacionalView()
+        header = view.table.horizontalHeader()
+        self.assertIsInstance(header, WordWrapHeaderView)
+        self.assertTrue(bool(header.defaultAlignment() & Qt.AlignHCenter))
+        self.assertTrue(bool(header.defaultAlignment() & Qt.AlignVCenter))
+        self.assertEqual(view.table.horizontalScrollBarPolicy(), Qt.ScrollBarAsNeeded)
+
+        for course_key, course_name in (("8", "8vo EGB"), ("9", "9no EGB"), ("10", "10mo EGB")):
+            with self.subTest(course=course_name):
+                view.set_context(f"AS-{course_key}", 1, course_name)
+                expected = OrientacionVocacionalView.COURSE_CONFIG[course_key]["indicators"]
+                actual = [view.table.horizontalHeaderItem(column).text() for column in range(2, 7)]
+                tooltips = [view.table.horizontalHeaderItem(column).toolTip() for column in range(2, 7)]
+                self.assertEqual(actual, expected)
+                self.assertEqual(tooltips, expected)
+                self.assertTrue(all(160 <= view.table.columnWidth(column) <= 220 for column in range(2, 7)))
+
+        for column in range(2, 7):
+            view.table.setColumnWidth(column, 150)
+        header.update_height()
+        narrow_height = header.required_height()
+        for column in range(2, 7):
+            view.table.setColumnWidth(column, 220)
+        header.update_height()
+        self.assertGreaterEqual(narrow_height, header.required_height())
+        self.assertEqual(header.height(), header.required_height())
+
 
 if __name__ == "__main__":
     unittest.main()

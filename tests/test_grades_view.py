@@ -66,10 +66,15 @@ class _FakeGradeRegistrationService:
 
 
 class _FakeClassroomAccompanimentService:
+    def __init__(self, contexts: list[dict] | None = None) -> None:
+        self.contexts = contexts or [{"id_asignacion": "AS-COMP", "display": "Comportamiento demo"}]
+        self.loaded_assignment_ids: list[str] = []
+
     def listar_contextos_disponibles(self) -> list[dict]:
-        return []
+        return list(self.contexts)
 
     def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
+        self.loaded_assignment_ids.append(asignacion_id)
         return {"students": [], "skill_categories": [], "active_skills": [], "responses": {}, "results": {}}
 
     def guardar_evaluacion(self, asignacion_id: str, trimestre_num: int, active_skills: list[str], responses: dict) -> tuple[bool, str]:
@@ -250,6 +255,66 @@ class TestGradesView(unittest.TestCase):
         view.assignment_combo.setCurrentIndex(0)
         self.assertTrue(view._accompaniment_mode)
         self.assertFalse(view.table.isVisible())
+
+    def test_recarga_contextos_integrados_y_selecciona_el_id_exacto(self) -> None:
+        from src.presentation.views.grades_view import GradesView
+
+        grade_service = _FakeGradeRegistrationService(
+            contexts=[{"id_asignacion": "AS1", "display": "Matemática", "asignatura_nombre": "Matemática"}]
+        )
+        accompaniment_service = _FakeClassroomAccompanimentService(
+            contexts=[{"id_asignacion": "AS-ANTERIOR", "display": "Anterior"}]
+        )
+        view = GradesView(grade_service, classroom_accompaniment_service=accompaniment_service)
+
+        grade_service.contexts = [
+            {
+                "id_asignacion": "AS-COMP-2",
+                "display": "Comportamiento | 2do EGB-A",
+                "asignatura_nombre": "Comportamiento",
+            }
+        ]
+        accompaniment_service.contexts = [
+            {"id_asignacion": "AS-COMP-2", "display": "Comportamiento | 2do EGB-A"}
+        ]
+        view.load_contexts(selected_assignment_id="AS-COMP-2")
+
+        assert view.accompaniment_view is not None
+        self.assertEqual(view.accompaniment_view.assignment_combo.currentData(), "AS-COMP-2")
+        self.assertEqual(accompaniment_service.loaded_assignment_ids[-1], "AS-COMP-2")
+
+    def test_asignacion_integrada_inexistente_limpia_y_no_reutiliza_anterior(self) -> None:
+        from PySide6.QtWidgets import QMessageBox, QTableWidgetItem
+
+        from src.presentation.views.grades_view import GradesView
+
+        grade_service = _FakeGradeRegistrationService(
+            contexts=[{"id_asignacion": "AS1", "display": "Matemática", "asignatura_nombre": "Matemática"}]
+        )
+        accompaniment_service = _FakeClassroomAccompanimentService(
+            contexts=[{"id_asignacion": "AS-ANTERIOR", "display": "Anterior"}]
+        )
+        view = GradesView(grade_service, classroom_accompaniment_service=accompaniment_service)
+        assert view.accompaniment_view is not None
+        view.accompaniment_view.table.setColumnCount(1)
+        view.accompaniment_view.table.setRowCount(1)
+        view.accompaniment_view.table.setItem(0, 0, QTableWidgetItem("No reutilizar"))
+
+        grade_service.contexts = [
+            {
+                "id_asignacion": "AS-INEXISTENTE",
+                "display": "Comportamiento inexistente",
+                "asignatura_nombre": "Comportamiento",
+            }
+        ]
+        with patch.object(QMessageBox, "warning") as warning:
+            view.load_contexts(selected_assignment_id="AS-INEXISTENTE")
+
+        self.assertIsNone(view.accompaniment_view.assignment_combo.currentData())
+        self.assertEqual(view.accompaniment_view.table.rowCount(), 0)
+        self.assertNotIn("AS-ANTERIOR", accompaniment_service.loaded_assignment_ids)
+        warning.assert_called_once()
+        self.assertIn("evitar cargar otra asignación", warning.call_args.args[2])
 
     def test_carga_automatica_en_materia_cuantitativa(self) -> None:
         from src.presentation.views.grades_view import GradesView

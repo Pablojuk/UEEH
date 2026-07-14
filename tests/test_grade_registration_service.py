@@ -6,6 +6,7 @@ import unittest
 
 from src.application.services.grade_registration_service import GradeRegistrationService
 from src.infrastructure.persistence.db import initialize_database
+from src.infrastructure.persistence.seed import CATALOG_COURSES
 
 
 class TestGradeRegistrationService(unittest.TestCase):
@@ -189,6 +190,80 @@ class TestGradeRegistrationService(unittest.TestCase):
 
         rows = self.service.cargar_registro("AS2", 1)
         self.assertEqual(rows, [])
+
+    def test_cargar_estudiantes_de_2do_egb_en_asignacion_cuantitativa(self) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO matriculas (id_matricula, estudiante_id, curso_id, paralelo_id, periodo_id, numero_lista) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("M-EGB", "E1", "C2", "P1", "2025-2026", 1),
+            )
+
+        rows = self.service.cargar_registro("AS-EGB", 1)
+        self.assertEqual([row["estudiante_id"] for row in rows], ["E1"])
+
+    def test_mensaje_claro_cuando_asignacion_no_tiene_matriculas(self) -> None:
+        rows, message = self.service.cargar_registro_con_estado("AS-EGB", 1)
+        self.assertEqual(rows, [])
+        self.assertEqual(
+            message,
+            "No se encontraron estudiantes matriculados para Segundo de EGB, "
+            "paralelo A, período 2025-2026.",
+        )
+
+    def test_diferencia_curso_paralelo_y_periodo_por_ids_exactos(self) -> None:
+        with self.conn:
+            self.conn.execute("INSERT INTO paralelos (id_paralelo, nombre) VALUES (?, ?)", ("P2", "B"))
+            self.conn.execute(
+                "INSERT INTO periodos_lectivos (id_periodo, anio_inicio, anio_fin) VALUES (?, ?, ?)",
+                ("2026-2027", 2026, 2027),
+            )
+            for student_id in ("E2", "E3", "E4"):
+                self.conn.execute(
+                    "INSERT INTO estudiantes (id_estudiante, codigo, apellidos, nombres) VALUES (?, ?, ?, ?)",
+                    (student_id, f"EST-{student_id}", "Prueba", student_id),
+                )
+            self.conn.executemany(
+                "INSERT INTO matriculas (id_matricula, estudiante_id, curso_id, paralelo_id, periodo_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [
+                    ("MX1", "E2", "C2", "P1", "2025-2026"),
+                    ("MX2", "E3", "C2", "P2", "2025-2026"),
+                    ("MX3", "E4", "C2", "P1", "2026-2027"),
+                ],
+            )
+
+        rows = self.service.cargar_registro("AS-EGB", 1)
+        self.assertEqual([row["estudiante_id"] for row in rows], ["E2"])
+
+    def test_carga_estudiantes_en_todos_los_cursos_del_catalogo(self) -> None:
+        with self.conn:
+            for index, course in enumerate(CATALOG_COURSES):
+                student_id = f"EC-{index}"
+                self.conn.execute(
+                    "INSERT INTO cursos (id_curso, nombre, nivel) VALUES (?, ?, ?)",
+                    (course["id_curso"], course["nombre"], course["nivel"]),
+                )
+                self.conn.execute(
+                    "INSERT INTO estudiantes (id_estudiante, codigo, apellidos, nombres) VALUES (?, ?, ?, ?)",
+                    (student_id, f"COD-{index}", "Sintético", str(index)),
+                )
+                self.conn.execute(
+                    "INSERT INTO matriculas (id_matricula, estudiante_id, curso_id, paralelo_id, periodo_id) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (f"MC-{index}", student_id, course["id_curso"], "P1", "2025-2026"),
+                )
+                self.conn.execute(
+                    "INSERT INTO asignaciones_docente "
+                    "(id_asignacion, docente_id, asignatura_id, curso_id, paralelo_id, periodo_id) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (f"AC-{index}", "D1", "A1", course["id_curso"], "P1", "2025-2026"),
+                )
+
+        for index, _course in enumerate(CATALOG_COURSES):
+            with self.subTest(course=index):
+                rows = self.service.cargar_registro(f"AC-{index}", 1)
+                self.assertEqual([row["estudiante_id"] for row in rows], [f"EC-{index}"])
 
     def test_persistencia_metadata_actividades(self) -> None:
         ok, _ = self.service.configurar_numero_actividades("AS1", 1, 2)

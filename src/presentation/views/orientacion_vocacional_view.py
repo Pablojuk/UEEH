@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from src.presentation.widgets.word_wrap_header import WordWrapHeaderView
+
 
 class OrientacionVocacionalView(QWidget):
     RESPONSE_OPTIONS = [("-", None), ("SIEMPRE", 3), ("FRECUENTEMENTE", 2), ("OCASIONALMENTE", 1)]
@@ -82,6 +84,7 @@ class OrientacionVocacionalView(QWidget):
         header_layout.addWidget(self.save_button)
 
         self.table = QTableWidget(0, 8)
+        self.table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal, self.table))
         self.table.setHorizontalHeaderLabels(
             [
                 "N°",
@@ -97,7 +100,8 @@ class OrientacionVocacionalView(QWidget):
         self.table.verticalHeader().setVisible(False)
         header = self.table.horizontalHeader()
         header.setStretchLastSection(False)
-        header.setMinimumSectionSize(70)
+        header.setMinimumSectionSize(60)
+        header.setSectionsMovable(False)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
@@ -106,9 +110,11 @@ class OrientacionVocacionalView(QWidget):
         for col in range(2, 7):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
-        self.table.setColumnWidth(1, 320)
+        self.table.setColumnWidth(1, 280)
         for col in range(2, 7):
-            self.table.setColumnWidth(col, 220)
+            self.table.setColumnWidth(col, 190)
+        if isinstance(header, WordWrapHeaderView):
+            header.update_height()
 
         root.addWidget(header_card)
         root.addWidget(self.table, 1)
@@ -153,6 +159,9 @@ class OrientacionVocacionalView(QWidget):
             item = self.table.horizontalHeaderItem(col)
             if item is not None:
                 item.setToolTip(title)
+        header = self.table.horizontalHeader()
+        if isinstance(header, WordWrapHeaderView):
+            header.update_height()
 
     def _build_table(self) -> None:
         self.table.setRowCount(0)

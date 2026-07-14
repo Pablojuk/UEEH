@@ -6,6 +6,7 @@ import sqlite3
 import uuid
 from typing import Any
 
+from src.application.services.enrollment_service import load_students_for_assignment
 from src.domain.calculations import calcular_valoracion_acompanamiento
 from src.infrastructure.persistence.repositories import (
     ClassroomAccompanimentRepository,
@@ -146,10 +147,8 @@ class ClassroomAccompanimentService:
         if trimestre_num not in (1, 2, 3):
             raise ValueError("El trimestre debe ser 1, 2 o 3")
 
-        asignacion = self.connection.execute(
-            "SELECT * FROM asignaciones_docente WHERE id_asignacion = ?", (asignacion_id,)
-        ).fetchone()
-        if not asignacion:
+        enrollment_match = load_students_for_assignment(self.connection, asignacion_id)
+        if enrollment_match.context is None:
             return {
                 "students": [],
                 "skill_categories": self._skill_categories_with_visibility({}, [], []),
@@ -158,26 +157,6 @@ class ClassroomAccompanimentService:
                 "results": {},
                 "validation_message": "",
             }
-
-        estudiantes = self.connection.execute(
-            """
-            SELECT
-                e.id_estudiante,
-                e.codigo,
-                e.apellidos,
-                e.nombres,
-                m.numero_lista
-            FROM matriculas m
-            JOIN estudiantes e ON e.id_estudiante = m.estudiante_id
-            WHERE m.curso_id = ? AND m.paralelo_id = ? AND m.periodo_id = ?
-            ORDER BY
-                CASE WHEN m.numero_lista IS NULL THEN 1 ELSE 0 END,
-                m.numero_lista,
-                e.apellidos,
-                e.nombres
-            """,
-            (asignacion["curso_id"], asignacion["paralelo_id"], asignacion["periodo_id"]),
-        ).fetchall()
 
         skills = self.listar_habilidades_base()
         configured_visibility = self._load_visibility(asignacion_id, trimestre_num)
@@ -203,7 +182,7 @@ class ClassroomAccompanimentService:
             responses.setdefault(sid, {})[row["habilidad_clave"]] = row["valor"]
 
         students_out: list[dict[str, Any]] = []
-        for estudiante in estudiantes:
+        for estudiante in enrollment_match.students:
             sid = estudiante["id_estudiante"]
             students_out.append(
                 {
@@ -224,7 +203,7 @@ class ClassroomAccompanimentService:
             "validation_message": (
                 f"Solo se pueden seleccionar hasta {MAX_ACTIVE_SKILLS} habilidades activas para esta evaluación."
                 if exceeded
-                else ""
+                else enrollment_match.validation_message
             ),
         }
 

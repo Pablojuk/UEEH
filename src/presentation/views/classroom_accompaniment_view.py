@@ -8,7 +8,7 @@ import unicodedata
 from datetime import datetime
 from typing import Any
 
-from PySide6.QtCore import QMarginsF, Qt
+from PySide6.QtCore import QMarginsF, QSignalBlocker, Qt
 from PySide6.QtGui import QPageLayout, QPageSize
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -360,12 +360,14 @@ class ClassroomAccompanimentView(QWidget):
         self.trimester_combo.setVisible(not embedded)
         self.load_button.setVisible(not embedded)
 
-    def load_contexts(self, selected_assignment_id: str | None = None) -> None:
+    def load_contexts(self, selected_assignment_id: str | None = None) -> bool:
+        blocker = QSignalBlocker(self.assignment_combo)
         self.assignment_combo.clear()
         self._contexts = self.accompaniment_service.listar_contextos_disponibles()
         if not self._contexts:
             self.assignment_combo.addItem("Sin asignaciones disponibles", None)
-            return
+            del blocker
+            return False
 
         for context in self._contexts:
             self.assignment_combo.addItem(context.get("display", context.get("id_asignacion", "")), context.get("id_asignacion"))
@@ -374,6 +376,24 @@ class ClassroomAccompanimentView(QWidget):
             idx = self.assignment_combo.findData(selected_assignment_id)
             if idx >= 0:
                 self.assignment_combo.setCurrentIndex(idx)
+            else:
+                self.assignment_combo.setCurrentIndex(-1)
+        del blocker
+        return bool(
+            selected_assignment_id
+            and self.assignment_combo.currentData() == selected_assignment_id
+        )
+
+    def clear_assignment_context(self) -> None:
+        blocker = QSignalBlocker(self.assignment_combo)
+        self.assignment_combo.setCurrentIndex(-1)
+        del blocker
+        self._students = []
+        self._responses = {}
+        self._active_skills = []
+        self._skill_categories = []
+        self._skills_by_key = {}
+        self._clear_table()
 
     def load_rows(self) -> None:
         assignment_id = self.assignment_combo.currentData()
