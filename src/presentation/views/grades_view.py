@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 import unicodedata
+from itertools import combinations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QDate, QEvent, QSignalBlocker, Qt
-from PySide6.QtGui import QColor, QShortcut
+from PySide6.QtGui import QColor, QFontMetrics, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -331,6 +332,10 @@ class GradesView(QWidget):
         self._table_columns.extend(self.SUMMATIVE_COLUMNS_EGB_BASICA if self._egb_basic_mode else self.SUMMATIVE_COLUMNS)
         self.table.setColumnCount(len(self._table_columns))
         self.table.setHorizontalHeaderLabels([self._format_header_label(title) for _, title in self._table_columns])
+        for column, (_, title) in enumerate(self._table_columns):
+            header_item = self.table.horizontalHeaderItem(column)
+            if header_item is not None:
+                header_item.setToolTip(title)
 
     def _fill_table(self, rows: list[dict]) -> None:
         self._clear_table()
@@ -387,10 +392,19 @@ class GradesView(QWidget):
     @staticmethod
     def _format_header_label(title: str) -> str:
         words = title.split()
-        if len(words) <= 2:
+        if len(title) <= 16 or len(words) == 1:
             return title
-        split_index = len(words) // 2
-        return f"{' '.join(words[:split_index])}\n{' '.join(words[split_index:])}"
+
+        line_count = 3 if len(words) >= 5 else 2
+        possible_breaks = combinations(range(1, len(words)), line_count - 1)
+        best_lines = min(
+            (
+                [" ".join(words[start:end]) for start, end in zip((0, *breaks), (*breaks, len(words)))]
+                for breaks in possible_breaks
+            ),
+            key=lambda lines: (max(map(len, lines)), max(map(len, lines)) - min(map(len, lines))),
+        )
+        return "\n".join(best_lines)
 
     @staticmethod
     def _is_numeric_field(field: str) -> bool:
@@ -578,11 +592,33 @@ class GradesView(QWidget):
         )
 
     def _apply_column_resize_policy(self) -> None:
+        header = self.table.horizontalHeader()
+        font_metrics = QFontMetrics(header.font())
+        horizontal_margin = 24
+        maximum_line_count = 1
+
         self.table.resizeColumnToContents(0)
-        self.table.setColumnWidth(0, max(self.table.columnWidth(0), 220))
-        for _, col_act, col_ref in self._activity_group_columns:
-            self.table.setColumnWidth(col_act, max(90, self.table.columnWidth(col_act)))
-            self.table.setColumnWidth(col_ref, max(90, self.table.columnWidth(col_ref)))
+        for column in range(self.table.columnCount()):
+            header_item = self.table.horizontalHeaderItem(column)
+            label = header_item.text() if header_item is not None else ""
+            lines = label.splitlines() or [""]
+            maximum_line_count = max(maximum_line_count, len(lines))
+            minimum_width = max(font_metrics.horizontalAdvance(line) for line in lines) + horizontal_margin
+
+            if column == 0:
+                minimum_width = max(minimum_width, self.table.columnWidth(column), 220)
+            elif any(column in (col_act, col_ref) for _, col_act, col_ref in self._activity_group_columns):
+                minimum_width = max(minimum_width, 90)
+
+            self.table.setColumnWidth(column, minimum_width)
+
+        vertical_margin = 12
+        header_height = (
+            font_metrics.height()
+            + (maximum_line_count - 1) * font_metrics.lineSpacing()
+            + vertical_margin
+        )
+        header.setFixedHeight(header_height)
 
     def _on_assignment_or_trimester_changed(self) -> None:
         if self._switching_mode:

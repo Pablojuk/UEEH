@@ -8,7 +8,9 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QFontMetrics
+    from PySide6.QtWidgets import QApplication, QHeaderView
 except ImportError:  # pragma: no cover
     QApplication = None
 
@@ -161,14 +163,51 @@ class TestGradesView(unittest.TestCase):
         headers = [view.table.horizontalHeaderItem(i).text() for i in range(view.table.columnCount())]
         self.assertIn("Equivalencia", headers)
 
-    def test_formato_encabezado_largo_en_dos_lineas(self) -> None:
+    def test_formato_encabezado_largo_en_dos_o_tres_lineas(self) -> None:
         from src.presentation.views.grades_view import GradesView
 
         self.assertEqual(
             GradesView._format_header_label("Promedio Evaluación Sumativa 30%"),
             "Promedio Evaluación\nSumativa 30%",
         )
+        self.assertEqual(
+            GradesView._format_header_label("Promedio con Mejora Evaluación Sumativa"),
+            "Promedio con\nMejora Evaluación\nSumativa",
+        )
+        self.assertEqual(
+            GradesView._format_header_label("Proyecto Interdisciplinar"),
+            "Proyecto\nInterdisciplinar",
+        )
         self.assertEqual(GradesView._format_header_label("Actividad 1"), "Actividad 1")
+
+    def test_dimensiona_encabezados_para_todos_los_niveles_y_cantidades_de_actividades(self) -> None:
+        from src.presentation.views.grades_view import GradesView
+
+        for egb_basic_mode in (False, True):
+            for activity_count in (3, 5, 8):
+                with self.subTest(egb_basic_mode=egb_basic_mode, activity_count=activity_count):
+                    view = GradesView(_FakeGradeRegistrationService(rows=[]))
+                    view._egb_basic_mode = egb_basic_mode
+                    view._numero_actividades = activity_count
+                    view._setup_columns()
+                    view._apply_column_resize_policy()
+
+                    header = view.table.horizontalHeader()
+                    metrics = QFontMetrics(header.font())
+                    maximum_line_count = 1
+                    for column, (_, full_title) in enumerate(view._table_columns):
+                        item = view.table.horizontalHeaderItem(column)
+                        lines = item.text().splitlines()
+                        maximum_line_count = max(maximum_line_count, len(lines))
+                        expected_minimum = max(metrics.horizontalAdvance(line) for line in lines) + 24
+                        self.assertGreaterEqual(view.table.columnWidth(column), expected_minimum)
+                        self.assertEqual(item.toolTip(), full_title)
+                        self.assertLessEqual(len(lines), 3)
+
+                    expected_height = metrics.height() + (maximum_line_count - 1) * metrics.lineSpacing() + 12
+                    self.assertEqual(header.height(), expected_height)
+                    self.assertEqual(header.sectionResizeMode(0), QHeaderView.Interactive)
+                    self.assertNotEqual(view.table.horizontalScrollBarPolicy(), Qt.ScrollBarAlwaysOff)
 
     def test_copy_paste_en_tabla(self) -> None:
         from src.presentation.views.grades_view import GradesView
