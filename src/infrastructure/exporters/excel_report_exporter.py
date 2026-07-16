@@ -1,0 +1,453 @@
+"""Exportador de reportes académicos a Excel (.xlsx) con diseño institucional."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+from openpyxl.cell.cell import MergedCell
+
+
+class ExcelReportExporter:
+    COLOR_HEADER_BG = "1F4E79"
+    COLOR_HEADER_FG = "FFFFFF"
+    COLOR_FILA_PAR = "DCE6F1"
+    COLOR_FILA_IMPAR = "FFFFFF"
+    COLOR_APROBADO = "C6EFCE"
+    COLOR_REPROBADO = "FFC7CE"
+    COLOR_SPL = "FFEB9C"
+    COLOR_BORDE = "B8CCE4"
+
+    def _safe_set_cell_value(self, ws, row: int, column: int, value):
+        cell = ws.cell(row=row, column=column)
+        if isinstance(cell, MergedCell):
+            for merged_range in ws.merged_cells.ranges:
+                if cell.coordinate in merged_range:
+                    top_left = ws.cell(row=merged_range.min_row, column=merged_range.min_col)
+                    top_left.value = value
+                    return top_left
+            return cell
+        cell.value = value
+        return cell
+
+    def exportar(
+        self,
+        output_path: str,
+        report_title: str,
+        context: dict[str, Any],
+        rows: list[dict[str, Any]],
+        ocultar_filas_vacias: bool = False,
+    ) -> str:
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("openpyxl no está instalado") from exc
+
+        filtered_rows = list(rows)
+        if ocultar_filas_vacias:
+            filtered_rows = [row for row in rows if str(row.get("estudiante", "")).strip()]
+
+        if not filtered_rows and ocultar_filas_vacias:
+            filtered_rows = []
+
+        if not rows:
+            raise ValueError("No hay datos para exportar")
+
+        path = Path(output_path).expanduser().resolve()
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Informe"
+
+        thin = Side(style="thin", color=self.COLOR_BORDE)
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        ws.merge_cells("A1:N1")
+        ws["A1"] = (context.get("institucion_nombre") or "Institución").upper()
+        ws["A1"].font = Font(bold=True, size=16)
+        ws["A1"].alignment = Alignment(horizontal="center")
+
+        ws.merge_cells("A2:N2")
+        ws["A2"] = report_title.upper()
+        ws["A2"].font = Font(bold=True, size=13)
+        ws["A2"].alignment = Alignment(horizontal="center")
+
+        ws.merge_cells("A3:N3")
+        ws["A3"] = "San Salvador de Cañaribamba"
+        ws["A3"].font = Font(bold=False, size=10)
+        ws["A3"].alignment = Alignment(horizontal="center")
+
+        self._add_logos(ws, context)
+
+        info_font = Font(bold=True, italic=True)
+        ws.merge_cells("A5:B5"); ws["A5"] = "Docente:"; ws["A5"].font = info_font
+        ws.merge_cells("C5:D5"); ws["C5"] = context.get("docente_nombre", "N/D")
+        ws.merge_cells("A6:B6"); ws["A6"] = "Curso:"; ws["A6"].font = info_font
+        ws.merge_cells("C6:D6"); ws["C6"] = context.get("curso_nombre", "N/D")
+        ws.merge_cells("A7:B7"); ws["A7"] = "Nivel:"; ws["A7"].font = info_font
+        ws.merge_cells("C7:D7"); ws["C7"] = context.get("curso_nivel", "N/D")
+
+        ws.merge_cells("F5:G5"); ws["F5"] = "Asignatura:"; ws["F5"].font = info_font
+        ws.merge_cells("H5:I5"); ws["H5"] = context.get("asignatura_nombre", "N/D")
+        ws.merge_cells("F6:G6"); ws["F6"] = "Paralelo:"; ws["F6"].font = info_font
+        ws.merge_cells("H6:I6"); ws["H6"] = context.get("paralelo_nombre", "N/D")
+        ws.merge_cells("F7:G7"); ws["F7"] = "Tipo de reporte:"; ws["F7"].font = info_font
+        ws.merge_cells("H7:I7")
+        ws["H7"] = "TRIMESTRAL" if context.get("report_type") == "trimestral" else "ANUAL"
+
+        ws.merge_cells("K5:L5"); ws["K5"] = "Tutor:"; ws["K5"].font = info_font
+        ws.merge_cells("M5:N5"); ws["M5"] = context.get("firmantes", {}).get("tutor_curso", "")
+
+        for row in range(5, 8):
+            for col in [1, 3, 6, 8, 11, 13]:
+                ws.cell(row=row, column=col).alignment = Alignment(horizontal="left", vertical="center")
+
+        start_row = 10
+        if context.get("report_type") == "trimestral":
+            simplified = bool(context.get("is_simplified_trimestral"))
+            if simplified:
+                headers = ["N°", "Nómina", "Promedio Trimestral", "Cualitativo", "Equivalencia"]
+            else:
+                headers = [
+                    "N°", "Nómina",
+                    "Aportes/Insumos Calificación", "Aportes/Insumos 70%",
+                    "Evaluaciones sumativas Calificación", "Evaluaciones sumativas 30%",
+                    "Promedio Final", "Cualitativa", "Equivalencia", "Observación",
+                ]
+            for col, title in enumerate(headers, start=1):
+                cell = ws.cell(row=start_row, column=col, value=title)
+                cell.font = Font(bold=True, color=self.COLOR_HEADER_FG, size=9)
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.fill = PatternFill(start_color=self.COLOR_HEADER_BG, end_color=self.COLOR_HEADER_BG, fill_type="solid")
+                cell.border = border
+
+            for idx, row in enumerate(filtered_rows, start=1):
+                r = start_row + idx
+                values = (
+                    [
+                        idx,
+                        row.get("estudiante", ""),
+                        row.get("promedio_trimestral", row.get("promedio_final")),
+                        row.get("cualitativo", row.get("cualitativa", "")),
+                        self._equivalencia_egb_basica_desde_cualitativo(row.get("cualitativo", row.get("cualitativa", ""))),
+                    ]
+                    if simplified else
+                    [
+                        idx,
+                        row.get("estudiante", ""),
+                        row.get("aportes_calificacion"),
+                        row.get("aportes_70"),
+                        row.get("sumativas_calificacion"),
+                        row.get("sumativas_30"),
+                        row.get("promedio_final"),
+                        row.get("cualitativa", ""),
+                        row.get("equivalencia", ""),
+                        row.get("observacion", ""),
+                    ]
+                )
+                for cidx, value in enumerate(values, start=1):
+                    cell = ws.cell(row=r, column=cidx, value=value)
+                    cell.alignment = Alignment(horizontal="left" if cidx == 2 else "center", vertical="center")
+                    cell.border = border
+                    base_color = self.COLOR_FILA_PAR if idx % 2 == 0 else self.COLOR_FILA_IMPAR
+                    cell.fill = PatternFill(start_color=base_color, end_color=base_color, fill_type="solid")
+                    if isinstance(value, (int, float)) and cidx != 1:
+                        cell.number_format = "0.00"
+                if not simplified:
+                    obs_text = str(row.get("observacion", "")).strip().upper()
+                    obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
+                    if obs_color:
+                        obs_cell = ws.cell(row=r, column=10)
+                        obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
+            if simplified:
+                widths = [5, 34, 16, 12, 34]
+                signatures_row = self._draw_trimester_stats(ws, max(start_row + len(filtered_rows) + 4, 18), border, filtered_rows)
+            else:
+                widths = [5, 34, 14, 12, 15, 12, 10, 10, 10, 12]
+                signatures_row = max(start_row + len(filtered_rows) + 3, 39)
+        else:
+            simplified_anual = bool(context.get("is_simplified_anual"))
+            headers = [
+                "N°", "Nómina",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Promedio", "Cualitativo", "Equivalencia",
+            ] if simplified_anual else [
+                "N°", "Nómina",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Trimestre Cali", "Trimestre Cuali",
+                "Promedio", "Cualitativa", "Supletorio", "Promedio Final", "Cualitativo", "Observación",
+            ]
+            for col, title in enumerate(headers, start=1):
+                cell = ws.cell(row=start_row, column=col, value=title)
+                cell.font = Font(bold=True, color=self.COLOR_HEADER_FG, size=9)
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.fill = PatternFill(start_color=self.COLOR_HEADER_BG, end_color=self.COLOR_HEADER_BG, fill_type="solid")
+                cell.border = border
+            for idx, row in enumerate(filtered_rows, start=1):
+                r = start_row + idx
+                values = [
+                    idx,
+                    row.get("estudiante", ""),
+                    row.get("trimestre_1"),
+                    row.get("equivalencia_t1", ""),
+                    row.get("trimestre_2"),
+                    row.get("equivalencia_t2", ""),
+                    row.get("trimestre_3"),
+                    row.get("equivalencia_t3", ""),
+                    row.get("promedio"),
+                    row.get("cualitativa_anual", ""),
+                    row.get("equivalencia", row.get("cualitativo_final", "")),
+                ] if simplified_anual else [
+                    idx,row.get("estudiante",""),row.get("trimestre_1"),row.get("equivalencia_t1",""),
+                    row.get("trimestre_2"),row.get("equivalencia_t2",""),row.get("trimestre_3"),row.get("equivalencia_t3",""),
+                    row.get("promedio"),row.get("cualitativa_anual",""),row.get("supletorio"),row.get("promedio_final"),
+                    row.get("cualitativo_final",""),row.get("observacion",""),
+                ]
+                for cidx, value in enumerate(values, start=1):
+                    cell = ws.cell(row=r, column=cidx, value=value)
+                    cell.alignment = Alignment(horizontal="left" if cidx == 2 else "center", vertical="center")
+                    cell.border = border
+                    base_color = self.COLOR_FILA_PAR if idx % 2 == 0 else self.COLOR_FILA_IMPAR
+                    cell.fill = PatternFill(start_color=base_color, end_color=base_color, fill_type="solid")
+                    if isinstance(value, (int, float)) and cidx != 1:
+                        cell.number_format = "0.00"
+                if not simplified_anual:
+                    obs_text = str(row.get("observacion", "")).strip().upper()
+                    obs_color = {"APB": self.COLOR_APROBADO, "REP": self.COLOR_REPROBADO, "SPL": self.COLOR_SPL}.get(obs_text)
+                    if obs_color:
+                        obs_cell = ws.cell(row=r, column=14)
+                        obs_cell.fill = PatternFill(start_color=obs_color, end_color=obs_color, fill_type="solid")
+            widths = [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 24] if simplified_anual else [5, 34, 11, 11, 11, 11, 11, 11, 10, 10, 10, 11, 11, 12]
+            last_student_row = start_row + len(filtered_rows)
+            stats_start = max(last_student_row + 4, 39)
+            signatures_row = self._draw_annual_statistics(ws, stats_start, border, filtered_rows, last_student_row)
+
+        ws.row_dimensions[1].height = 24
+        ws.row_dimensions[2].height = 22
+        ws.row_dimensions[3].height = 18
+
+        for idx, w in enumerate(widths, start=1):
+            ws.column_dimensions[chr(ord("A") + idx - 1)].width = w
+
+        signatures_row = signatures_row + 2
+        self._apply_print_settings(ws, len(widths), signatures_row)
+        self._draw_signatures(ws, signatures_row, len(widths), context.get("firmantes", {}))
+        wb.save(str(path))
+        return str(path)
+
+    def _draw_trimester_stats(self, ws, start_row: int, border, rows: list[dict[str, Any]]) -> int:
+        from openpyxl.styles import Alignment, Font
+        labels = ["A+", "A-", "B+", "B-", "C+", "C-", "D+", "D-", "E+", "E-"]
+        total = len(rows)
+        counts = {k: 0 for k in labels}
+        for row in rows:
+            c = str(row.get("cualitativo", row.get("cualitativa", ""))).strip().upper()
+            if c in counts:
+                counts[c] += 1
+        self._safe_set_cell_value(ws, start_row, 1, "ESCALA CUALITATIVA")
+        self._safe_set_cell_value(ws, start_row, 2, "N°")
+        self._safe_set_cell_value(ws, start_row, 3, "%")
+        ws.cell(row=start_row, column=1).font = Font(bold=True)
+        ws.cell(row=start_row, column=2).font = Font(bold=True)
+        ws.cell(row=start_row, column=3).font = Font(bold=True)
+        for c in range(1, 4):
+            ws.cell(row=start_row, column=c).border = border
+            ws.cell(row=start_row, column=c).alignment = Alignment(horizontal="center")
+        for idx, label in enumerate(labels, start=1):
+            r = start_row + idx
+            self._safe_set_cell_value(ws, r, 1, label)
+            self._safe_set_cell_value(ws, r, 2, counts[label])
+            self._safe_set_cell_value(ws, r, 3, ((counts[label] / total) if total else 0))
+            ws.cell(r, 3).number_format = "0.00%"
+            for c in range(1, 4):
+                ws.cell(r, c).border = border
+                ws.cell(r, c).alignment = Alignment(horizontal="center")
+        return start_row + len(labels) + 2
+
+    @staticmethod
+    def _equivalencia_egb_basica_desde_cualitativo(cualitativo: object) -> str:
+        key = str(cualitativo or "").strip().upper()
+        if key in {"A+", "A-", "B+"}:
+            return "Destreza o aprendizaje alcanzado"
+        if key in {"B-", "C+", "C-"}:
+            return "Destreza o aprendizaje en proceso de desarrollo"
+        if key in {"D+", "D-", "E+", "E-"}:
+            return "Destreza o aprendizaje iniciado"
+        return ""
+
+    @staticmethod
+    def _apply_print_settings(ws, max_cols: int, max_rows: int, orientation: str = "landscape") -> None:
+        from openpyxl.worksheet.page import PageMargins
+
+        ws.page_setup.paperSize = ws.PAPERSIZE_A4
+        ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT if orientation == "portrait" else ws.ORIENTATION_LANDSCAPE
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 1
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.print_options.horizontalCentered = True
+        ws.print_options.verticalCentered = False
+        ws.page_margins = PageMargins(left=0.25, right=0.25, top=0.5, bottom=0.5, header=0.2, footer=0.2)
+        ws.print_area = f"A1:{chr(ord('A') + max_cols - 1)}{max_rows + 3}"
+
+    def _add_logos(self, ws, context: dict[str, Any]) -> None:
+        try:
+            from openpyxl.drawing.image import Image
+            from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
+            from openpyxl.utils.units import cm_to_EMU
+        except Exception:  # noqa: BLE001
+            return
+
+        logo_specs = [
+            {
+                "path": context.get("logo_path"),
+                "base_col": 0,
+                "base_row": 0,
+                "offset_x_cm": 2.0,
+                "offset_y_cm": 1.058,
+                "width_cm": 2.07,
+                "height_cm": 1.95,
+            },
+            {
+                "path": context.get("logo_ministerio_path"),
+                "base_col": 11,
+                "base_row": 0,
+                "offset_x_cm": 0.0,
+                "offset_y_cm": 1.058,
+                "width_cm": 2.85,
+                "height_cm": 1.31,
+            },
+        ]
+
+        for spec in logo_specs:
+            logo_path = spec["path"]
+            if not logo_path:
+                continue
+            path = Path(str(logo_path)).expanduser().resolve()
+            if not path.exists():
+                continue
+            try:
+                image = Image(str(path))
+                width_emu = cm_to_EMU(spec["width_cm"])
+                height_emu = cm_to_EMU(spec["height_cm"])
+                marker = AnchorMarker(
+                    col=spec["base_col"],
+                    row=spec["base_row"],
+                    colOff=cm_to_EMU(spec["offset_x_cm"]),
+                    rowOff=cm_to_EMU(spec["offset_y_cm"]),
+                )
+                image.anchor = OneCellAnchor(_from=marker, ext=(width_emu, height_emu))
+                ws.add_image(image)
+            except Exception:  # noqa: BLE001
+                continue
+
+    def _draw_annual_statistics(self, ws, start_row: int, border, rows: list[dict[str, Any]], last_student_row: int) -> int:
+        from openpyxl.chart import PieChart, Reference
+        from openpyxl.chart.label import DataLabelList
+        from openpyxl.styles import Alignment, Font
+
+        aprobados, reprobados = self._count_observations(rows)
+        total = aprobados + reprobados
+        pct_aprobados = round((aprobados / total) * 100, 2) if total else 0
+        pct_reprobados = round((reprobados / total) * 100, 2) if total else 0
+        promedio = self._average_promedio_final(rows)
+
+        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=6)
+        title_cell = ws.cell(row=start_row, column=1, value="Cuadro de logros en la evaluación de los aprendizajes")
+        title_cell.font = Font(bold=True)
+        title_cell.alignment = Alignment(horizontal="center")
+        for col in range(1, 7):
+            ws.cell(row=start_row, column=col).border = border
+
+        labels = ["Total aprobados", "Total reprobados"]
+        values = [aprobados, reprobados]
+        percentages = [pct_aprobados, pct_reprobados]
+
+        for idx, label in enumerate(labels, start=1):
+            r = start_row + idx
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+            ws.cell(row=r, column=1, value=label).alignment = Alignment(horizontal="left")
+            ws.cell(row=r, column=5, value=values[idx - 1]).alignment = Alignment(horizontal="center")
+            ws.cell(row=r, column=6, value=percentages[idx - 1] / 100).number_format = "0%"
+            ws.cell(row=r, column=6).alignment = Alignment(horizontal="center")
+            for col in range(1, 7):
+                ws.cell(row=r, column=col).border = border
+
+        promedio_row = start_row + 4
+        ws.merge_cells(start_row=promedio_row, start_column=1, end_row=promedio_row, end_column=5)
+        ws.cell(row=promedio_row, column=1, value="Promedio").alignment = Alignment(horizontal="center")
+        ws.cell(row=promedio_row, column=6, value=promedio if promedio is not None else "—")
+        if promedio is not None:
+            ws.cell(row=promedio_row, column=6).number_format = "0.00"
+        ws.cell(row=promedio_row, column=6).alignment = Alignment(horizontal="center")
+        for col in range(1, 7):
+            ws.cell(row=promedio_row, column=col).border = border
+
+        chart = PieChart()
+        data = Reference(ws, min_col=5, min_row=start_row + 1, max_row=start_row + 2)
+        cats = Reference(ws, min_col=1, min_row=start_row + 1, max_row=start_row + 2)
+        chart.add_data(data, titles_from_data=False)
+        chart.set_categories(cats)
+        chart.height = 3.04 / 2.54
+        chart.width = 7.16 / 2.54
+        chart.dataLabels = DataLabelList()
+        chart.dataLabels.showPercent = True
+        chart_row = last_student_row + 2
+        ws.add_chart(chart, f"H{chart_row}")
+
+        return max(promedio_row + 3, chart_row + 6)
+
+    @staticmethod
+    def _count_observations(rows: list[dict[str, Any]]) -> tuple[int, int]:
+        aprobados = 0
+        reprobados = 0
+        for row in rows:
+            obs = str(row.get("observacion", "")).strip().lower()
+            has_final = row.get("promedio_final") is not None
+            if obs in {"aprobado", "apr", "apb"}:
+                aprobados += 1
+            elif obs or has_final:
+                reprobados += 1
+        return aprobados, reprobados
+
+    @staticmethod
+    def _average_promedio_final(rows: list[dict[str, Any]]) -> float | None:
+        values: list[float] = []
+        for row in rows:
+            value = row.get("promedio_final")
+            if value is None:
+                continue
+            try:
+                values.append(float(value))
+            except Exception:  # noqa: BLE001
+                continue
+        if not values:
+            return None
+        return round(sum(values) / len(values), 2)
+
+    @staticmethod
+    def _draw_signatures(ws, start_row: int, max_cols: int, firmantes: dict[str, str]) -> None:
+        from openpyxl.styles import Alignment
+
+        roles = [
+            ("Docente", firmantes.get("docente", "")),
+            ("Coordinador de Área", firmantes.get("coordinador_area", "")),
+            ("Rector", firmantes.get("rector", "")),
+            ("Tutor de Curso", firmantes.get("tutor_curso", "")),
+        ]
+        block = max(1, max_cols // 4)
+        for idx, (rol, firma) in enumerate(roles):
+            col_start = (idx * block) + 1
+            col_end = min(max_cols, col_start + block - 1)
+            ws.merge_cells(start_row=start_row, start_column=col_start, end_row=start_row, end_column=col_end)
+            ws.merge_cells(start_row=start_row + 1, start_column=col_start, end_row=start_row + 1, end_column=col_end)
+            ws.merge_cells(start_row=start_row + 2, start_column=col_start, end_row=start_row + 2, end_column=col_end)
+            ws.cell(row=start_row, column=col_start, value="_____________________________")
+            ws.cell(row=start_row + 1, column=col_start, value=firma or "")
+            ws.cell(row=start_row + 2, column=col_start, value=rol)
+            ws.cell(row=start_row, column=col_start).alignment = Alignment(horizontal="center")
+            ws.cell(row=start_row + 1, column=col_start).alignment = Alignment(horizontal="center")
+            ws.cell(row=start_row + 2, column=col_start).alignment = Alignment(horizontal="center")

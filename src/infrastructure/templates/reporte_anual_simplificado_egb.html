@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cuadro de Calificación — Anual EGB Simplificado</title>
+<style>
+  @page { size: A4 portrait; margin: 10mm; }
+  :root { --azul-oscuro:#1F4E79; --azul-medio:#2E75B6; --azul-claro:#9DC3E6; --gris-tabla:#B7B7B7; --fila-par:#FFFFFF; --fila-impar:#F0F7FF; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 100%; background: #C8C8C8; font-family: 'Calibri', 'Trebuchet MS', sans-serif; font-size: 8.5pt; color: #000; display: flex; flex-direction: column; align-items: center; padding: 24px; }
+  .hoja { width: min(794px, 100%); max-width: 100%; background: white; border: none; display: flex; flex-direction: column; page-break-after: avoid; }
+  .header-top { background: var(--azul-oscuro); display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; min-height: 68px; flex-shrink: 0; }
+  .logo-box { width: 78px; height: 62px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logo-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .header-center { flex: 1; min-width: 0; text-align: center; padding: 0 8px; }
+  .inst-nombre { font-size: 20pt; font-weight: bold; color: white; line-height: 1.15; }
+  .inst-subtitulo { font-size: 8.5pt; color: rgba(255,255,255,0.88); margin-top: 1px; }
+  .meta-bloque { background: var(--azul-claro); padding: 4px 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 1px 20px; flex-shrink: 0; }
+  .meta-row { display: flex; min-width: 0; align-items: baseline; font-size: 8.5pt; line-height: 1.55; overflow-wrap: anywhere; }
+  .meta-label { font-weight: bold; font-style: italic; margin-right: 4px; white-space: nowrap; }
+  .tabla-wrap { width: 100%; max-width: 100%; flex-shrink: 0; overflow: visible; }
+  table.principal { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7pt; }
+  table.principal col.c-num{width:4%;} table.principal col.c-nomina{width:24%;} table.principal col.c-tcal{width:7%;} table.principal col.c-tcual{width:5.5%;} table.principal col.c-prom{width:7.5%;} table.principal col.c-cual{width:7%;} table.principal col.c-equiv{width:20%;}
+  table.principal th, table.principal td { border: 1px solid var(--gris-tabla); text-align: center; vertical-align: middle; padding: 2px 2px; overflow: hidden; white-space: nowrap; }
+  table.principal thead tr.head1 th { background: var(--azul-medio); color: white; font-weight: bold; font-size: 7.5pt; height: 28px; white-space: normal; line-height: 1.2; }
+  table.principal thead tr.head2 th { background: var(--azul-claro); color: #000; font-size: 6.7pt; height: 24px; white-space: normal; line-height: 1.2; }
+  table.principal td.nomina { text-align: left; padding-left: 3px; white-space: normal; overflow-wrap: anywhere; }
+  table.principal td.celda-equivalencia { white-space: normal; overflow-wrap: anywhere; line-height: 1.2; text-align: left; padding-left: 5px; }
+  table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); } table.principal tbody tr:nth-child(odd) td { background: var(--fila-par); }
+  table.principal td.prom-bold { font-weight: bold; }
+  .bloque-inferior { padding: 8px 14px 0; flex-shrink: 0; page-break-inside: avoid; break-after: avoid; page-break-after: avoid; }
+  .fila-logros { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: flex-start; gap: 10px; margin-bottom: 8px; page-break-inside: avoid; }
+  table.estadistica { border-collapse: collapse; font-size: 7.6pt; width: 100%; }
+  table.estadistica th, table.estadistica td { border: 1px solid #000; padding: 2px 5px; }
+  table.estadistica thead th { background: var(--azul-medio); color: white; font-weight: bold; text-align: center; }
+  table.estadistica td.c-escala, table.estadistica th.c-escala { text-align: center; width: 150px; font-weight: bold; }
+  table.estadistica td.c-cantidad, table.estadistica th.c-cantidad { text-align: center; width: 55px; }
+  table.estadistica td.c-pct, table.estadistica th.c-pct { text-align: center; width: 80px; }
+  table.estadistica tr.total td { font-weight: bold; background: var(--azul-claro); }
+  .grafico-wrap { display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; padding: 5px 8px; background: white; flex: 1; min-width: 0; min-height: 145px; }
+  .bar-chart { width: 100%; min-height: 130px; display: flex; align-items: flex-end; justify-content: space-around; gap: 8px; }
+  .bar-item { flex: 1; text-align: center; font-size: 7pt; }
+  .bar-pct { min-height: 13px; line-height: 1.1; margin-bottom: 2px; }
+  .bar { width: 100%; min-height: 2px; background: var(--azul-medio); border: 1px solid var(--azul-oscuro); }
+  .bar-n { margin-top: 2px; font-weight: bold; }
+  .bar-label { margin-top: 1px; font-weight: bold; }
+  .fila-promedio { display: flex; justify-content: center; margin: 8px 0 0; page-break-inside: avoid; }
+  table.promedio { border-collapse: collapse; font-size: 8pt; width: 360px; }
+  table.promedio td { border: 1px solid #000; padding: 3px 8px; }
+  table.promedio td.p-label { text-align: center; } table.promedio td.p-valor { text-align: center; font-weight: bold; width: 68px; }
+  .firmas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 60px; padding: 0 10px; flex-shrink: 0; page-break-inside: avoid; break-before: avoid; page-break-before: avoid; }
+  .firma-bloque { display: flex; flex-direction: column; align-items: center; min-width: 0; width: 100%; }
+  .firma-linea { width: 100%; border-top: 1px solid #000; margin-bottom: 3px; }
+  .firma-nombre { font-size: 8.5pt; text-align: center; font-weight: bold; overflow-wrap: anywhere; }
+  .firma-cargo { font-size: 8pt; text-align: center; color: #222; }
+  @media print { body { background: white; padding: 0; margin: 0; } .hoja { width: 100%; max-width: none; page-break-after: avoid; } .header-top, .meta-bloque, .bloque-inferior, .firmas, table.principal tr { break-inside: avoid; page-break-inside: avoid; } table.principal thead { display: table-header-group; } }
+</style>
+</head>
+<body>
+<div class="hoja">
+<div class="header-top"><div class="logo-box"><img src="[[logo_inst_src]]" alt="Logo institución"></div><div class="header-center"><div class="inst-nombre">[[institucion_nombre]]</div><div class="inst-subtitulo">[[institucion_subtitulo]]</div><div class="inst-subtitulo" style="font-weight:bold;font-size:9pt;margin-top:2px;color:white;">CUADRO DE CALIFICACIÓN ANUAL</div></div><div class="logo-box"><img src="[[logo_mineduc_src]]" alt="Logo ministerio"></div></div>
+<div class="meta-bloque"><div class="meta-row"><span class="meta-label">Docente:</span> [[docente_nombre]]</div><div class="meta-row"><span class="meta-label">Asignatura:</span> [[asignatura_nombre]]</div><div class="meta-row"><span class="meta-label">Curso:</span> [[curso_nombre]] &nbsp;&nbsp;<span class="meta-label">Nivel:</span> [[nivel]]</div><div class="meta-row"><span class="meta-label">Paralelo:</span> [[paralelo_nombre]] &nbsp;&nbsp;<span class="meta-label">Tutor:</span> [[tutor]]</div><div class="meta-row"><span class="meta-label">Año lectivo:</span> [[periodo_lectivo]]</div><div class="meta-row"><span class="meta-label">Fecha:</span> [[fecha]]</div></div>
+<div class="tabla-wrap"><table class="principal"><colgroup><col class="c-num"><col class="c-nomina"><col class="c-tcal"><col class="c-tcual"><col class="c-tcal"><col class="c-tcual"><col class="c-tcal"><col class="c-tcual"><col class="c-prom"><col class="c-cual"><col class="c-equiv"></colgroup><thead><tr class="head1"><th rowspan="2">N°</th><th rowspan="2">Nómina</th><th colspan="2">Primer<br>Trimestre</th><th colspan="2">Segundo<br>Trimestre</th><th colspan="2">Tercer<br>Trimestre</th><th rowspan="2">Promedio</th><th rowspan="2">Cualitativo</th><th rowspan="2">Equivalencia</th></tr><tr class="head2"><th>Calificación</th><th>Cualitativo</th><th>Calificación</th><th>Cualitativo</th><th>Calificación</th><th>Cualitativo</th></tr></thead><tbody>[[rows_html]]</tbody></table></div>
+<div class="bloque-inferior"><div class="fila-logros"><div><table class="estadistica"><thead><tr><th class="c-escala">ESCALA CUALITATIVA</th><th class="c-cantidad">N°</th><th class="c-pct">%</th></tr></thead><tbody>[[logros_rows_html]]</tbody></table></div><div class="grafico-wrap">[[chart_svg]]</div></div><div class="fila-promedio"><table class="promedio"><tr><td class="p-label">Promedio General Anual</td><td class="p-valor">[[promedio_general]]</td></tr></table></div></div>
+<div class="firmas"><div class="firma-bloque"><div class="firma-linea"></div><div class="firma-nombre">[[firma_docente]]</div><div class="firma-cargo">Docente</div></div><div class="firma-bloque"><div class="firma-linea"></div><div class="firma-nombre">[[firma_coordinador]]</div><div class="firma-cargo">Coordinador de Área</div></div><div class="firma-bloque"><div class="firma-linea"></div><div class="firma-nombre">[[firma_rector]]</div><div class="firma-cargo">Rector</div></div><div class="firma-bloque"><div class="firma-linea"></div><div class="firma-nombre">[[firma_tutor]]</div><div class="firma-cargo">Tutor de Curso</div></div></div>
+</div>
+</body></html>

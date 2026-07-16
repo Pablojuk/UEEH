@@ -1,56 +1,99 @@
-# Gestión Académica
+# Sistema Académico UEEH V2
 
-Aplicación de escritorio en **PySide6** para visualizar un informe de notas (estilo Excel) directamente en la interfaz, con opciones de guardado a **PDF** y **Excel (.xlsx)**.
+## Descripción general
+Sistema académico de escritorio para gestión institucional y pedagógica en entorno local.
 
-## Estructura
+## Objetivo de la aplicación
+Centralizar procesos clave de gestión académica para docentes e institución: configuración, registro, seguimiento, reportes y respaldo de información.
 
-```text
-.
-├── data/                        # Datos persistentes (SQLite u otros)
-├── main.py                      # Punto de entrada para desarrollo/Spyder
-├── pyproject.toml               # Configuración del paquete
-├── reports/                     # Salidas recomendadas (PDF/XLSX)
-└── src/
-    └── gestion_academica/
-        ├── __init__.py
-        ├── app.py               # Arranque de la app Qt
-        ├── config/
-        │   ├── __init__.py
-        │   └── estilos.py
-        ├── data/
-        │   ├── __init__.py
-        │   └── datos_demo.py
-        ├── resources/
-        │   └── logos/
-        │       ├── institucion.png
-        │       └── mineduc.png
-        ├── services/
-        │   ├── __init__.py
-        │   └── exportadores.py
-        └── views/
-            ├── __init__.py
-            ├── tabla_calificaciones.py
-            └── ventana_principal.py
-```
+## Tipo de aplicación
+Aplicación de escritorio local para docentes.
 
-> Si los logos no existen, la app usa un fallback visual y sigue funcionando.
+## Tecnologías usadas
+- Python
+- PySide6
+- SQLite
+- openpyxl
+- Jinja2
+- pytest
 
-## Ejecución
+## Módulos principales
+- Configuración inicial
+- Login
+- Institución
+- Docentes
+- Catálogos
+- Estudiantes
+- Importación de estudiantes
+- Matrículas
+- Asignaciones docentes
+- Registro de calificaciones
+- Reportes
+- Asistencia
+- Acompañamiento integral
+- Respaldo/restauración
 
-### Desde terminal
+## Requisitos previos
+- Python 3.10 o superior
+- pip
+- Entorno virtual recomendado
 
+## Instalación
+- Crear entorno virtual:
 ```bash
-python main.py
+python -m venv .venv
 ```
 
-### Desde Spyder
+- Activación del entorno virtual en Windows:
+```bash
+.venv\Scripts\activate
+```
 
-1. Abrir la carpeta del proyecto (`/workspace/UEEH`) como *Working Directory*.
-2. Abrir `main.py`.
-3. Ejecutar (Run file/F5).
+- Instalación de dependencias:
+```bash
+python -m pip install -r requirements-dev.txt
+```
 
-## Funcionalidades de salida
+## Ejecución de la app
+```bash
+python -m src.app
+```
 
-- **Imprimir**: abre diálogo de impresión del sistema.
-- **Guardar PDF**: renderiza el reporte completo paginado a un archivo PDF.
-- **Guardar Excel**: genera un `.xlsx` con metadatos, tabla y resumen.
+## Ejecución de pruebas
+```bash
+python -m pytest
+```
+
+## Nota sobre el entorno de Codex
+En el entorno de Codex, la instalación de dependencias puede fallar por restricción de red (error 403). La validación completa debe ejecutarse en una PC con acceso a internet.
+
+## Base de datos
+La aplicación utiliza SQLite local. Los archivos `data/*.db` no deben versionarse en Git.
+
+## Respaldos
+Cada docente debe realizar respaldos periódicos de su base local para evitar pérdida de información.
+
+## Estructura del proyecto
+- `src/application`: capa de servicios y casos de uso.
+- `src/domain`: reglas y modelos de dominio.
+- `src/infrastructure`: persistencia, importadores y exportadores.
+- `src/presentation`: interfaz gráfica y vistas.
+- `src/shared`: utilidades compartidas.
+- `tests`: pruebas automáticas.
+
+## Buenas prácticas
+- Trabajar por ramas pequeñas.
+- No subir `__pycache__` ni `*.pyc`.
+- No subir archivos `.db` locales.
+- No modificar lógica sin pruebas.
+
+## Estado actual
+- Base limpia de trabajo consolidada en `codex/V2` (referencia de proceso).
+- Dependencias documentadas en `requirements.txt` y `requirements-dev.txt`.
+- Validación funcional completa pendiente en entorno con internet.
+
+## Próximos pasos
+1. Validar instalación en PC local con internet.
+2. Ejecutar pruebas automáticas.
+3. Revisar flujos y salida de reportes.
+4. Preparar instalador para Windows.
