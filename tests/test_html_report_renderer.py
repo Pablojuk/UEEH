@@ -54,6 +54,99 @@ class TestHtmlReportRenderer(unittest.TestCase):
         self.assertIn("class='nomina'", html)
         self.assertIn("<svg", html)
 
+    def test_reporte_anual_normal_usa_a4_horizontal_y_ancho_flexible(self) -> None:
+        renderer = HtmlReportRenderer()
+        html = renderer.render(
+            {
+                "report_type": "anual",
+                "institucion_nombre": "UEEH",
+                "docente_nombre": "Docente de Prueba",
+                "asignatura_nombre": "Matemática",
+                "curso_nombre": "Décimo de EGB",
+                "paralelo_nombre": "A",
+                "firmantes": {},
+                "institucion": {},
+            },
+            [
+                {
+                    "estudiante": "Apellidos Sintéticos Muy Extensos Nombres de Prueba",
+                    "trimestre_1": 9,
+                    "trimestre_2": 8,
+                    "trimestre_3": 9,
+                    "promedio": 8.67,
+                    "promedio_final": 8.67,
+                    "observacion": "Aprobado",
+                }
+            ],
+        )
+        self.assertEqual(html.count("size: A4 landscape"), 1)
+        self.assertNotIn("size: A4 portrait", html)
+        self.assertNotIn("width: 794px", html)
+        self.assertIn("width: min(1120px, 100%);", html)
+        self.assertIn("table.principal col.c-nomina  { width: 24%; }", html)
+        self.assertIn("table.principal col.c-obs     { width: 11%; }", html)
+        self.assertIn("overflow-wrap: anywhere", html)
+        self.assertIn("Apellidos Sintéticos Muy Extensos Nombres de Prueba", html)
+        self.assertIn("margin-top: 60px;", html)
+
+    def test_reporte_anual_normal_no_agrega_filas_vacias_que_fuercen_otra_pagina(self) -> None:
+        html = HtmlReportRenderer()._build_anual_rows_html(
+            [{"estudiante": "Estudiante Sintético", "promedio_final": 8, "observacion": "Aprobado"}]
+        )
+        self.assertEqual(html.count("<tr>"), 1)
+
+    def test_reporte_trimestral_normal_usa_a4_horizontal_y_ancho_util(self) -> None:
+        html = HtmlReportRenderer().render(
+            {
+                "report_type": "trimestral",
+                "trimestre_num": 2,
+                "institucion_nombre": "UEEH",
+                "docente_nombre": "Docente Sintético",
+                "asignatura_nombre": "Lengua y Literatura",
+                "curso_nombre": "Décimo EGB",
+                "paralelo_nombre": "A",
+                "firmantes": {},
+                "institucion": {},
+            },
+            [{"estudiante": "Maldonado Villavicencio María Fernanda", "promedio_final": 8.75}],
+        )
+        self.assertEqual(html.count("size: A4 landscape"), 1)
+        self.assertNotIn("size: A4 portrait", html)
+        self.assertNotIn("width: 210mm", html)
+        self.assertNotIn("width: 794px", html)
+        self.assertIn("width: min(1120px, 100%);", html)
+        self.assertIn("table.principal col.c-num    { width: 3%; }", html)
+        self.assertIn("table.principal col.c-nomina { width: 26%; }", html)
+        self.assertIn("table.principal col.c-obs    { width: 12%; }", html)
+
+    def test_reporte_trimestral_normal_no_agrega_filas_vacias(self) -> None:
+        html = HtmlReportRenderer()._build_trimestral_rows_html(
+            [{"estudiante": "Estudiante Sintético", "promedio_final": 8, "observacion": "Aprobado"}]
+        )
+        self.assertEqual(html.count("<tr>"), 1)
+
+    def test_reporte_trimestral_simplificado_conserva_a4_vertical_sin_desborde(self) -> None:
+        html = HtmlReportRenderer().render(
+            {
+                "report_type": "trimestral",
+                "is_simplified_trimestral": True,
+                "institucion_nombre": "UEEH",
+                "docente_nombre": "Docente Sintético",
+                "asignatura_nombre": "Matemática",
+                "curso_nombre": "Segundo de EGB",
+                "paralelo_nombre": "A",
+                "firmantes": {},
+                "institucion": {},
+            },
+            [{"estudiante": "Maldonado Villavicencio María Fernanda", "promedio_trimestral": 8.75}],
+        )
+        self.assertEqual(html.count("size: A4 portrait"), 1)
+        self.assertNotIn("size: A4 landscape", html)
+        self.assertIn("width: min(794px, 100%);", html)
+        self.assertIn(".hoja { width: 100%; max-width: none;", html)
+        self.assertIn("table.principal col.c-num { width: 5%; }", html)
+        self.assertIn("table.principal col.c-equiv { width: 35%; }", html)
+
     def test_render_anual_simplificado_no_muestra_supletorio(self) -> None:
         renderer = HtmlReportRenderer()
         html = renderer.render(
@@ -73,6 +166,9 @@ class TestHtmlReportRenderer(unittest.TestCase):
         self.assertNotIn("Supletorio", html)
         self.assertNotIn("Promedio Final", html)
         self.assertIn("Equivalencia", html)
+        self.assertEqual(html.count("size: A4 portrait"), 1)
+        self.assertIn("width: min(794px, 100%);", html)
+        self.assertIn("margin-top: 60px;", html)
 
     def test_estadistica_anual_trata_spl_como_reprobado(self) -> None:
         renderer = HtmlReportRenderer()

@@ -12,6 +12,50 @@ from src.infrastructure.exporters.pdf_report_exporter import PdfReportExporter
 
 
 class TestPdfReportExporter(unittest.TestCase):
+    def test_reporte_trimestral_normal_exporta_en_horizontal(self) -> None:
+        exporter = PdfReportExporter()
+        context = {"report_type": "trimestral", "is_simplified_trimestral": False}
+        rows = [{"estudiante": "Estudiante Sintético", "promedio_final": 8}]
+        with patch.object(exporter, "_render_report_html", return_value="<html></html>"), patch.object(
+            exporter, "export_to_pdf", return_value=True
+        ) as export_to_pdf:
+            exporter.exportar("reporte.pdf", "Reporte", context, rows)
+
+        self.assertEqual(export_to_pdf.call_args.kwargs["orientation"], "landscape")
+
+    def test_reporte_trimestral_simplificado_conserva_orientacion_vertical(self) -> None:
+        exporter = PdfReportExporter()
+        context = {"report_type": "trimestral", "is_simplified_trimestral": True}
+        rows = [{"estudiante": "Estudiante Sintético", "promedio_final": 8}]
+        with patch.object(exporter, "_render_report_html", return_value="<html></html>"), patch.object(
+            exporter, "export_to_pdf", return_value=True
+        ) as export_to_pdf:
+            exporter.exportar("reporte.pdf", "Reporte", context, rows)
+
+        self.assertEqual(export_to_pdf.call_args.kwargs["orientation"], "portrait")
+
+    def test_reporte_anual_normal_exporta_en_horizontal(self) -> None:
+        exporter = PdfReportExporter()
+        context = {"report_type": "anual", "is_simplified_anual": False}
+        rows = [{"estudiante": "Estudiante Sintético", "promedio_final": 8}]
+        with patch.object(exporter, "_render_report_html", return_value="<html></html>"), patch.object(
+            exporter, "export_to_pdf", return_value=True
+        ) as export_to_pdf:
+            exporter.exportar("reporte.pdf", "Reporte", context, rows)
+
+        self.assertEqual(export_to_pdf.call_args.kwargs["orientation"], "landscape")
+
+    def test_reporte_anual_simplificado_conserva_orientacion_vertical(self) -> None:
+        exporter = PdfReportExporter()
+        context = {"report_type": "anual", "is_simplified_anual": True}
+        rows = [{"estudiante": "Estudiante Sintético", "promedio_final": 8}]
+        with patch.object(exporter, "_render_report_html", return_value="<html></html>"), patch.object(
+            exporter, "export_to_pdf", return_value=True
+        ) as export_to_pdf:
+            exporter.exportar("reporte.pdf", "Reporte", context, rows)
+
+        self.assertEqual(export_to_pdf.call_args.kwargs["orientation"], "portrait")
+
     def test_ocultar_filas_js_incluye_regla_para_guion(self) -> None:
         exporter = PdfReportExporter()
         captured_js: dict[str, str] = {}

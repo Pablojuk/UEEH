@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import unittest
 
-from src.presentation.styles import APP_STYLE, BASE_FONT_POINT_SIZE
+from src.presentation.styles import APP_STYLE, ATTENDANCE_TABS_STYLE, BASE_FONT_POINT_SIZE
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -28,6 +28,13 @@ class TestStyleDefinition(unittest.TestCase):
         self.assertIn("selection-background-color: #dbeafe;", APP_STYLE)
         self.assertIn("selection-color: #0f172a;", APP_STYLE)
         self.assertIn("border: 1px solid #93c5fd;", APP_STYLE)
+
+    def test_pestanas_de_asistencias_tienen_estilo_local_legible(self) -> None:
+        self.assertIn("QTabWidget#AttendanceTabs QTabBar::tab:selected", ATTENDANCE_TABS_STYLE)
+        self.assertIn("background-color: #1f4e79;", ATTENDANCE_TABS_STYLE)
+        self.assertIn("color: #ffffff;", ATTENDANCE_TABS_STYLE)
+        self.assertIn("QTabBar::tab:!selected:hover", ATTENDANCE_TABS_STYLE)
+        self.assertNotIn("AttendanceTabs", APP_STYLE)
 
 
 @unittest.skipIf(QApplication is None, "PySide6 no está instalado en el entorno")

@@ -37,9 +37,12 @@ class PdfReportExporter:
             context.get("report_type") == "trimestral" and context.get("is_simplified_trimestral")
         )
         is_simplified_anual = bool(context.get("report_type") == "anual" and context.get("is_simplified_anual"))
-        orientation = "portrait" if (is_simplified_trimestral or is_simplified_anual) else (
-            "landscape" if context.get("report_type") == "trimestral" else "portrait"
-        )
+        if is_simplified_trimestral or is_simplified_anual:
+            orientation = "portrait"
+        elif context.get("report_type") in {"trimestral", "anual"}:
+            orientation = "landscape"
+        else:
+            orientation = "portrait"
         if not self.export_to_pdf(
             rendered,
             str(path),

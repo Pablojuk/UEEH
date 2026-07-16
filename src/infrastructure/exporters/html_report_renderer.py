@@ -370,8 +370,6 @@ class HtmlReportRenderer:
                 f"<td class='{self._observation_class(observacion_raw)}'>{observacion}</td>"
                 "</tr>"
             )
-        for _ in range(len(rows), 34):
-            html_rows.append("<tr><td>&nbsp;</td>" + "<td>&nbsp;</td>" * 9 + "</tr>")
         return "".join(html_rows)
 
     def _build_anual_rows_html(self, rows: list[dict[str, Any]]) -> str:
@@ -394,8 +392,6 @@ class HtmlReportRenderer:
                 f"<td class='{self._observation_class(observacion_raw)}'>{observacion}</td>"
                 "</tr>"
             )
-        for _ in range(len(rows), 34):
-            html_rows.append("<tr><td>&nbsp;</td>" + "<td>&nbsp;</td>" * 13 + "</tr>")
         return "".join(html_rows)
 
     def _build_logros_rows_html(self, rows: list[dict[str, Any]]) -> str:

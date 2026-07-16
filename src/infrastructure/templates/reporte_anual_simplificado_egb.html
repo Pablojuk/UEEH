@@ -8,30 +8,30 @@
   @page { size: A4 portrait; margin: 10mm; }
   :root { --azul-oscuro:#1F4E79; --azul-medio:#2E75B6; --azul-claro:#9DC3E6; --gris-tabla:#B7B7B7; --fila-par:#FFFFFF; --fila-impar:#F0F7FF; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { width: 100%; background: #C8C8C8; font-family: 'Calibri', 'Trebuchet MS', sans-serif; font-size: 8.5pt; color: #000; display: flex; flex-direction: column; align-items: center; padding: 24px 0 48px; }
-  .hoja { width: 794px; background: white; border: none; display: flex; flex-direction: column; page-break-inside: avoid; page-break-after: avoid; }
+  body { width: 100%; background: #C8C8C8; font-family: 'Calibri', 'Trebuchet MS', sans-serif; font-size: 8.5pt; color: #000; display: flex; flex-direction: column; align-items: center; padding: 24px; }
+  .hoja { width: min(794px, 100%); max-width: 100%; background: white; border: none; display: flex; flex-direction: column; page-break-after: avoid; }
   .header-top { background: var(--azul-oscuro); display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; min-height: 68px; flex-shrink: 0; }
   .logo-box { width: 78px; height: 62px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .logo-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
-  .header-center { flex: 1; text-align: center; padding: 0 8px; }
+  .header-center { flex: 1; min-width: 0; text-align: center; padding: 0 8px; }
   .inst-nombre { font-size: 20pt; font-weight: bold; color: white; line-height: 1.15; }
   .inst-subtitulo { font-size: 8.5pt; color: rgba(255,255,255,0.88); margin-top: 1px; }
   .meta-bloque { background: var(--azul-claro); padding: 4px 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 1px 20px; flex-shrink: 0; }
-  .meta-row { display: flex; align-items: baseline; font-size: 8.5pt; line-height: 1.55; }
+  .meta-row { display: flex; min-width: 0; align-items: baseline; font-size: 8.5pt; line-height: 1.55; overflow-wrap: anywhere; }
   .meta-label { font-weight: bold; font-style: italic; margin-right: 4px; white-space: nowrap; }
-  .tabla-wrap { flex-shrink: 0; overflow: hidden; }
+  .tabla-wrap { width: 100%; max-width: 100%; flex-shrink: 0; overflow: visible; }
   table.principal { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7pt; }
-  table.principal col.c-num{width:24px;} table.principal col.c-nomina{width:220px;} table.principal col.c-tcal{width:52px;} table.principal col.c-tcual{width:44px;} table.principal col.c-prom{width:58px;} table.principal col.c-cual{width:56px;} table.principal col.c-equiv{width:auto;}
+  table.principal col.c-num{width:4%;} table.principal col.c-nomina{width:24%;} table.principal col.c-tcal{width:7%;} table.principal col.c-tcual{width:5.5%;} table.principal col.c-prom{width:7.5%;} table.principal col.c-cual{width:7%;} table.principal col.c-equiv{width:20%;}
   table.principal th, table.principal td { border: 1px solid var(--gris-tabla); text-align: center; vertical-align: middle; padding: 2px 2px; overflow: hidden; white-space: nowrap; }
   table.principal thead tr.head1 th { background: var(--azul-medio); color: white; font-weight: bold; font-size: 7.5pt; height: 28px; white-space: normal; line-height: 1.2; }
   table.principal thead tr.head2 th { background: var(--azul-claro); color: #000; font-size: 6.7pt; height: 24px; white-space: normal; line-height: 1.2; }
-  table.principal td.nomina { text-align: left; padding-left: 3px; text-overflow: ellipsis; }
-  table.principal td.celda-equivalencia { white-space: normal; word-break: break-word; line-height: 1.2; text-align: left; padding-left: 5px; }
+  table.principal td.nomina { text-align: left; padding-left: 3px; white-space: normal; overflow-wrap: anywhere; }
+  table.principal td.celda-equivalencia { white-space: normal; overflow-wrap: anywhere; line-height: 1.2; text-align: left; padding-left: 5px; }
   table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); } table.principal tbody tr:nth-child(odd) td { background: var(--fila-par); }
   table.principal td.prom-bold { font-weight: bold; }
-  .bloque-inferior { padding: 8px 14px 0; flex-shrink: 0; page-break-inside: avoid; }
-  .fila-logros { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 8px; page-break-inside: avoid; }
-  table.estadistica { border-collapse: collapse; font-size: 7.6pt; width: 300px; flex-shrink: 0; }
+  .bloque-inferior { padding: 8px 14px 0; flex-shrink: 0; page-break-inside: avoid; break-after: avoid; page-break-after: avoid; }
+  .fila-logros { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: flex-start; gap: 10px; margin-bottom: 8px; page-break-inside: avoid; }
+  table.estadistica { border-collapse: collapse; font-size: 7.6pt; width: 100%; }
   table.estadistica th, table.estadistica td { border: 1px solid #000; padding: 2px 5px; }
   table.estadistica thead th { background: var(--azul-medio); color: white; font-weight: bold; text-align: center; }
   table.estadistica td.c-escala, table.estadistica th.c-escala { text-align: center; width: 150px; font-weight: bold; }
@@ -49,12 +49,12 @@
   table.promedio { border-collapse: collapse; font-size: 8pt; width: 360px; }
   table.promedio td { border: 1px solid #000; padding: 3px 8px; }
   table.promedio td.p-label { text-align: center; } table.promedio td.p-valor { text-align: center; font-weight: bold; width: 68px; }
-  .firmas { display: flex; justify-content: space-around; margin-top: 45px; padding: 0 10px 8px; flex-shrink: 0; page-break-inside: avoid; }
-  .firma-bloque { display: flex; flex-direction: column; align-items: center; width: 160px; }
+  .firmas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 60px; padding: 0 10px; flex-shrink: 0; page-break-inside: avoid; break-before: avoid; page-break-before: avoid; }
+  .firma-bloque { display: flex; flex-direction: column; align-items: center; min-width: 0; width: 100%; }
   .firma-linea { width: 100%; border-top: 1px solid #000; margin-bottom: 3px; }
-  .firma-nombre { font-size: 8.5pt; text-align: center; font-weight: bold; }
+  .firma-nombre { font-size: 8.5pt; text-align: center; font-weight: bold; overflow-wrap: anywhere; }
   .firma-cargo { font-size: 8pt; text-align: center; color: #222; }
-  @media print { body { background: white; padding: 0; } .hoja { page-break-after: avoid; page-break-inside: avoid; } }
+  @media print { body { background: white; padding: 0; margin: 0; } .hoja { width: 100%; max-width: none; page-break-after: avoid; } .header-top, .meta-bloque, .bloque-inferior, .firmas, table.principal tr { break-inside: avoid; page-break-inside: avoid; } table.principal thead { display: table-header-group; } }
 </style>
 </head>
 <body>

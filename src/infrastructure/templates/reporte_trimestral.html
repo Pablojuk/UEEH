@@ -30,11 +30,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 24px 0 48px;
+    padding: 24px;
   }
 
   .hoja {
-    width: 794px;
+    width: min(1120px, 100%);
+    max-width: 100%;
     background: white;
     border: 2.5px solid var(--azul-linea);
     display: flex;
@@ -84,6 +85,7 @@
 
   .header-center {
     flex: 1;
+    min-width: 0;
     text-align: center;
     padding: 0 8px;
   }
@@ -112,9 +114,11 @@
 
   .meta-row {
     display: flex;
+    min-width: 0;
     align-items: baseline;
     font-size: 8.5pt;
     line-height: 1.55;
+    overflow-wrap: anywhere;
   }
 
   .meta-label {
@@ -126,7 +130,9 @@
 
   .tabla-wrap {
     flex-shrink: 0;
-    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
   }
 
   table.principal {
@@ -136,16 +142,16 @@
     font-size: 7.8pt;
   }
 
-  table.principal col.c-num    { width: 28px; }
-  table.principal col.c-nomina { width: 220px; }
-  table.principal col.c-cal-a  { width: 68px; }
-  table.principal col.c-pond-a { width: 44px; }
-  table.principal col.c-cal-s  { width: 68px; }
-  table.principal col.c-pond-s { width: 44px; }
-  table.principal col.c-prom   { width: 64px; }
-  table.principal col.c-cual   { width: 56px; }
-  table.principal col.c-equiv  { width: 56px; }
-  table.principal col.c-obs    { width: 86px; }
+  table.principal col.c-num    { width: 3%; }
+  table.principal col.c-nomina { width: 26%; }
+  table.principal col.c-cal-a  { width: 10%; }
+  table.principal col.c-pond-a { width: 7%; }
+  table.principal col.c-cal-s  { width: 10%; }
+  table.principal col.c-pond-s { width: 7%; }
+  table.principal col.c-prom   { width: 9%; }
+  table.principal col.c-cual   { width: 8%; }
+  table.principal col.c-equiv  { width: 8%; }
+  table.principal col.c-obs    { width: 12%; }
 
   table.principal th,
   table.principal td {
@@ -172,15 +178,21 @@
     color: #000;
     font-weight: normal;
     font-size: 7.5pt;
-    height: 20px;
+    height: 24px;
+    white-space: normal;
+    line-height: 1.2;
   }
 
   table.principal td.nomina {
     text-align: left;
     padding-left: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  table.principal td:last-child {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   table.principal tbody tr:nth-child(even) td { background: var(--fila-impar); }
@@ -192,21 +204,24 @@
   table.principal td.prom-bold { font-weight: bold; }
 
   .bloque-inferior {
-    padding: 10px 14px 0;
+    padding: 6px 10px 0;
     flex-shrink: 0;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   .fila-logros {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(220px, 2fr);
     align-items: flex-start;
-    gap: 24px;
-    margin-bottom: 10px;
+    gap: 10px;
+    margin-bottom: 6px;
   }
 
   table.logros {
     border-collapse: collapse;
     font-size: 7.8pt;
-    width: 390px;
+    width: 100%;
   }
 
   table.logros th,
@@ -233,14 +248,20 @@
     border: 1px solid #ccc;
     padding: 6px 8px;
     background: white;
-    min-width: 250px;
-    min-height: 130px;
+    min-width: 0;
+    min-height: 100px;
+  }
+
+  .grafico-wrap svg {
+    display: block;
+    max-width: 100%;
+    max-height: 100px;
   }
 
   .fila-promedio {
     display: flex;
     justify-content: center;
-    margin: 8px 0 0;
+    margin: 4px 0 0;
   }
 
   table.promedio {
@@ -262,18 +283,22 @@
   }
 
   .firmas {
-    display: flex;
-    justify-content: space-around;
-    margin-top: 72px;
-    padding: 0 10px 20px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 60px;
+    padding: 0 10px;
     flex-shrink: 0;
+    break-before: avoid;
+    page-break-before: avoid;
   }
 
   .firma-bloque {
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 160px;
+    min-width: 0;
+    width: 100%;
   }
 
   .firma-linea {
@@ -286,6 +311,7 @@
     font-size: 8.5pt;
     text-align: center;
     font-weight: bold;
+    overflow-wrap: anywhere;
   }
 
   .firma-cargo {
@@ -302,20 +328,30 @@
     }
 
     .hoja {
-      width: 210mm;
+      width: 100%;
+      max-width: none;
       border: none;
       margin: 0;
       page-break-after: always;
+    }
+
+    .header-top,
+    .meta-bloque,
+    .bloque-inferior,
+    .firmas,
+    table.principal tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    table.principal thead {
+      display: table-header-group;
     }
 
     .hoja:last-child {
       page-break-after: avoid;
     }
 
-    @page {
-      size: A4 portrait;
-      margin: 10mm;
-    }
   }
 </style>
 </head>

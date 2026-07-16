@@ -2,6 +2,34 @@
 
 BASE_FONT_POINT_SIZE = 9.75
 
+ATTENDANCE_TABS_STYLE = """
+QTabWidget#AttendanceTabs::pane {
+    border: 1px solid #93b4d1;
+    border-radius: 0 6px 6px 6px;
+    background-color: #ffffff;
+    top: -1px;
+}
+QTabWidget#AttendanceTabs QTabBar::tab {
+    background-color: #eaf2f8;
+    color: #163a5f;
+    border: 1px solid #b7cde0;
+    border-bottom-color: #93b4d1;
+    padding: 8px 16px;
+    min-width: 120px;
+    font-weight: 600;
+}
+QTabWidget#AttendanceTabs QTabBar::tab:selected {
+    background-color: #1f4e79;
+    color: #ffffff;
+    border-color: #1f4e79;
+}
+QTabWidget#AttendanceTabs QTabBar::tab:!selected:hover {
+    background-color: #d5e7f5;
+    color: #0f2f4f;
+    border-color: #2d6ba3;
+}
+"""
+
 APP_STYLE = """
 QWidget {
     background-color: #f5f7fa;

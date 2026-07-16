@@ -192,6 +192,16 @@ class TestReportExportService(unittest.TestCase):
         context, _ = service._prepare_report_context("AS1", "anual", None, None)
         self.assertTrue(context["is_simplified_anual"])
 
+    def test_detecta_trimestral_simplificado_y_mantiene_banderas_exclusivas(self) -> None:
+        service = ReportExportService(
+            connection=self.conn,
+            academic_summary_service=self.academic_summary_service,
+            institution_service=self.institution_service,
+        )
+        context, _ = service._prepare_report_context("AS1", "trimestral", 2, None)
+        self.assertTrue(context["is_simplified_trimestral"])
+        self.assertFalse(context["is_simplified_anual"])
+
 
 
 if __name__ == "__main__":

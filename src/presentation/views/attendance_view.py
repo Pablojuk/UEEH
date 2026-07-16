@@ -16,6 +16,7 @@ from src.application.services.attendance_service import AttendanceService
 from src.infrastructure.exporters.attendance_report_renderer import AttendanceReportRenderer
 from src.infrastructure.exporters.attendance_excel_exporter import AttendanceExcelExporter
 from src.infrastructure.exporters.pdf_report_exporter import PdfReportExporter
+from src.presentation.styles import ATTENDANCE_TABS_STYLE
 
 class AttendanceView(QWidget):
     STATUS=["P","A","F","J"]
@@ -24,7 +25,7 @@ class AttendanceView(QWidget):
         self.renderer=AttendanceReportRenderer(); self.excel_exporter=AttendanceExcelExporter(); self.pdf_exporter=PdfReportExporter()
         self.assignments=[]; self._days=[]; self._quarterly_data=None; self._annual_data=None
         self._attendance_firmantes={"docente":"","tutor":"","rector":""}
-        root=QVBoxLayout(self); self.tabs=QTabWidget(); root.addWidget(self.tabs)
+        root=QVBoxLayout(self); self.tabs=QTabWidget(); self.tabs.setObjectName("AttendanceTabs"); self.tabs.setStyleSheet(ATTENDANCE_TABS_STYLE); root.addWidget(self.tabs)
         self.tabs.addTab(self._build_month_sheet_tab(),"Sábana mensual")
         self.tabs.addTab(self._build_quarterly_report_tab(),"Informe trimestral")
         self.tabs.addTab(self._build_annual_report_tab(),"Informe anual")
