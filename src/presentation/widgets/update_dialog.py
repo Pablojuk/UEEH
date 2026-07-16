@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QTextEdit,
@@ -193,6 +196,35 @@ class UpdateDialog(QDialog):
         self.btn_ignorar.setText("Cerrar")
         self.btn_ignorar.setEnabled(True)
         self.btn_descargar.setVisible(False)
+
+        # Preguntar/avisar al usuario para ejecutar la instalación y cerrar la aplicación
+        QMessageBox.information(
+            self,
+            "Descarga completada",
+            "Descarga completada. El sistema se cerrará automáticamente para iniciar la instalación."
+        )
+
+        try:
+            if hasattr(os, "startfile"):
+                os.startfile(file_path)
+            else:
+                import subprocess
+                if sys.platform == "win32":
+                    subprocess.Popen([file_path], shell=True)
+                elif sys.platform == "darwin":
+                    subprocess.Popen(["open", file_path])
+                else:
+                    subprocess.Popen(["xdg-open", file_path])
+            
+            # Cerrar la aplicación de forma segura para evitar bloquear archivos al instalar
+            QApplication.quit()
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                "Error al ejecutar instalador",
+                f"No se pudo iniciar el instalador automáticamente.\n"
+                f"Puede ejecutarlo manualmente desde:\n{file_path}\n\nDetalle: {exc}"
+            )
 
     def _download_error(self, err_msg: str) -> None:
         self.progress_bar.setVisible(False)
