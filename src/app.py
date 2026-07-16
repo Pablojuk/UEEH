@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import sys
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog
 
 from src.application.services.academic_summary_service import AcademicSummaryService
 from src.application.services.attendance_service import AttendanceService
@@ -24,7 +24,6 @@ from src.application.services.teaching_assignment_service import TeachingAssignm
 from src.infrastructure.persistence.db import DEFAULT_DB_PATH, initialize_database
 from src.presentation.main_window import MainWindow
 from src.presentation.styles import APP_STYLE
-from src.presentation.views.login_view import LoginView
 from src.presentation.views.setup_view import SetupView
 from src.presentation.widgets.interaction_support import install_global_interaction_support
 
@@ -57,25 +56,21 @@ def run_application() -> int:
     classroom_accompaniment_service = ClassroomAccompanimentService(connection)
     attendance_service = AttendanceService(connection)
 
-    # Control de licencias y versión de prueba antes de acceder
+    # La configuración institucional debe poder completarse en una instalación
+    # nueva antes de evaluar el período de prueba o la licencia.
+    if setup_service.es_primer_uso():
+        setup_dialog = SetupView(setup_service=setup_service, institution_service=institution_service)
+        if setup_dialog.exec() != QDialog.Accepted:
+            connection.close()
+            return 0
+
+    # Control independiente de licencias y versión de prueba.
     if not setup_service.is_licensed():
-        from PySide6.QtWidgets import QDialog
         from src.presentation.widgets.license_dialog import LicenseDialog
         license_dialog = LicenseDialog(setup_service=setup_service)
         if license_dialog.exec() != QDialog.Accepted:
             connection.close()
             return 0
-
-    if setup_service.es_primer_uso():
-        setup_dialog = SetupView(setup_service=setup_service, institution_service=institution_service)
-        if setup_dialog.exec() != SetupView.Accepted:
-            connection.close()
-            return 0
-
-    login_dialog = LoginView(setup_service=setup_service)
-    if login_dialog.exec() != LoginView.Accepted:
-        connection.close()
-        return 0
 
     window = MainWindow(
         institution_service=institution_service,

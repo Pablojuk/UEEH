@@ -39,24 +39,16 @@ class SetupService:
         """Indica si el sistema aún no completó configuración inicial."""
         return self.obtener_estado_sistema()["primer_uso"]
 
-    def configurar_sistema_inicial(self, clave_maestra: str) -> dict[str, Any]:
-        """Configura por primera vez el sistema con clave maestra hasheada."""
-        if not clave_maestra:
-            raise ValueError("La clave maestra es obligatoria")
-
+    def configurar_sistema_inicial(self) -> dict[str, Any]:
+        """Marca la configuración inicial como completa sin crear credenciales."""
         existente = self.repo.obtener_por_id(1)
         if existente and int(existente["primer_uso_completado"]) == 1:
             return {"creado": False, "mensaje": "El sistema ya fue configurado"}
-
-        salt = generar_salt()
-        clave_hash = hash_clave(clave_maestra, salt)
 
         if existente:
             self.repo.actualizar(
                 1,
                 {
-                    "clave_inicial_hash": clave_hash,
-                    "clave_inicial_salt": salt,
                     "primer_uso_completado": 1,
                 },
             )
@@ -64,8 +56,8 @@ class SetupService:
             self.repo.crear(
                 {
                     "id": 1,
-                    "clave_inicial_hash": clave_hash,
-                    "clave_inicial_salt": salt,
+                    "clave_inicial_hash": None,
+                    "clave_inicial_salt": None,
                     "primer_uso_completado": 1,
                     "escala_maxima": 10.0,
                     "escala_minima": 0.0,
@@ -78,7 +70,7 @@ class SetupService:
         return {"creado": True, "mensaje": "Configuración inicial completada"}
 
     def validar_clave_maestra(self, clave_maestra: str) -> bool:
-        """Valida clave maestra contra configuración persistida."""
+        """Compatibilidad heredada; V4 no invoca este método para acceder."""
         configuracion = self.repo.obtener_por_id(1)
         if not configuracion:
             return False
@@ -137,18 +129,18 @@ class SetupService:
             return 30
 
     def get_recovery_email(self) -> str | None:
-        """Retorna el correo electrónico registrado para recuperación."""
+        """Compatibilidad heredada con configuraciones anteriores a V4."""
         configuracion = self.repo.obtener_por_id(1)
         if not configuracion:
             return None
         return configuracion.get("correo_recuperacion")
 
     def save_recovery_email(self, email: str) -> None:
-        """Registra o actualiza el correo electrónico de recuperación."""
+        """Compatibilidad heredada; no se expone en la interfaz de V4."""
         self.repo.actualizar(1, {"correo_recuperacion": email.strip()})
 
     def recover_master_key(self) -> tuple[bool, str]:
-        """Genera y establece una contraseña maestra temporal segura.
+        """Compatibilidad heredada; V4 no invoca recuperación para acceder.
 
         Retorna (True, nueva_clave_plana) en caso de éxito.
         """

@@ -147,7 +147,7 @@ class MainWindow(QMainWindow):
                 accompaniment_service=self.classroom_accompaniment_service,
                 app_signals=self.app_signals,
             ),
-            "settings": SettingsView(backup_service=self.backup_service, setup_service=self.setup_service),
+            "settings": SettingsView(backup_service=self.backup_service),
         }
 
         for view in self.views.values():

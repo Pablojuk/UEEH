@@ -6,8 +6,8 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS configuracion_sistema (
         id INTEGER PRIMARY KEY CHECK (id = 1),
-        clave_inicial_hash TEXT NOT NULL,
-        clave_inicial_salt TEXT NOT NULL,
+        clave_inicial_hash TEXT,
+        clave_inicial_salt TEXT,
         primer_uso_completado INTEGER NOT NULL DEFAULT 0 CHECK (primer_uso_completado IN (0, 1)),
         escala_maxima REAL NOT NULL DEFAULT 10.0,
         escala_minima REAL NOT NULL DEFAULT 0.0,
