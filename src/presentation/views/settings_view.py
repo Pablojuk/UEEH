@@ -15,13 +15,17 @@ from PySide6.QtWidgets import (
 )
 
 from src.application.services.backup_service import BackupService
+from src.version import __version__
+from src.presentation.workers.update_worker import UpdateCheckWorker
+from src.presentation.widgets.update_dialog import UpdateDialog
 
 
 class SettingsView(QWidget):
-    def __init__(self, backup_service: BackupService, app_version: str = "1.0.0") -> None:
+    def __init__(self, backup_service: BackupService, app_version: str = __version__) -> None:
         super().__init__()
         self.backup_service = backup_service
         self.selected_backup_dir = ""
+        self.update_worker: UpdateCheckWorker | None = None
 
         root = QVBoxLayout(self)
 
@@ -46,11 +50,14 @@ class SettingsView(QWidget):
         self.backup_button.clicked.connect(self.create_backup)
         self.restore_button = QPushButton("Restaurar respaldo")
         self.restore_button.clicked.connect(self.restore_backup)
+        self.check_updates_button = QPushButton("Buscar actualizaciones")
+        self.check_updates_button.clicked.connect(self.check_for_updates_manual)
 
         actions_row = QHBoxLayout()
         actions_row.addWidget(self.select_folder_button)
         actions_row.addWidget(self.backup_button)
         actions_row.addWidget(self.restore_button)
+        actions_row.addWidget(self.check_updates_button)
 
         form.addRow("Versión", self.version_label)
         form.addRow("Ruta DB", self.db_path_label)
@@ -106,3 +113,29 @@ class SettingsView(QWidget):
             QMessageBox.information(self, "Éxito", message)
         else:
             QMessageBox.warning(self, "Error", message)
+
+    def check_for_updates_manual(self) -> None:
+        self.check_updates_button.setEnabled(False)
+        self.check_updates_button.setText("Buscando...")
+
+        self.update_worker = UpdateCheckWorker(self.version_label.text())
+        self.update_worker.update_available.connect(self._on_update_available_manual)
+        self.update_worker.no_update.connect(self._on_no_update_manual)
+        self.update_worker.error_occurred.connect(self._on_update_error_manual)
+        self.update_worker.start()
+
+    def _on_update_available_manual(self, release_info) -> None:
+        self.check_updates_button.setEnabled(True)
+        self.check_updates_button.setText("Buscar actualizaciones")
+        dialog = UpdateDialog(release_info, self.version_label.text(), self)
+        dialog.exec()
+
+    def _on_no_update_manual(self) -> None:
+        self.check_updates_button.setEnabled(True)
+        self.check_updates_button.setText("Buscar actualizaciones")
+        QMessageBox.information(self, "Actualización", "El sistema ya se encuentra actualizado a la última versión.")
+
+    def _on_update_error_manual(self, error_msg: str) -> None:
+        self.check_updates_button.setEnabled(True)
+        self.check_updates_button.setText("Buscar actualizaciones")
+        QMessageBox.warning(self, "Error", f"No se pudo comprobar la actualización:\n{error_msg}")

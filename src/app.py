@@ -85,6 +85,20 @@ def run_application() -> int:
     )
     window.show()
 
+    # Comprobación de actualizaciones OTA asíncrona al inicio
+    from src.version import __version__
+    from src.presentation.workers.update_worker import UpdateCheckWorker
+    from src.presentation.widgets.update_dialog import UpdateDialog
+
+    def abrir_actualizador(release_info) -> None:
+        dialog = UpdateDialog(release_info, __version__, window)
+        dialog.exec()
+
+    # Conservamos la referencia en el objeto window para evitar recolección de basura del QThread
+    window.check_worker = UpdateCheckWorker(__version__)
+    window.check_worker.update_available.connect(abrir_actualizador)
+    window.check_worker.start()
+
     exit_code = app.exec()
     connection.close()
     return exit_code
