@@ -57,6 +57,12 @@ def _run_compatibility_migrations(connection: sqlite3.Connection) -> None:
                 connection.execute(
                     "ALTER TABLE configuracion_sistema ADD COLUMN clave_inicial_salt TEXT NOT NULL DEFAULT ''"
                 )
+            if not _column_exists(connection, "configuracion_sistema", "correo_recuperacion"):
+                connection.execute("ALTER TABLE configuracion_sistema ADD COLUMN correo_recuperacion TEXT")
+            if not _column_exists(connection, "configuracion_sistema", "licencia_activada"):
+                connection.execute("ALTER TABLE configuracion_sistema ADD COLUMN licencia_activada INTEGER NOT NULL DEFAULT 0 CHECK (licencia_activada IN (0, 1))")
+            if not _column_exists(connection, "configuracion_sistema", "fecha_primer_inicio"):
+                connection.execute("ALTER TABLE configuracion_sistema ADD COLUMN fecha_primer_inicio TEXT")
 
         if _column_exists(connection, "docentes", "id_docente"):
             if not _column_exists(connection, "docentes", "activo"):

@@ -70,6 +70,9 @@ def seed_configuracion_base(
                 "primer_uso_completado": 0,
                 "escala_maxima": 10.0,
                 "escala_minima": 0.0,
+                "correo_recuperacion": None,
+                "licencia_activada": 0,
+                "fecha_primer_inicio": None,
             }
         )
 

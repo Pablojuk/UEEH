@@ -27,12 +27,15 @@ class SetupView(QDialog):
         form = QFormLayout()
 
         self.institution_input = QLineEdit()
+        self.email_input = QLineEdit()
+        self.email_input.setPlaceholderText("correo-recuperacion@ejemplo.com")
         self.password_input = QLineEdit()
         self.password_input.setEchoMode(QLineEdit.Password)
         self.password_confirm_input = QLineEdit()
         self.password_confirm_input.setEchoMode(QLineEdit.Password)
 
         form.addRow("Institución", self.institution_input)
+        form.addRow("Correo Recuperación", self.email_input)
         form.addRow("Clave maestra", self.password_input)
         form.addRow("Confirmar clave", self.password_confirm_input)
 
@@ -46,11 +49,20 @@ class SetupView(QDialog):
 
     def _on_save(self) -> None:
         institution_name = self.institution_input.text().strip()
+        email = self.email_input.text().strip()
         password = self.password_input.text().strip()
         password_confirm = self.password_confirm_input.text().strip()
 
         if not institution_name:
             QMessageBox.warning(self, "Validación", "El nombre de la institución es obligatorio.")
+            return
+
+        if not email:
+            QMessageBox.warning(self, "Validación", "El correo de recuperación es obligatorio para proteger su cuenta.")
+            return
+
+        if "@" not in email or "." not in email:
+            QMessageBox.warning(self, "Validación", "Por favor, ingrese un formato de correo de recuperación válido.")
             return
 
         if not password:
@@ -67,6 +79,7 @@ class SetupView(QDialog):
             self.reject()
             return
 
+        self.setup_service.save_recovery_email(email)
         self.institution_service.crear_o_actualizar(nombre=institution_name, jornada="Por definir")
         QMessageBox.information(self, "Éxito", "Configuración inicial guardada correctamente.")
         self.accept()

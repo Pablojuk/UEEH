@@ -27,6 +27,7 @@ from src.application.services.student_import_service import StudentImportService
 from src.application.services.student_service import StudentService
 from src.application.services.teacher_service import TeacherService
 from src.application.services.teaching_assignment_service import TeachingAssignmentService
+from src.application.services.setup_service import SetupService
 from src.presentation.app_signals import AppSignals
 from src.presentation.views.catalogs_view import CatalogsView
 from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
@@ -63,8 +64,10 @@ class MainWindow(QMainWindow):
         backup_service: BackupService,
         classroom_accompaniment_service: ClassroomAccompanimentService,
         attendance_service: AttendanceService,
+        setup_service: SetupService | None = None,
     ) -> None:
         super().__init__()
+        self.setup_service = setup_service
 
         self.institution_service = institution_service
         self.teacher_service = teacher_service
@@ -144,18 +147,27 @@ class MainWindow(QMainWindow):
                 accompaniment_service=self.classroom_accompaniment_service,
                 app_signals=self.app_signals,
             ),
-            "settings": SettingsView(backup_service=self.backup_service),
+            "settings": SettingsView(backup_service=self.backup_service, setup_service=self.setup_service),
         }
 
         for view in self.views.values():
             self.stack.addWidget(view)
 
+        footer_layout = QHBoxLayout()
         self.author_label = QLabel("Autor: Econ Pablo Hernan Juca Farfan.")
         enable_copyable_label(self.author_label)
         self.author_label.setStyleSheet("color: #94a3b8; font-size: 11px;")
+        footer_layout.addWidget(self.author_label)
+        footer_layout.addStretch()
+
+        if self.setup_service and not self.setup_service.is_licensed():
+            days_left = self.setup_service.get_trial_days_remaining()
+            self.trial_label = QLabel(f"⚠️ Versión de prueba: Restan {days_left} días")
+            self.trial_label.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 11px; font-family: 'Segoe UI', Arial, sans-serif;")
+            footer_layout.addWidget(self.trial_label)
 
         right_layout.addWidget(self.stack, 1)
-        right_layout.addWidget(self.author_label)
+        right_layout.addLayout(footer_layout)
 
         container.addWidget(self.sidebar)
         container.addWidget(right_panel, 1)

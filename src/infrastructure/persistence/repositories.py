@@ -64,6 +64,9 @@ class ConfiguracionSistemaRepository(SQLiteRepository):
         "primer_uso_completado",
         "escala_maxima",
         "escala_minima",
+        "correo_recuperacion",
+        "licencia_activada",
+        "fecha_primer_inicio",
     )
 
 

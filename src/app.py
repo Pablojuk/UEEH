@@ -57,6 +57,15 @@ def run_application() -> int:
     classroom_accompaniment_service = ClassroomAccompanimentService(connection)
     attendance_service = AttendanceService(connection)
 
+    # Control de licencias y versión de prueba antes de acceder
+    if not setup_service.is_licensed():
+        from PySide6.QtWidgets import QDialog
+        from src.presentation.widgets.license_dialog import LicenseDialog
+        license_dialog = LicenseDialog(setup_service=setup_service)
+        if license_dialog.exec() != QDialog.Accepted:
+            connection.close()
+            return 0
+
     if setup_service.es_primer_uso():
         setup_dialog = SetupView(setup_service=setup_service, institution_service=institution_service)
         if setup_dialog.exec() != SetupView.Accepted:
@@ -82,6 +91,7 @@ def run_application() -> int:
         backup_service=backup_service,
         classroom_accompaniment_service=classroom_accompaniment_service,
         attendance_service=attendance_service,
+        setup_service=setup_service,
     )
     window.show()
 

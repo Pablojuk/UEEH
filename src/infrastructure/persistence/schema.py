@@ -11,6 +11,9 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         primer_uso_completado INTEGER NOT NULL DEFAULT 0 CHECK (primer_uso_completado IN (0, 1)),
         escala_maxima REAL NOT NULL DEFAULT 10.0,
         escala_minima REAL NOT NULL DEFAULT 0.0,
+        correo_recuperacion TEXT,
+        licencia_activada INTEGER NOT NULL DEFAULT 0 CHECK (licencia_activada IN (0, 1)),
+        fecha_primer_inicio TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
