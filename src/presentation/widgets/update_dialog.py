@@ -177,7 +177,7 @@ class UpdateDialog(QDialog):
         filename = self.release_info.download_url.split("/")[-1]
         dest_path = downloads_dir / filename
 
-        self.download_worker = DownloadWorker(self.release_info.download_url, dest_path)
+        self.download_worker = DownloadWorker(self.release_info.download_url, dest_path, self.release_info.expected_hash)
         self.download_worker.progress.connect(self._update_progress)
         self.download_worker.finished.connect(self._download_success)
         self.download_worker.error_occurred.connect(self._download_error)

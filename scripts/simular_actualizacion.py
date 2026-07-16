@@ -18,20 +18,35 @@ if str(_REPO_ROOT) not in sys.path:
 # Realizar monkeypatch ANTES de importar o iniciar la aplicación
 from src.infrastructure.update_checker import UpdateChecker, ReleaseInfo
 
+import hashlib
+
+# Calcular el hash real de README.md local para que pase la verificación de descarga
+def calcular_readme_hash() -> str:
+    readme_path = _REPO_ROOT / "README.md"
+    sha256 = hashlib.sha256()
+    with open(readme_path, "rb") as f:
+        for block in iter(lambda: f.read(4096), b""):
+            sha256.update(block)
+    return sha256.hexdigest()
+
 # 1. Simulación de la respuesta de la API de GitHub
 def mock_check_latest(self) -> ReleaseInfo | None:
     print("[MOCK] Simulando consulta de última versión en GitHub...")
+    h = calcular_readme_hash()
+    print(f"[MOCK] Hash SHA-256 de README.md local calculado: {h}")
     return ReleaseInfo(
         tag_name="v2.0.0",
         release_notes=(
             "- Se corrigieron errores en los reportes trimestrales.\n"
             "- Mejoras de rendimiento en el motor de base de datos.\n"
             "- Solución a la superposición en la sección de firmas.\n"
-            "- Nueva interfaz de actualización OTA en segundo plano."
+            "- Nueva interfaz de actualización OTA en segundo plano.\n\n"
+            f"SHA256: {h}"
         ),
         # Usamos el archivo README.md del propio repositorio como archivo de prueba para descargar
         download_url="https://raw.githubusercontent.com/Pablojuk/UEEH/main/README.md",
-        html_url="https://github.com/Pablojuk/UEEH"
+        html_url="https://github.com/Pablojuk/UEEH",
+        expected_hash=h
     )
 
 # 2. Simulación de la lógica de comparación de versiones (forzar actualización disponible)

@@ -42,10 +42,11 @@ class DownloadWorker(QThread):
     finished = Signal(str)
     error_occurred = Signal(str)
 
-    def __init__(self, url: str, dest_path: Path, parent=None) -> None:
+    def __init__(self, url: str, dest_path: Path, expected_hash: str | None, parent=None) -> None:
         super().__init__(parent)
         self.url = url
         self.dest_path = dest_path
+        self.expected_hash = expected_hash
         self.checker = UpdateChecker()
 
     def run(self) -> None:
@@ -53,11 +54,12 @@ class DownloadWorker(QThread):
             self.checker.download_asset(
                 url=self.url,
                 dest_path=self.dest_path,
+                expected_hash=self.expected_hash,
                 progress_callback=self._emit_progress
             )
             self.finished.emit(str(self.dest_path))
         except Exception as e:
-            self.error_occurred.emit(f"Error al descargar la actualización: {str(e)}")
+            self.error_occurred.emit(str(e))
 
     def _emit_progress(self, percentage: int) -> None:
         self.progress.emit(percentage)

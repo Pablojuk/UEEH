@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import re
+import hashlib
+import os
 import urllib.request
 import urllib.error
 from dataclasses import dataclass
@@ -19,12 +22,18 @@ GITHUB_REPO_NAME = "UEEH"
 # ==============================================================================
 
 
+class SecurityError(ValueError):
+    """Excepción para errores de seguridad crítica en el actualizador."""
+    pass
+
+
 @dataclass
 class ReleaseInfo:
     tag_name: str
     release_notes: str
     download_url: str | None
     html_url: str
+    expected_hash: str | None = None
 
 
 class UpdateChecker:
@@ -56,6 +65,10 @@ class UpdateChecker:
                 body = data.get("body", "")
                 html_url = data.get("html_url", "")
 
+                # Extraer el hash SHA-256 esperado del cuerpo (ej. SHA256: HASH)
+                hash_match = re.search(r"(?i)sha256:\s*([a-fA-F0-9]{64})", body)
+                expected_hash = hash_match.group(1).lower() if hash_match else None
+
                 # Buscar el asset que corresponde a un ejecutable (.exe)
                 download_url = None
                 assets = data.get("assets", [])
@@ -69,7 +82,8 @@ class UpdateChecker:
                     tag_name=tag_name,
                     release_notes=body,
                     download_url=download_url,
-                    html_url=html_url
+                    html_url=html_url,
+                    expected_hash=expected_hash
                 )
 
         except urllib.error.URLError:
@@ -128,12 +142,18 @@ class UpdateChecker:
         self,
         url: str,
         dest_path: Path,
+        expected_hash: str | None = None,
         progress_callback: Callable[[int], None] | None = None
     ) -> Path:
         """Descarga el asset desde la URL especificada hacia el destino local.
 
         Informa del progreso (0 a 100) llamando a progress_callback.
+        Valida que el SHA-256 del archivo coincida con el hash esperado.
         """
+        # Forzar HTTPS y validación estricta de SSL
+        if not url.lower().startswith("https://"):
+            raise SecurityError("Error de seguridad: solo se permiten descargas a través de conexiones seguras (HTTPS).")
+
         req = urllib.request.Request(
             url,
             headers={"User-Agent": "UEEH-OTA-Updater"}
@@ -162,5 +182,35 @@ class UpdateChecker:
             # Asegurar progreso final al 100%
             if progress_callback:
                 progress_callback(100)
+
+        # Validación criptográfica SHA-256 obligatoria (DevSecOps Hardening)
+        if not expected_hash:
+            if dest_path.exists():
+                try:
+                    os.remove(dest_path)
+                except Exception:
+                    pass
+            raise ValueError(
+                "Error de seguridad crítico: No se encontró la firma hash SHA-256 en las notas del release.\n"
+                "Se aborta la instalación para prevenir posibles ataques a la cadena de suministro."
+            )
+
+        # Calcular hash del archivo descargado
+        sha256_hash = hashlib.sha256()
+        with open(dest_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        calculated_hash = sha256_hash.hexdigest().lower()
+
+        if calculated_hash != expected_hash.strip().lower():
+            if dest_path.exists():
+                try:
+                    os.remove(dest_path)
+                except Exception:
+                    pass
+            raise ValueError(
+                "¡Alerta crítica de seguridad! El hash SHA-256 del archivo descargado no coincide con el publicado.\n"
+                "La descarga ha sido eliminada por sospecha de alteración o malware (Man-in-the-Middle)."
+            )
 
         return dest_path

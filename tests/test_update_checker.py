@@ -7,6 +7,7 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 import urllib.error
+import hashlib
 
 import pytest
 
@@ -48,7 +49,7 @@ def test_check_latest_success(mock_urlopen):
     """Prueba la obtención exitosa de los datos de la última versión usando mocks."""
     mock_response_data = {
         "tag_name": "v1.1.0",
-        "body": "Novedades de la versión:\n- Bug fixes\n- Nueva UI",
+        "body": "Novedades de la versión:\n- Bug fixes\n- Nueva UI\n\nSHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "html_url": "https://github.com/Pablojuk/UEEH/releases/tag/v1.1.0",
         "assets": [
             {
@@ -75,6 +76,7 @@ def test_check_latest_success(mock_urlopen):
     assert "Bug fixes" in info.release_notes
     assert info.download_url == "https://github.com/Pablojuk/UEEH/releases/download/v1.1.0/UEEH_Installer.exe"
     assert info.html_url == "https://github.com/Pablojuk/UEEH/releases/tag/v1.1.0"
+    assert info.expected_hash == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 
 @patch("urllib.request.urlopen")
@@ -119,15 +121,12 @@ def test_check_latest_network_error(mock_urlopen):
 
 @patch("urllib.request.urlopen")
 def test_download_asset(mock_urlopen, tmp_path):
-    """Prueba la descarga simulada de un asset y la invocación del callback de progreso."""
-    # Datos simulados de descarga (100 bytes)
+    """Prueba la descarga simulada de un asset con verificación exitosa de hash."""
     dummy_data = b"x" * 100
+    expected_hash = hashlib.sha256(dummy_data).hexdigest()
 
     mock_response = MagicMock()
     mock_response.headers = {"content-length": "100"}
-    
-    # Simular lectura parcial
-    # Retorna 50 bytes primero, luego otros 50, luego nada
     mock_response.read.side_effect = [dummy_data[:50], dummy_data[50:], b""]
     mock_urlopen.return_value.__enter__.return_value = mock_response
 
@@ -141,13 +140,79 @@ def test_download_asset(mock_urlopen, tmp_path):
     checker.download_asset(
         url="https://github.com/dummy/installer.exe",
         dest_path=dest_file,
+        expected_hash=expected_hash,
         progress_callback=progress_callback
     )
 
-    # Verificar que el archivo se guardó
     assert dest_file.exists()
     assert dest_file.read_bytes() == dummy_data
-
-    # Verificar que se reportó el progreso y terminó en 100
     assert len(progress_ticks) > 0
     assert progress_ticks[-1] == 100
+
+
+@patch("urllib.request.urlopen")
+def test_download_asset_invalid_hash(mock_urlopen, tmp_path):
+    """Prueba que el actualizador rechaza descargas con hash incorrecto y elimina el archivo."""
+    dummy_data = b"incorrect_payload"
+    bad_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+
+    mock_response = MagicMock()
+    mock_response.headers = {"content-length": "17"}
+    mock_response.read.side_effect = [dummy_data, b""]
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    checker = UpdateChecker()
+    dest_file = tmp_path / "unsafe_installer.exe"
+
+    with pytest.raises(ValueError) as excinfo:
+        checker.download_asset(
+            url="https://github.com/dummy/unsafe.exe",
+            dest_path=dest_file,
+            expected_hash=bad_hash
+        )
+
+    assert "no coincide con el publicado" in str(excinfo.value)
+    # El archivo descargado debe haber sido eliminado inmediatamente por seguridad
+    assert not dest_file.exists()
+
+
+@patch("urllib.request.urlopen")
+def test_download_asset_missing_hash(mock_urlopen, tmp_path):
+    """Prueba que el actualizador rechaza la instalación si no se declaró un hash en el release."""
+    dummy_data = b"some_data"
+
+    mock_response = MagicMock()
+    mock_response.headers = {"content-length": "9"}
+    mock_response.read.side_effect = [dummy_data, b""]
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    checker = UpdateChecker()
+    dest_file = tmp_path / "unverified_installer.exe"
+
+    with pytest.raises(ValueError) as excinfo:
+        checker.download_asset(
+            url="https://github.com/dummy/unverified.exe",
+            dest_path=dest_file,
+            expected_hash=None
+        )
+
+    assert "No se encontró la firma hash SHA-256" in str(excinfo.value)
+    assert not dest_file.exists()
+
+
+def test_download_asset_non_https(tmp_path):
+    """Prueba que el actualizador bloquea de forma inmediata descargas que no usen HTTPS."""
+    from src.infrastructure.update_checker import SecurityError
+    
+    checker = UpdateChecker()
+    dest_file = tmp_path / "insecure.exe"
+
+    with pytest.raises(SecurityError) as excinfo:
+        checker.download_asset(
+            url="http://insecure-connection.com/malicious.exe",
+            dest_path=dest_file,
+            expected_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        )
+
+    assert "solo se permiten descargas a través de conexiones seguras (HTTPS)" in str(excinfo.value)
+    assert not dest_file.exists()
