@@ -7,8 +7,20 @@ from pathlib import Path
 
 from .schema import get_schema_statements
 
-DEFAULT_DB_DIR = Path(__file__).resolve().parents[3] / "data"
-DEFAULT_DB_PATH = DEFAULT_DB_DIR / "sistema_notas.db"
+import os
+import sys
+
+def _get_default_db_path() -> Path:
+    # Si estamos en Windows, usar %APPDATA%/UEEH
+    if sys.platform == "win32" and "APPDATA" in os.environ:
+        base_dir = Path(os.environ["APPDATA"])
+    else:
+        # Fallback multiplataforma
+        base_dir = Path.home() / ".config"
+    return base_dir / "UEEH" / "sistema_notas.db"
+
+DEFAULT_DB_PATH = _get_default_db_path()
+DEFAULT_DB_DIR = DEFAULT_DB_PATH.parent
 
 
 SQLITE_MEMORY_PATHS = {":memory:"}
