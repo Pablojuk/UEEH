@@ -6,8 +6,8 @@ SRC_DIR = ROOT_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from gestion_academica.app import main
+from src.app import run_application
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(run_application())
