@@ -19,7 +19,6 @@ Aplicación de escritorio local para docentes.
 
 ## Módulos principales
 - Configuración inicial
-- Login
 - Institución
 - Docentes
 - Catálogos

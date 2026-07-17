@@ -255,6 +255,10 @@ INDEX_STATEMENTS: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_acompanamiento_cfg_asig_trim ON acompanamiento_habilidades_config(asignacion_id, trimestre_num);",
     "CREATE INDEX IF NOT EXISTS idx_animacion_eval_asig_trim ON animacion_lectura_evaluaciones(asignacion_id, trimestre_num);",
     "CREATE INDEX IF NOT EXISTS idx_orientacion_eval_asig_trim ON orientacion_vocacional_evaluaciones(asignacion_id, trimestre_num);",
+    "CREATE INDEX IF NOT EXISTS idx_matriculas_contexto_lista ON matriculas(curso_id, paralelo_id, periodo_id, numero_lista);",
+    "CREATE INDEX IF NOT EXISTS idx_attendance_assignment_date_student ON attendance_records(assignment_id, date, student_id);",
+    "CREATE INDEX IF NOT EXISTS idx_attendance_assignment_student_status_date ON attendance_records(assignment_id, student_id, status, date);",
+    "CREATE INDEX IF NOT EXISTS idx_attendance_justifications_assignment_student_date ON attendance_justifications(assignment_id, student_id, date);",
 )
 
 

@@ -17,6 +17,3 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[project.scripts]
-gestion-academica = "gestion_academica.app:main"

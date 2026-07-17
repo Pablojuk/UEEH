@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -58,8 +59,6 @@ class _FakeUpdateWorker:
 
 def _patch_runtime(monkeypatch, db_path: Path, created_windows: list):
     from src import app as app_module
-    from src.presentation.views import login_view as legacy_login_module
-    from src.presentation.workers import email_worker as legacy_email_module
     from src.presentation.workers import update_worker as update_worker_module
 
     original_initialize = initialize_database
@@ -73,14 +72,6 @@ def _patch_runtime(monkeypatch, db_path: Path, created_windows: list):
         def show(self) -> None:
             self.shown = True
 
-    class ForbiddenLogin:
-        def __init__(self, *_args, **_kwargs) -> None:
-            raise AssertionError("V4 no debe crear LoginView")
-
-    class ForbiddenEmailWorker:
-        def __init__(self, *_args, **_kwargs) -> None:
-            raise AssertionError("V4 no debe iniciar recuperación SMTP")
-
     def forbidden_authentication(*_args, **_kwargs):
         raise AssertionError("V4 no debe verificar ni recuperar una clave al iniciar")
 
@@ -93,8 +84,6 @@ def _patch_runtime(monkeypatch, db_path: Path, created_windows: list):
     monkeypatch.setattr(app_module, "MainWindow", FakeMainWindow)
     monkeypatch.setattr(app_module, "install_global_interaction_support", lambda _app: None)
     monkeypatch.setattr(update_worker_module, "UpdateCheckWorker", _FakeUpdateWorker)
-    monkeypatch.setattr(legacy_login_module, "LoginView", ForbiddenLogin)
-    monkeypatch.setattr(legacy_email_module, "EmailSendWorker", ForbiddenEmailWorker)
     monkeypatch.setattr(SetupService, "validar_clave_maestra", forbidden_authentication)
     monkeypatch.setattr(SetupService, "get_recovery_email", forbidden_authentication)
     monkeypatch.setattr(SetupService, "save_recovery_email", forbidden_authentication)
@@ -109,6 +98,8 @@ def _patch_runtime(monkeypatch, db_path: Path, created_windows: list):
         monkeypatch.delenv(name, raising=False)
 
     assert not hasattr(app_module, "LoginView")
+    assert importlib.util.find_spec("src.presentation.views.login_view") is None
+    assert importlib.util.find_spec("src.presentation.workers.email_worker") is None
     return app_module
 
 

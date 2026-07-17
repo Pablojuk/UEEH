@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sqlite3
 import unicodedata
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +14,18 @@ from src.application.services.institution_service import InstitutionService
 from src.infrastructure.exporters.excel_report_exporter import ExcelReportExporter
 from src.infrastructure.exporters.html_report_renderer import HtmlReportRenderer
 from src.infrastructure.exporters.pdf_report_exporter import PdfReportExporter
+
+
+@dataclass(frozen=True)
+class PreparedReport:
+    """Datos inmutables listos para renderizar o escribir fuera del hilo UI."""
+
+    export_kind: str
+    output_path: str
+    title: str
+    context: dict[str, Any]
+    rows: list[dict[str, Any]]
+    ocultar_filas_vacias: bool = False
 
 
 class ReportExportService:
@@ -82,6 +96,131 @@ class ReportExportService:
         if not rows or not self._hay_datos_exportables(rows, report_type):
             raise ValueError("No hay datos para generar vista previa")
         return self.html_renderer.render(context, rows)
+
+    def preparar_exportacion(
+        self,
+        asignacion_id: str,
+        output_path: str,
+        *,
+        export_kind: str,
+        report_type: str = "anual",
+        trimestre_num: int | None = None,
+        firmantes: dict[str, str] | None = None,
+        ocultar_filas_vacias: bool = False,
+    ) -> PreparedReport:
+        """Consulta SQLite en su hilo propietario y devuelve un trabajo portable."""
+        if export_kind not in {"pdf", "excel"}:
+            raise ValueError("Tipo de exportación no compatible")
+        if not str(asignacion_id or "").strip():
+            raise ValueError("Debe seleccionar una asignación")
+
+        context, rows = self._prepare_report_context(
+            asignacion_id,
+            report_type,
+            trimestre_num,
+            firmantes,
+        )
+        if not rows or not self._hay_datos_exportables(rows, report_type):
+            raise ValueError("No hay datos para exportar")
+
+        title = (
+            "Cuadro de Calificación Trimestral"
+            if report_type == "trimestral"
+            else "Cuadro de Calificación Anual"
+        )
+        return PreparedReport(
+            export_kind=export_kind,
+            output_path=self._normalize_output_path(output_path, export_kind),
+            title=title,
+            context=context,
+            rows=rows,
+            ocultar_filas_vacias=ocultar_filas_vacias,
+        )
+
+    def preparar_vista_previa(
+        self,
+        asignacion_id: str,
+        *,
+        report_type: str = "anual",
+        trimestre_num: int | None = None,
+        firmantes: dict[str, str] | None = None,
+    ) -> PreparedReport:
+        """Prepara datos para renderizar HTML sin mantener acceso a SQLite."""
+        context, rows = self._prepare_report_context(
+            asignacion_id,
+            report_type,
+            trimestre_num,
+            firmantes,
+        )
+        if not rows or not self._hay_datos_exportables(rows, report_type):
+            raise ValueError("No hay datos para generar vista previa")
+        title = (
+            "Cuadro de Calificación Trimestral"
+            if report_type == "trimestral"
+            else "Cuadro de Calificación Anual"
+        )
+        return PreparedReport(
+            export_kind="html",
+            output_path="",
+            title=title,
+            context=context,
+            rows=rows,
+        )
+
+    def renderizar_html_preparado(self, report: PreparedReport) -> str:
+        """Renderiza Jinja2 sin acceder a SQLite ni a objetos visuales Qt."""
+        if report.export_kind not in {"pdf", "html"}:
+            raise ValueError("El trabajo no corresponde a HTML o PDF")
+        html = self.html_renderer.render(report.context, report.rows)
+        if not html:
+            raise RuntimeError("No se pudo renderizar la plantilla HTML del reporte")
+        return html
+
+    def renderizar_pdf_preparado(self, report: PreparedReport) -> str:
+        """Alias explícito conservado para consumidores de exportación PDF."""
+        return self.renderizar_html_preparado(report)
+
+    def exportar_excel_preparado(self, report: PreparedReport) -> str:
+        """Escribe Excel sin acceder a SQLite; es seguro ejecutarlo en un worker."""
+        if report.export_kind != "excel":
+            raise ValueError("El trabajo no corresponde a Excel")
+        try:
+            return self.excel_exporter.exportar(
+                report.output_path,
+                report.title,
+                report.context,
+                report.rows,
+                ocultar_filas_vacias=report.ocultar_filas_vacias,
+            )
+        except TypeError:
+            return self.excel_exporter.exportar(
+                report.output_path,
+                report.title,
+                report.context,
+                report.rows,
+            )
+
+    def exportar_pdf_preparado_async(
+        self,
+        report: PreparedReport,
+        html_content: str,
+        finished: Callable[[bool, str], None],
+    ) -> object:
+        """Imprime el HTML con WebEngine mediante señales, sin bucle anidado."""
+        if report.export_kind != "pdf":
+            raise ValueError("El trabajo no corresponde a PDF")
+
+        def on_finished(ok: bool, detail: str) -> None:
+            message = f"Archivo generado: {detail}" if ok else f"Error al exportar: {detail}"
+            finished(ok, message)
+
+        return self.pdf_exporter.export_to_pdf_async(
+            html_content,
+            report.output_path,
+            orientation=self.pdf_exporter.orientation_for_context(report.context),
+            ocultar_filas_vacias=report.ocultar_filas_vacias,
+            finished=on_finished,
+        )
 
     def _exportar(
         self,
