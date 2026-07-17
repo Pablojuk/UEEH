@@ -213,6 +213,41 @@ class TestPersistenceSQLite(unittest.TestCase):
         self.assertIn("activo", doc_cols)
         migrated_connection.close()
 
+    def test_indices_compuestos_optimizan_asistencia_y_matriculas(self) -> None:
+        index_names = {
+            row["name"]
+            for row in self.connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index'"
+            ).fetchall()
+        }
+        self.assertIn("idx_grade_records_assignment_trimestre", index_names)
+        self.assertIn("idx_matriculas_contexto_lista", index_names)
+        self.assertIn("idx_attendance_assignment_date_student", index_names)
+        self.assertIn("idx_attendance_assignment_student_status_date", index_names)
+
+        attendance_plan = " ".join(
+            str(row["detail"])
+            for row in self.connection.execute(
+                "EXPLAIN QUERY PLAN "
+                "SELECT student_id, date, status FROM attendance_records "
+                "WHERE assignment_id = ? AND date BETWEEN ? AND ?",
+                ("AS-TEST", "2026-01-01", "2026-01-31"),
+            ).fetchall()
+        )
+        self.assertIn("idx_attendance_assignment_date_student", attendance_plan)
+
+        enrollment_plan = " ".join(
+            str(row["detail"])
+            for row in self.connection.execute(
+                "EXPLAIN QUERY PLAN "
+                "SELECT estudiante_id FROM matriculas "
+                "WHERE curso_id = ? AND paralelo_id = ? AND periodo_id = ? "
+                "ORDER BY numero_lista",
+                ("CURSO", "PARALELO", "PERIODO"),
+            ).fetchall()
+        )
+        self.assertIn("idx_matriculas_contexto_lista", enrollment_plan)
+
 
 if __name__ == "__main__":
     unittest.main()

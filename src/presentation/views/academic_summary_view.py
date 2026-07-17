@@ -32,7 +32,8 @@ except Exception:  # noqa: BLE001
     QWebEngineView = None
 
 from src.application.services.academic_summary_service import AcademicSummaryService
-from src.application.services.report_export_service import ReportExportService
+from src.application.services.report_export_service import PreparedReport, ReportExportService
+from src.presentation.workers.report_export_worker import ReportExportWorker
 from src.presentation.widgets.busy_state import busy_button
 
 
@@ -106,6 +107,10 @@ class AcademicSummaryView(QWidget):
         }
         self._suppress_auto_refresh = False
         self._simplified_mode = False
+        self._export_worker: ReportExportWorker | None = None
+        self._pdf_export_job: object | None = None
+        self._background_operation: str | None = None
+        self._preview_is_silent = False
 
         root = QVBoxLayout(self)
         root.setAlignment(Qt.AlignTop)
@@ -141,17 +146,11 @@ class AcademicSummaryView(QWidget):
             lambda _checked=False: self._run_with_busy_state(self.save_button, "Guardando...", self.save_rows)
         )
         self.preview_button = QPushButton("Vista previa")
-        self.preview_button.clicked.connect(
-            lambda _checked=False: self._run_with_busy_state(self.preview_button, "Generando...", self.show_preview)
-        )
+        self.preview_button.clicked.connect(self.show_preview)
         self.export_pdf_button = QPushButton("Exportar PDF")
-        self.export_pdf_button.clicked.connect(
-            lambda _checked=False: self._run_with_busy_state(self.export_pdf_button, "Exportando...", self.export_pdf)
-        )
+        self.export_pdf_button.clicked.connect(self.export_pdf)
         self.export_excel_button = QPushButton("Exportar Excel")
-        self.export_excel_button.clicked.connect(
-            lambda _checked=False: self._run_with_busy_state(self.export_excel_button, "Exportando...", self.export_excel)
-        )
+        self.export_excel_button.clicked.connect(self.export_excel)
 
         filter_row.addWidget(QLabel("Asignación"))
         filter_row.addWidget(self.assignment_combo, 1)
@@ -320,29 +319,63 @@ class AcademicSummaryView(QWidget):
             QMessageBox.warning(self, "Error", message)
 
     def show_preview(self) -> None:
+        self._start_preview(silent=False)
+
+    def _start_preview(self, *, silent: bool) -> None:
         if self.report_export_service is None:
-            QMessageBox.warning(self, "Error", "Servicio de exportación no disponible")
+            if not silent:
+                QMessageBox.warning(self, "Error", "Servicio de exportación no disponible")
+            return
+        if (self._export_worker is not None and self._export_worker.isRunning()) or self._pdf_export_job is not None:
+            if not silent:
+                QMessageBox.information(self, "Vista previa", "Existe otra operación de reporte en curso")
             return
 
         asignacion_id = self.assignment_combo.currentData()
         if not asignacion_id:
-            QMessageBox.warning(self, "Validación", "Seleccione una asignación")
+            if not silent:
+                QMessageBox.warning(self, "Validación", "Seleccione una asignación")
             return
 
         report_type, trimestre_num = self.report_type_combo.currentData()
+        if not hasattr(self.report_export_service, "preparar_vista_previa"):
+            try:
+                html_report = self.report_export_service.generar_resumen_html(
+                    asignacion_id,
+                    report_type=report_type,
+                    trimestre_num=trimestre_num,
+                    firmantes=self._firmantes,
+                )
+            except Exception as exc:  # noqa: BLE001
+                if not silent:
+                    QMessageBox.warning(self, "Error", f"No se pudo generar la vista previa: {exc}")
+                return
+            self._set_preview_html(html_report)
+            if not silent:
+                self.tabs.setCurrentIndex(1)
+            return
+
         try:
-            html_report = self.report_export_service.generar_resumen_html(
+            prepared = self.report_export_service.preparar_vista_previa(
                 asignacion_id,
                 report_type=report_type,
                 trimestre_num=trimestre_num,
                 firmantes=self._firmantes,
             )
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Error", f"No se pudo generar la vista previa: {exc}")
+            if not silent:
+                QMessageBox.warning(self, "Error", f"No se pudo preparar la vista previa: {exc}")
             return
 
-        self._set_preview_html(html_report)
-        self.tabs.setCurrentIndex(1)
+        self._background_operation = "preview"
+        self._preview_is_silent = silent
+        self._set_preview_busy(True)
+        worker = ReportExportWorker(self.report_export_service, prepared)
+        self._export_worker = worker
+        worker.completed.connect(self._on_worker_completed)
+        worker.html_ready.connect(self._on_html_rendered)
+        worker.finished.connect(self._on_export_worker_finished)
+        worker.start()
 
     def export_pdf(self) -> None:
         self._export("pdf")
@@ -353,6 +386,9 @@ class AcademicSummaryView(QWidget):
     def _export(self, kind: str) -> None:
         if self.report_export_service is None:
             QMessageBox.warning(self, "Error", "Servicio de exportación no disponible")
+            return
+        if (self._export_worker is not None and self._export_worker.isRunning()) or self._pdf_export_job is not None:
+            QMessageBox.information(self, "Exportación", "Ya existe una exportación en curso")
             return
 
         asignacion_id = self.assignment_combo.currentData()
@@ -375,29 +411,83 @@ class AcademicSummaryView(QWidget):
             return
 
         ocultar_filas_vacias = self.btn_toggle_filas.isChecked()
-        if kind == "pdf":
-            ok, message = self.report_export_service.exportar_resumen_pdf(
+        try:
+            prepared = self.report_export_service.preparar_exportacion(
                 asignacion_id,
                 selected_path,
+                export_kind=kind,
                 report_type=report_type,
                 trimestre_num=trimestre_num,
                 firmantes=self._firmantes,
                 ocultar_filas_vacias=ocultar_filas_vacias,
             )
-        else:
-            ok, message = self.report_export_service.exportar_resumen_excel(
-                asignacion_id,
-                selected_path,
-                report_type=report_type,
-                trimestre_num=trimestre_num,
-                firmantes=self._firmantes,
-                ocultar_filas_vacias=ocultar_filas_vacias,
-            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Error", f"No se pudo preparar la exportación: {exc}")
+            return
 
+        self._set_export_busy(True, kind)
+        self._background_operation = "export"
+        worker = ReportExportWorker(self.report_export_service, prepared)
+        self._export_worker = worker
+        worker.completed.connect(self._on_worker_completed)
+        worker.html_ready.connect(self._on_html_rendered)
+        worker.finished.connect(self._on_export_worker_finished)
+        worker.start()
+
+    def _on_html_rendered(self, report: PreparedReport, html_content: str) -> None:
+        if report.export_kind == "html":
+            self._set_preview_html(html_content)
+            if not self._preview_is_silent:
+                self.tabs.setCurrentIndex(1)
+            self._set_preview_busy(False)
+            self._background_operation = None
+            return
+        if self.report_export_service is None:
+            self._on_export_completed(False, "Servicio de exportación no disponible")
+            return
+        try:
+            self._pdf_export_job = self.report_export_service.exportar_pdf_preparado_async(
+                report,
+                html_content,
+                self._on_export_completed,
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._on_export_completed(False, f"Error al iniciar la impresión PDF: {exc}")
+
+    def _on_export_worker_finished(self) -> None:
+        worker = self._export_worker
+        self._export_worker = None
+        if worker is not None:
+            worker.deleteLater()
+
+    def _on_worker_completed(self, ok: bool, message: str) -> None:
+        if self._background_operation == "preview":
+            silent = self._preview_is_silent
+            self._set_preview_busy(False)
+            self._background_operation = None
+            if not ok and not silent:
+                QMessageBox.warning(self, "Error", message)
+            return
+        self._on_export_completed(ok, message)
+
+    def _on_export_completed(self, ok: bool, message: str) -> None:
+        self._pdf_export_job = None
+        self._background_operation = None
+        self._set_export_busy(False)
         if ok:
             QMessageBox.information(self, "Éxito", message)
         else:
             QMessageBox.warning(self, "Error", message)
+
+    def _set_export_busy(self, busy: bool, kind: str | None = None) -> None:
+        self.export_pdf_button.setEnabled(not busy)
+        self.export_excel_button.setEnabled(not busy)
+        self.export_pdf_button.setText("Generando PDF..." if busy and kind == "pdf" else "Exportar PDF")
+        self.export_excel_button.setText("Generando Excel..." if busy and kind == "excel" else "Exportar Excel")
+
+    def _set_preview_busy(self, busy: bool) -> None:
+        self.preview_button.setEnabled(not busy)
+        self.preview_button.setText("Generando..." if busy else "Vista previa")
 
     def _fill_table(self, rows: list[dict]) -> None:
         self.table.setRowCount(0)
@@ -565,23 +655,10 @@ class AcademicSummaryView(QWidget):
         return " ".join(normalized.split())
 
     def _refresh_preview_silent(self) -> None:
-        if self.report_export_service is None:
-            return
-        asignacion_id = self.assignment_combo.currentData()
-        if not asignacion_id:
+        if not self.assignment_combo.currentData():
             self._set_preview_html("")
             return
-        report_type, trimestre_num = self.report_type_combo.currentData()
-        try:
-            html_report = self.report_export_service.generar_resumen_html(
-                asignacion_id,
-                report_type=report_type,
-                trimestre_num=trimestre_num,
-                firmantes=self._firmantes,
-            )
-        except Exception:  # noqa: BLE001
-            return
-        self._set_preview_html(html_report)
+        self._start_preview(silent=True)
 
     def eventFilter(self, obj, event):  # type: ignore[override]
         if obj is self.table and event.type() == QEvent.KeyPress:
