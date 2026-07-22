@@ -272,7 +272,11 @@ class ReportsView(QWidget):
                 nivel=nivel,
             )
             if not rows:
-                rows = self.grade_registration_service.cargar_registro(assignment_id, int(trimester_num))
+                rows = self.grade_registration_service.cargar_registro(
+                    assignment_id,
+                    int(trimester_num),
+                    alphabetical=True,
+                )
         except ValueError:
             return []
         return [
@@ -298,7 +302,11 @@ class ReportsView(QWidget):
         try:
             rows = self.grade_registration_service.obtener_orientacion_vocacional_evaluacion(assignment_id, int(trimester_num))
             if not rows:
-                rows = self.grade_registration_service.cargar_registro(assignment_id, int(trimester_num))
+                rows = self.grade_registration_service.cargar_registro(
+                    assignment_id,
+                    int(trimester_num),
+                    alphabetical=True,
+                )
         except ValueError:
             return []
         mapped: list[dict[str, str]] = []

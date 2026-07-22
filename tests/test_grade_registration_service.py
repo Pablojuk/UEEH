@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from src.application.services.enrollment_service import load_students_for_assignment
 from src.application.services.grade_registration_service import GradeRegistrationService
 from src.infrastructure.persistence.db import initialize_database
 from src.infrastructure.persistence.seed import CATALOG_COURSES
@@ -78,6 +79,62 @@ class TestGradeRegistrationService(unittest.TestCase):
         rows = self.service.cargar_registro("AS1", 1)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["estudiante_id"], "E1")
+
+    def test_notas_ordena_alfabeticamente_sin_desasociar_calificaciones(self) -> None:
+        with self.conn:
+            self.conn.execute(
+                "UPDATE estudiantes SET apellidos = ?, nombres = ? WHERE id_estudiante = ?",
+                ("Zambrano", "Ana", "E1"),
+            )
+            self.conn.executemany(
+                "INSERT INTO estudiantes (id_estudiante, codigo, apellidos, nombres) VALUES (?, ?, ?, ?)",
+                [
+                    ("E2", "EST-2", "Álvarez", "Luis"),
+                    ("E3", "EST-3", "alvarez", "Beatriz"),
+                ],
+            )
+            self.conn.executemany(
+                "INSERT INTO matriculas "
+                "(id_matricula, estudiante_id, curso_id, paralelo_id, periodo_id, numero_lista) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    ("M3", "E2", "C1", "P1", "2025-2026", 2),
+                    ("M4", "E3", "C1", "P1", "2025-2026", 3),
+                ],
+            )
+
+        ok, _ = self.service.guardar_registros(
+            "AS1",
+            1,
+            [
+                {"estudiante_id": "E1", "actividad_1": 6},
+                {"estudiante_id": "E2", "actividad_1": 8},
+                {"estudiante_id": "E3", "actividad_1": 10},
+            ],
+        )
+        self.assertTrue(ok)
+
+        default_rows = self.service.cargar_registro("AS1", 1)
+        rows = self.service.cargar_registro("AS1", 1, alphabetical=True)
+
+        self.assertEqual([row["estudiante_id"] for row in default_rows], ["E1", "E2", "E3"])
+        self.assertEqual([row["estudiante_id"] for row in rows], ["E3", "E2", "E1"])
+        self.assertEqual([row["estudiante"] for row in rows], ["alvarez Beatriz", "Álvarez Luis", "Zambrano Ana"])
+        self.assertEqual([row["actividad_1"] for row in rows], [10.0, 8.0, 6.0])
+        self.assertEqual(len({row["estudiante_id"] for row in rows}), 3)
+        self.assertEqual(
+            self.conn.execute(
+                "SELECT COUNT(*) AS total FROM grade_records WHERE asignacion_id = ? AND trimestre_num = ?",
+                ("AS1", 1),
+            ).fetchone()["total"],
+            3,
+        )
+
+        shared_order = load_students_for_assignment(self.conn, "AS1")
+        self.assertEqual(
+            [student["id_estudiante"] for student in shared_order.students],
+            ["E1", "E2", "E3"],
+        )
 
     def test_guardar_notas_nuevas(self) -> None:
         ok, _ = self.service.guardar_registros(
@@ -312,6 +369,68 @@ class TestGradeRegistrationService(unittest.TestCase):
         self.assertEqual(rows[0]["cualitativo"], "A-")
         self.assertEqual(rows[0]["cualitativo_1"], "A")
         self.assertEqual(rows[0]["notas_indicadores"], [8.5, 9.0])
+
+    def test_listas_especiales_ordenan_y_conservan_datos_por_estudiante(self) -> None:
+        with self.conn:
+            self.conn.execute(
+                "UPDATE estudiantes SET codigo = ?, apellidos = ?, nombres = ? WHERE id_estudiante = ?",
+                ("EST-1", "Zambrano", "Ana", "E1"),
+            )
+            self.conn.executemany(
+                "INSERT INTO estudiantes (id_estudiante, codigo, apellidos, nombres) VALUES (?, ?, ?, ?)",
+                [
+                    ("E2", "EST-2", "Álvarez", "Luis"),
+                    ("E3", "EST-3", "alvarez", "Beatriz"),
+                ],
+            )
+            self.conn.executemany(
+                "INSERT INTO matriculas "
+                "(id_matricula, estudiante_id, curso_id, paralelo_id, periodo_id, numero_lista) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    ("M3", "E2", "C1", "P1", "2025-2026", 2),
+                    ("M4", "E3", "C1", "P1", "2025-2026", 3),
+                    ("M5", "E2", "C8", "P1", "2025-2026", 2),
+                    ("M6", "E3", "C8", "P1", "2025-2026", 3),
+                ],
+            )
+
+        ok_animation, _ = self.service.guardar_animacion_lectura_evaluacion(
+            {
+                "asignacion_id": "AS1",
+                "trimestre_num": 1,
+                "nivel": "media",
+                "filas": [
+                    {"estudiante_id": "E1", "notas_indicadores": [6], "promedio": 6, "cualitativo": "C-"},
+                    {"estudiante_id": "E2", "notas_indicadores": [8], "promedio": 8, "cualitativo": "B+"},
+                    {"estudiante_id": "E3", "notas_indicadores": [10], "promedio": 10, "cualitativo": "A+"},
+                ],
+                "has_invalid_notes": False,
+            }
+        )
+        ok_orientation, _ = self.service.guardar_orientacion_vocacional_evaluacion(
+            {
+                "asignacion_id": "AS-OVP",
+                "trimestre_num": 1,
+                "curso_clave": "8",
+                "filas": [
+                    {"estudiante_id": "E1", "respuestas": [1], "puntaje_total": 1, "calificacion": "B+"},
+                    {"estudiante_id": "E2", "respuestas": [2], "puntaje_total": 2, "calificacion": "A-"},
+                    {"estudiante_id": "E3", "respuestas": [3], "puntaje_total": 3, "calificacion": "A+"},
+                ],
+            }
+        )
+        self.assertTrue(ok_animation)
+        self.assertTrue(ok_orientation)
+
+        animation_rows = self.service.obtener_animacion_lectura_evaluacion("AS1", 1)
+        orientation_rows = self.service.obtener_orientacion_vocacional_evaluacion("AS-OVP", 1)
+
+        expected_ids = ["E3", "E2", "E1"]
+        self.assertEqual([row["estudiante_id"] for row in animation_rows], expected_ids)
+        self.assertEqual([row["valor"] for row in animation_rows], [10, 8, 6])
+        self.assertEqual([row["estudiante_id"] for row in orientation_rows], expected_ids)
+        self.assertEqual([row["calificacion"] for row in orientation_rows], ["A+", "A-", "B+"])
 
     def test_guardado_animacion_lectura_rechaza_payload_invalido(self) -> None:
         ok, message = self.service.guardar_animacion_lectura_evaluacion(

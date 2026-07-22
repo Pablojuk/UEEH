@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -33,6 +34,8 @@ class AssignmentEnrollmentMatch:
 def load_students_for_assignment(
     connection: sqlite3.Connection,
     assignment_id: str,
+    *,
+    alphabetical: bool = False,
 ) -> AssignmentEnrollmentMatch:
     """Obtiene estudiantes por los tres IDs exactos de la asignación."""
 
@@ -78,7 +81,24 @@ def load_students_for_assignment(
             (context["curso_id"], context["paralelo_id"], context["periodo_id"]),
         ).fetchall()
     ]
+    if alphabetical:
+        students.sort(key=student_alphabetical_key)
     return AssignmentEnrollmentMatch(context=context, students=students)
+
+
+def student_alphabetical_key(student: dict[str, Any]) -> tuple[str, str, str, str]:
+    """Genera una clave estable que ignora mayúsculas, minúsculas y tildes."""
+
+    def normalize(value: Any) -> str:
+        decomposed = unicodedata.normalize("NFKD", str(value or ""))
+        return "".join(char for char in decomposed if not unicodedata.combining(char)).casefold()
+
+    return (
+        normalize(student.get("apellidos")),
+        normalize(student.get("nombres")),
+        normalize(student.get("codigo")),
+        normalize(student.get("id_estudiante") or student.get("estudiante_id")),
+    )
 
 
 class EnrollmentService:

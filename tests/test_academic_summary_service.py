@@ -165,6 +165,49 @@ class TestAcademicSummaryService(unittest.TestCase):
         self.assertEqual(row["equivalencia_t2"], "AA")
         self.assertEqual(row["equivalencia_t3"], "PA")
 
+    def test_reportes_ordenan_por_nombre_y_conservan_notas_por_estudiante(self) -> None:
+        with self.conn:
+            self.conn.execute(
+                "UPDATE estudiantes SET codigo = ?, apellidos = ?, nombres = ? WHERE id_estudiante = ?",
+                ("EST-1", "Zambrano", "Ana", "E1"),
+            )
+            self.conn.executemany(
+                "INSERT INTO estudiantes (id_estudiante, codigo, apellidos, nombres) VALUES (?, ?, ?, ?)",
+                [
+                    ("E2", "EST-2", "Álvarez", "Luis"),
+                    ("E3", "EST-3", "alvarez", "Beatriz"),
+                ],
+            )
+            self.conn.executemany(
+                "INSERT INTO matriculas "
+                "(id_matricula, estudiante_id, curso_id, paralelo_id, periodo_id, numero_lista) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    ("M2", "E2", "C1", "P1", "2025-2026", 2),
+                    ("M3", "E3", "C1", "P1", "2025-2026", 3),
+                ],
+            )
+            self.conn.executemany(
+                "INSERT INTO grade_records "
+                "(id_registro, estudiante_id, asignacion_id, trimestre_num, "
+                "promedio_formativo, promedio_sumativo, nota_trimestral) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [
+                    ("G4", "E2", "AS1", 1, 9, 9, 9),
+                    ("G5", "E3", "AS1", 1, 10, 10, 10),
+                ],
+            )
+
+        trimestral = self.service.obtener_reporte_trimestral("AS1", 1)
+        anual = self.service.obtener_reporte_anual("AS1")
+
+        expected_ids = ["E3", "E2", "E1"]
+        self.assertEqual([row["id_estudiante"] for row in trimestral], expected_ids)
+        self.assertEqual([row["aportes_calificacion"] for row in trimestral], [10, 9, 8])
+        self.assertEqual([row["estudiante_id"] for row in anual], expected_ids)
+        self.assertEqual([row["trimestre_1"] for row in anual], [10, 9, 8])
+        self.assertEqual(len({row["estudiante_id"] for row in anual}), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

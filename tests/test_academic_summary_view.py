@@ -139,6 +139,23 @@ class TestAcademicSummaryView(unittest.TestCase):
         self.assertEqual(view.table.item(0, 0).text(), "")
         self.assertEqual(view.table.item(0, 1).text(), "Lopez Maria")
 
+    def test_tabla_conserva_orden_alfabetico_entregado_por_servicio(self) -> None:
+        from src.presentation.views.academic_summary_view import AcademicSummaryView
+
+        rows = [
+            {"estudiante_id": "E3", "estudiante": "alvarez Beatriz", "numero_lista": 3},
+            {"estudiante_id": "E2", "estudiante": "Álvarez Luis", "numero_lista": 2},
+            {"estudiante_id": "E1", "estudiante": "Zambrano Ana", "numero_lista": 1},
+        ]
+        view = AcademicSummaryView(_FakeAcademicSummaryService(rows=rows))
+
+        view.load_summary()
+
+        self.assertEqual(
+            [view.table.item(row, 1).text() for row in range(view.table.rowCount())],
+            ["alvarez Beatriz", "Álvarez Luis", "Zambrano Ana"],
+        )
+
     def test_vista_previa_usa_servicio_generar_html(self) -> None:
         from src.presentation.views.academic_summary_view import AcademicSummaryView
 

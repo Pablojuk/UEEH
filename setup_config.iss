@@ -8,7 +8,7 @@
 ; El instalador resultante quedará en la carpeta "output\" en la raíz del repositorio.
 
 #define AppName "Sistema Académico UEEH"
-#define AppVersion "1.0.0"
+#define AppVersion "4.0.1"
 #define AppPublisher "Econ. Pablo Hernan Juca Farfan"
 #define AppExeName "UEEH.exe"
 
@@ -24,7 +24,7 @@ DisableProgramGroupPage=yes
 
 ; Configuración de salida del instalador
 OutputDir=output
-OutputBaseFilename=Instalador_UEEH_v1.0.0
+OutputBaseFilename=Instalador_UEEH_v4.0.1
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

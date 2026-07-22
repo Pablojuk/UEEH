@@ -56,6 +56,49 @@ class TestClassroomAccompanimentService(unittest.TestCase):
         self.assertEqual(len(payload["students"]), 1)
         self.assertTrue(len(payload["active_skills"]) > 0)
 
+    def test_carga_alfabetica_conserva_respuestas_por_estudiante(self) -> None:
+        with self.conn:
+            self.conn.execute(
+                "UPDATE estudiantes SET codigo = ?, apellidos = ?, nombres = ? WHERE id_estudiante = ?",
+                ("EST-1", "Zambrano", "Ana", "E1"),
+            )
+            self.conn.executemany(
+                "INSERT INTO estudiantes (id_estudiante, codigo, apellidos, nombres) VALUES (?, ?, ?, ?)",
+                [
+                    ("E2", "EST-2", "Álvarez", "Luis"),
+                    ("E3", "EST-3", "alvarez", "Beatriz"),
+                ],
+            )
+            self.conn.executemany(
+                "INSERT INTO matriculas "
+                "(id_matricula, estudiante_id, curso_id, paralelo_id, periodo_id, numero_lista) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    ("M2", "E2", "C1", "P1", "2025-2026", 2),
+                    ("M3", "E3", "C1", "P1", "2025-2026", 3),
+                ],
+            )
+
+        ok, _ = self.service.guardar_evaluacion(
+            "AS1",
+            1,
+            ["autoconocimiento"],
+            {
+                "E1": {"autoconocimiento": "Nunca"},
+                "E2": {"autoconocimiento": "Frecuentemente"},
+                "E3": {"autoconocimiento": "Siempre"},
+            },
+        )
+        self.assertTrue(ok)
+
+        payload = self.service.cargar_evaluacion("AS1", 1)
+
+        self.assertEqual([row["student_id"] for row in payload["students"]], ["E3", "E2", "E1"])
+        self.assertEqual(payload["responses"]["E3"]["autoconocimiento"], "Siempre")
+        self.assertEqual(payload["responses"]["E2"]["autoconocimiento"], "Frecuentemente")
+        self.assertEqual(payload["responses"]["E1"]["autoconocimiento"], "Nunca")
+        self.assertEqual(len({row["student_id"] for row in payload["students"]}), 3)
+
     def test_cargar_2do_egb_en_comportamiento_y_acompanamiento(self) -> None:
         with self.conn:
             self.conn.execute("INSERT INTO cursos (id_curso, nombre, nivel) VALUES (?,?,?)", ("C2", "2do EGB", "EGB"))

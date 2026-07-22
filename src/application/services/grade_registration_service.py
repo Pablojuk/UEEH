@@ -8,7 +8,7 @@ import uuid
 import unicodedata
 from typing import Any
 
-from src.application.services.enrollment_service import load_students_for_assignment
+from src.application.services.enrollment_service import load_students_for_assignment, student_alphabetical_key
 from src.domain.calculations import (
     calcular_cualitativo_trimestral,
     calcular_escala_cualitativa,
@@ -146,19 +146,35 @@ class GradeRegistrationService:
             self.activity_config_repo.crear({"id_config": str(uuid.uuid4()), **payload})
         return True, "Configuración de actividades guardada"
 
-    def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict[str, Any]]:
-        rows, _validation_message = self.cargar_registro_con_estado(asignacion_id, trimestre_num)
+    def cargar_registro(
+        self,
+        asignacion_id: str,
+        trimestre_num: int,
+        *,
+        alphabetical: bool = False,
+    ) -> list[dict[str, Any]]:
+        rows, _validation_message = self.cargar_registro_con_estado(
+            asignacion_id,
+            trimestre_num,
+            alphabetical=alphabetical,
+        )
         return rows
 
     def cargar_registro_con_estado(
         self,
         asignacion_id: str,
         trimestre_num: int,
+        *,
+        alphabetical: bool = False,
     ) -> tuple[list[dict[str, Any]], str]:
         if trimestre_num not in (1, 2, 3):
             raise ValueError("El trimestre debe ser 1, 2 o 3")
 
-        enrollment_match = load_students_for_assignment(self.connection, asignacion_id)
+        enrollment_match = load_students_for_assignment(
+            self.connection,
+            asignacion_id,
+            alphabetical=alphabetical,
+        )
         if enrollment_match.context is None:
             return [], ""
 
@@ -303,6 +319,7 @@ class GradeRegistrationService:
                 e.valor_promedio,
                 e.cualitativo,
                 e.cualitativo_1,
+                s.codigo,
                 s.apellidos,
                 s.nombres,
                 m.numero_lista
@@ -322,6 +339,7 @@ class GradeRegistrationService:
             """,
             params,
         ).fetchall()
+        rows = sorted((dict(row) for row in rows), key=student_alphabetical_key)
         out: list[dict[str, Any]] = []
         for row in rows:
             out.append(
@@ -389,6 +407,7 @@ class GradeRegistrationService:
                 e.respuestas_json,
                 e.puntaje_total,
                 e.calificacion,
+                s.codigo,
                 s.apellidos,
                 s.nombres,
                 m.numero_lista
@@ -408,6 +427,7 @@ class GradeRegistrationService:
             """,
             (asignacion_id, trimestre_num),
         ).fetchall()
+        rows = sorted((dict(row) for row in rows), key=student_alphabetical_key)
         out: list[dict[str, Any]] = []
         for row in rows:
             out.append(

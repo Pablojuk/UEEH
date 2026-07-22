@@ -147,7 +147,11 @@ class ClassroomAccompanimentService:
         if trimestre_num not in (1, 2, 3):
             raise ValueError("El trimestre debe ser 1, 2 o 3")
 
-        enrollment_match = load_students_for_assignment(self.connection, asignacion_id)
+        enrollment_match = load_students_for_assignment(
+            self.connection,
+            asignacion_id,
+            alphabetical=True,
+        )
         if enrollment_match.context is None:
             return {
                 "students": [],

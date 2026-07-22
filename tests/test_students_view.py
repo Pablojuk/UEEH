@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -39,6 +40,25 @@ class TestStudentsView(unittest.TestCase):
         self.assertEqual(view.table.rowCount(), 0)
         self.assertIsNotNone(view.search_input)
         self.assertIsNotNone(view.import_button)
+
+    def test_creacion_manual_y_edicion_conservan_nombres_y_apellidos(self) -> None:
+        from src.presentation.views.students_view import StudentsView
+
+        view = StudentsView(self.student_service, self.import_service)
+        view.names_input.setText("Ana María")
+        view.lastnames_input.setText("Pérez López")
+        view.identification_input.setText("SINTETICA-UI-001")
+
+        with patch("src.presentation.views.students_view.QMessageBox.information"):
+            view.save_student()
+
+        created = self.student_service.listar_estudiantes()[0]
+        self.assertEqual(created["nombres"], "Ana María")
+        self.assertEqual(created["apellidos"], "Pérez López")
+
+        view.select_student(0, 0)
+        self.assertEqual(view.names_input.text(), "Ana María")
+        self.assertEqual(view.lastnames_input.text(), "Pérez López")
 
     def test_tabla_ordena_codigos_naturalmente_tambien_en_busqueda(self) -> None:
         from PySide6.QtWidgets import QHeaderView

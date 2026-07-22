@@ -28,6 +28,28 @@ class TestStudentService(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(len(self.service.listar_estudiantes()), 1)
 
+    def test_creacion_manual_conserva_nombres_y_apellidos_por_separado(self) -> None:
+        ok, _ = self.service.crear_estudiante(
+            {
+                "nombres": "Ana María",
+                "apellidos": "Pérez López",
+                "identificacion": "SINTETICA-001",
+            }
+        )
+        self.assertTrue(ok)
+
+        created = self.service.listar_estudiantes()[0]
+        recovered = self.service.obtener_estudiante_por_id(created["id_estudiante"])
+        raw_row = self.connection.execute(
+            "SELECT nombres, apellidos FROM estudiantes WHERE id_estudiante = ?",
+            (created["id_estudiante"],),
+        ).fetchone()
+
+        self.assertEqual(recovered["nombres"], "Ana María")
+        self.assertEqual(recovered["apellidos"], "Pérez López")
+        self.assertEqual(raw_row["nombres"], "Ana María")
+        self.assertEqual(raw_row["apellidos"], "Pérez López")
+
     def test_buscar_estudiante(self) -> None:
         self.service.crear_estudiante({"nombres": "Luis", "apellidos": "García", "identificacion": "999"})
         found = self.service.buscar_estudiantes("luis")

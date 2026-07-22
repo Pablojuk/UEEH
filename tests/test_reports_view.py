@@ -106,9 +106,13 @@ class _FakeGradeRegistrationService:
     def __init__(self) -> None:
         self.calls: list[tuple[str, int, str | None]] = []
         self.orientation_calls: list[tuple[str, int]] = []
+        self.fallback_alphabetical: list[bool] = []
+        self.return_saved_rows = True
 
     def obtener_animacion_lectura_evaluacion(self, asignacion_id: str, trimestre_num: int, nivel: str | None = None) -> list[dict]:
         self.calls.append((asignacion_id, trimestre_num, nivel))
+        if not self.return_saved_rows:
+            return []
         return [
             {
                 "estudiante_id": "E1",
@@ -120,7 +124,14 @@ class _FakeGradeRegistrationService:
             }
         ]
 
-    def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
+    def cargar_registro(
+        self,
+        asignacion_id: str,
+        trimestre_num: int,
+        *,
+        alphabetical: bool = False,
+    ) -> list[dict]:
+        self.fallback_alphabetical.append(alphabetical)
         return [
             {
                 "estudiante_id": "E1",
@@ -133,6 +144,8 @@ class _FakeGradeRegistrationService:
 
     def obtener_orientacion_vocacional_evaluacion(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
         self.orientation_calls.append((asignacion_id, trimestre_num))
+        if not self.return_saved_rows:
+            return []
         return [
             {
                 "estudiante_id": "E1",
@@ -257,6 +270,15 @@ class TestReportsView(unittest.TestCase):
         self.assertIn("ORIENTACIÓN VOCACIONAL Y PROFESIONAL - TRIMESTRE 1", html)
         self.assertIn("Nómina de Estudiantes", html)
         self.assertNotIn("T1 Calificación", html)
+
+    def test_fallback_de_reportes_solicita_orden_alfabetico(self) -> None:
+        view, grade_service = self._build_view()
+        grade_service.return_saved_rows = False
+
+        view._load_animation_students("AS2", 1)
+        view._load_orientation_students("AS4", 1)
+
+        self.assertEqual(grade_service.fallback_alphabetical[-2:], [True, True])
 
 
 if __name__ == "__main__":

@@ -924,8 +924,12 @@ class GradesView(QWidget):
     ) -> tuple[list[dict], str]:
         load_with_status = getattr(self.grade_registration_service, "cargar_registro_con_estado", None)
         if callable(load_with_status):
-            return load_with_status(assignment_id, trimester_num)
-        return self.grade_registration_service.cargar_registro(assignment_id, trimester_num), ""
+            return load_with_status(assignment_id, trimester_num, alphabetical=True)
+        return self.grade_registration_service.cargar_registro(
+            assignment_id,
+            trimester_num,
+            alphabetical=True,
+        ), ""
 
     def _save_vocational_orientation_payload(self, payload: dict) -> tuple[bool, str]:
         ok, message = self.grade_registration_service.guardar_orientacion_vocacional_evaluacion(payload)

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 from src.application.services.catalog_service import CatalogService
-from src.application.services.enrollment_service import EnrollmentService
+from src.application.services.enrollment_service import EnrollmentService, student_alphabetical_key
 from src.application.services.student_service import StudentService
 from src.infrastructure.persistence.db import initialize_database
 
@@ -70,6 +70,17 @@ class TestEnrollmentService(unittest.TestCase):
         })
         rows = self.enrollment_service.listar_por_grupo("CUR-007", "PAR-001", "2025-2026")
         self.assertEqual(len(rows), 1)
+
+    def test_clave_alfabetica_desempata_por_codigo_e_identificador(self) -> None:
+        rows = [
+            {"id_estudiante": "E3", "codigo": "EST-2", "apellidos": "Álvarez", "nombres": "Ana"},
+            {"id_estudiante": "E2", "codigo": "EST-1", "apellidos": "alvarez", "nombres": "Ana"},
+            {"id_estudiante": "E1", "codigo": "EST-1", "apellidos": "ALVAREZ", "nombres": "Ana"},
+        ]
+
+        ordered = sorted(rows, key=student_alphabetical_key)
+
+        self.assertEqual([row["id_estudiante"] for row in ordered], ["E1", "E2", "E3"])
 
     def test_eliminar_matricula(self) -> None:
         self.enrollment_service.crear_matricula({

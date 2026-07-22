@@ -24,7 +24,13 @@ class _FakeGradeRegistrationService:
     def listar_contextos_disponibles(self) -> list[dict]:
         return list(self.contexts)
 
-    def cargar_registro(self, asignacion_id: str, trimestre_num: int) -> list[dict]:
+    def cargar_registro(
+        self,
+        asignacion_id: str,
+        trimestre_num: int,
+        *,
+        alphabetical: bool = False,
+    ) -> list[dict]:
         return list(self.rows)
 
     def obtener_numero_actividades(self, asignacion_id: str, trimestre_num: int) -> int:

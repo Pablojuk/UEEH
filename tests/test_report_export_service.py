@@ -35,9 +35,11 @@ class _FailingExporter:
 class _FakeHtmlRenderer:
     def __init__(self) -> None:
         self.calls = 0
+        self.last_rows: list[dict] = []
 
     def render(self, context: dict, rows: list[dict]) -> str:
         self.calls += 1
+        self.last_rows = [dict(row) for row in rows]
         return f"<html>{context.get('report_type')}:{len(rows)}</html>"
 
 
@@ -201,6 +203,53 @@ class TestReportExportService(unittest.TestCase):
         context, _ = service._prepare_report_context("AS1", "trimestral", 2, None)
         self.assertTrue(context["is_simplified_trimestral"])
         self.assertFalse(context["is_simplified_anual"])
+
+    def test_reporte_generado_conserva_orden_alfabetico_y_notas(self) -> None:
+        with self.conn:
+            self.conn.execute(
+                "UPDATE estudiantes SET codigo = ?, apellidos = ?, nombres = ? WHERE id_estudiante = ?",
+                ("EST-1", "Zambrano", "Ana", "E1"),
+            )
+            self.conn.executemany(
+                "INSERT INTO estudiantes (id_estudiante, codigo, apellidos, nombres) VALUES (?, ?, ?, ?)",
+                [
+                    ("E2", "EST-2", "Álvarez", "Luis"),
+                    ("E3", "EST-3", "alvarez", "Beatriz"),
+                ],
+            )
+            self.conn.executemany(
+                "INSERT INTO matriculas "
+                "(id_matricula, estudiante_id, curso_id, paralelo_id, periodo_id, numero_lista) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    ("M2", "E2", "C1", "P1", "2025-2026", 2),
+                    ("M3", "E3", "C1", "P1", "2025-2026", 3),
+                ],
+            )
+            self.conn.executemany(
+                "INSERT INTO grade_records "
+                "(id_registro, estudiante_id, asignacion_id, trimestre_num, "
+                "promedio_formativo, promedio_sumativo, nota_trimestral) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [
+                    ("G2", "E2", "AS1", 1, 9, 9, 9),
+                    ("G3", "E3", "AS1", 1, 10, 10, 10),
+                ],
+            )
+
+        renderer = _FakeHtmlRenderer()
+        service = ReportExportService(
+            connection=self.conn,
+            academic_summary_service=self.academic_summary_service,
+            institution_service=self.institution_service,
+            html_renderer=renderer,
+        )
+
+        html = service.generar_resumen_html("AS1", report_type="trimestral", trimestre_num=1)
+
+        self.assertIn("trimestral:3", html)
+        self.assertEqual([row["id_estudiante"] for row in renderer.last_rows], ["E3", "E2", "E1"])
+        self.assertEqual([row["promedio_final"] for row in renderer.last_rows], [10, 9, 8])
 
 
 

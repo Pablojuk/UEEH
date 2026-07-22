@@ -707,7 +707,7 @@ class ClassroomAccompanimentView(QWidget):
 
     def _construir_estudiantes_trimestrales(self, datos_trimestre: list[dict[str, str]], *, is_behavior: bool = False) -> list[dict[str, str]]:
         estudiantes = []
-        for item in sorted(datos_trimestre, key=lambda x: str(x.get("nombre", "")).strip().lower()):
+        for item in datos_trimestre:
             cual = str(item.get("valoracion_final", "")).strip()
             estudiantes.append(
                 {

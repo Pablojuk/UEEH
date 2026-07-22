@@ -15,8 +15,9 @@ except ImportError:  # pragma: no cover
 
 
 class _FakeAccompanimentService:
-    def __init__(self) -> None:
+    def __init__(self, students: list[dict] | None = None) -> None:
         self.load_calls = 0
+        self.students = students or [{"student_id": "E1", "code": "001", "name": "López María"}]
 
     def listar_contextos_disponibles(self) -> list[dict]:
         return [{"id_asignacion": "AS1", "display": "Demo"}]
@@ -24,7 +25,7 @@ class _FakeAccompanimentService:
     def cargar_evaluacion(self, asignacion_id: str, trimestre_num: int) -> dict:
         self.load_calls += 1
         return {
-            "students": [{"student_id": "E1", "code": "001", "name": "López María"}],
+            "students": list(self.students),
             "skill_categories": [
                 {
                     "category": "HABILIDADES COGNITIVAS",
@@ -43,7 +44,12 @@ class _FakeAccompanimentService:
     def guardar_evaluacion(self, asignacion_id: str, trimestre_num: int, active_skills: list[str], responses: dict) -> tuple[bool, str]:
         return True, "ok"
 
-    def calcular_resultado_estudiante(self, skill_values: dict[str, str], active_skills: list[str]) -> dict:
+    def calcular_resultado_estudiante(
+        self,
+        skill_values: dict[str, str],
+        active_skills: list[str],
+        variant: str = "accompaniment",
+    ) -> dict:
         return {
             "total_siempre": 1,
             "total_frecuentemente": 0,
@@ -84,6 +90,35 @@ class TestClassroomAccompanimentView(unittest.TestCase):
         before = service.load_calls
         view.trimester_combo.setCurrentIndex(1)
         self.assertGreater(service.load_calls, before)
+
+    def test_tabla_y_reporte_conservan_orden_alfabetico_del_servicio(self) -> None:
+        from src.presentation.views.classroom_accompaniment_view import ClassroomAccompanimentView
+
+        service = _FakeAccompanimentService(
+            students=[
+                {"student_id": "E3", "code": "EST-3", "name": "alvarez Beatriz"},
+                {"student_id": "E2", "code": "EST-2", "name": "Álvarez Luis"},
+                {"student_id": "E1", "code": "EST-1", "name": "Zambrano Ana"},
+            ]
+        )
+        view = ClassroomAccompanimentView(service)
+        view.load_rows()
+
+        self.assertEqual(
+            [view.table.item(row, 1).text() for row in range(view.table.rowCount())],
+            ["alvarez Beatriz", "Álvarez Luis", "Zambrano Ana"],
+        )
+        preview_rows = view._construir_estudiantes_trimestrales(
+            [
+                {"nombre": "alvarez Beatriz", "valoracion_final": ""},
+                {"nombre": "Álvarez Luis", "valoracion_final": ""},
+                {"nombre": "Zambrano Ana", "valoracion_final": ""},
+            ]
+        )
+        self.assertEqual(
+            [row["nombre"] for row in preview_rows],
+            ["alvarez Beatriz", "Álvarez Luis", "Zambrano Ana"],
+        )
 
     def test_configurar_habilidades_muestra_dialogo_con_cursor_normal(self) -> None:
         from PySide6.QtWidgets import QDialog

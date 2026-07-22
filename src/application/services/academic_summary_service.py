@@ -7,6 +7,7 @@ import uuid
 import unicodedata
 from typing import Any
 
+from src.application.services.enrollment_service import student_alphabetical_key
 from src.domain.calculations import (
     calcular_cualitativo,
     calcular_cualitativo_trimestral,
@@ -107,6 +108,9 @@ class AcademicSummaryService:
             """
             SELECT
                 e.id_estudiante,
+                e.codigo,
+                e.apellidos,
+                e.nombres,
                 e.apellidos || ' ' || e.nombres AS estudiante,
                 m.numero_lista,
                 g.promedio_formativo AS aportes_calificacion,
@@ -128,10 +132,14 @@ class AcademicSummaryService:
             """,
             (asignacion_id, trimestre_num, asignacion["curso_id"], asignacion["paralelo_id"], asignacion["periodo_id"]),
         ).fetchall()
+        rows = sorted((dict(row) for row in rows), key=student_alphabetical_key)
 
         resultado: list[dict[str, Any]] = []
         for row in rows:
             item = dict(row)
+            item.pop("codigo", None)
+            item.pop("apellidos", None)
+            item.pop("nombres", None)
             aportes = item.get("aportes_calificacion")
             sumativas = item.get("sumativas_calificacion")
             aportes_70 = round((aportes or 0) * 0.70, 2) if aportes is not None else None
@@ -184,6 +192,7 @@ class AcademicSummaryService:
             """,
             (asignacion["curso_id"], asignacion["paralelo_id"], asignacion["periodo_id"]),
         ).fetchall()
+        estudiantes = sorted((dict(row) for row in estudiantes), key=student_alphabetical_key)
 
         if not estudiantes:
             return []
